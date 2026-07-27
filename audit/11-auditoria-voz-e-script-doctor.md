@@ -145,3 +145,28 @@ com a transcrição mockada, então só falta a chamada HTTP ao provedor.
 4. Forçar erro (chave ElevenLabs inválida) → job falha **e** `ls` na pasta de trabalho não deixa `*_tts.wav` órfão.
 5. Dublar link do TikTok → transcrição, tradução, mix e MP4 final; pasta de trabalho limpa depois.
 6. Cancelar um job de dublagem no meio → sem processo FFmpeg zumbi e sem WAV órfão.
+
+---
+
+## 12 — Dublagem multi-idioma (qualquer idioma de entrada → idioma escolhido)
+
+Falhas encontradas e corrigidas:
+
+| Problema | Impacto real | Correção |
+| --- | --- | --- |
+| A dublagem sempre usava a `base_voice` da persona (pt-BR). Ao escolher inglês, uma voz brasileira lia texto em inglês. | Sotaque quebrado, áudio inutilizável fora do pt-BR. | `edge_tts.voice_for_language()` + `dubbing.resolve_voice()`: escolhe locutor **nativo do idioma alvo mantendo o gênero** da persona. Se a persona já fala o idioma, ela é preservada. |
+| Sem chave de LLM, `translate()` logava "tradução indisponível" e seguia com o texto original. | Entregava vídeo "dublado em inglês" falando espanhol. | Agora levanta `DubbingError` com instrução direta; falha parcial mantém só o bloco afetado. |
+| `detected.startswith(target)` — Whisper devolve `portuguese`, não `pt`. | pt→pt era retraduzido à toa (custo + risco). | `dubbing.normalize_language()` / `same_language()` com aliases por código, nome inglês e nome PT. |
+| Catálogo de idiomas com 7 entradas e Edge TTS filtrado em `pt/en/es`. | Sem japonês, coreano, chinês, russo, árabe, híndi, turco, indonésio. | 15 idiomas e 14 prefixos de locale liberados. |
+| Erro de transcrição deixava o arquivo de origem no disco. | Lixo acumulando no aaPanel. | `_sweep(src)` nos dois caminhos de falha do `_work_dub`. |
+
+Testes reais executados neste ambiente (Flask + FFmpeg + Edge TTS):
+
+- Trocar timbre (Voice Forge): `done`, MP3 entregue.
+- Trocar timbre (motor local): `done`, WAV entregue.
+- Texto → narração: `done`, artefato persistido.
+- Criar voz (prévia da persona): áudio gerado.
+- Dublagem EN: trilha de 6,000 s para vídeo de 6,0 s, voz `en-US-GuyNeural`.
+- Dublagem JA: trilha de 4,000 s, voz `ja-JP-NanamiNeural` (gênero preservado).
+- Dublagem sem chave de transcrição: HTTP 400 com mensagem clara.
+- Zero arquivos temporários órfãos após a bateria.
