@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 
-import { DiscoveryCard } from "@/components/DiscoveryPanel";
+import type { DiscoveryCard } from "@/components/DiscoveryPanel";
 import { Field, FileDrop, SelectInput, SubmitButton, TextInput } from "@/components/form";
 import { LinkInspector, type InspectedCard } from "@/components/LinkInspector";
 import { MutationSelect } from "@/components/MutationSelect";
