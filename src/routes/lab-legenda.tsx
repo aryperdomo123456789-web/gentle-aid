@@ -5,6 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { TopNav } from "@/components/TopNav";
 import {
   ANIMATIONS,
+  beatsFromBpm,
+  previewStyle,
+  snapLinesToBeats,
   ASPECTS,
   DEMO_SRT,
   PRESETS,
@@ -56,16 +59,30 @@ function CaptionLabPage() {
   const [fontScale, setFontScale] = useState(1);
   const [wordsPerLine, setWordsPerLine] = useState<number | null>(null);
   const [uppercase, setUppercase] = useState<boolean | null>(null);
+  const [beatSync, setBeatSync] = useState(false);
+  const [bpm, setBpm] = useState(120);
   const [playing, setPlaying] = useState(true);
   const [time, setTime] = useState(0);
 
   const preset = resolvePreset(presetId);
   const maxWords = clampWordsPerLine(wordsPerLine ?? preset.wordsPerLine);
 
-  const lines = useMemo(() => {
+  const rawLines = useMemo(() => {
     if (source === "srt") return linesFromSrt(srt, maxWords);
     return linesFromWords(wordsFromPlainText(plain, plainDuration), maxWords);
   }, [source, srt, plain, plainDuration, maxWords]);
+
+  // Grade de batidas: no aaPanel o BPM vem do áudio real (services/beatsync.py);
+  // aqui o BPM é informado à mão para simular o mesmo encaixe.
+  const beats = useMemo(() => {
+    const end = rawLines.length ? rawLines[rawLines.length - 1].end + 2 : 0;
+    return beatSync ? beatsFromBpm(bpm, end) : [];
+  }, [beatSync, bpm, rawLines]);
+
+  const lines = useMemo(
+    () => (beats.length ? snapLinesToBeats(rawLines, beats) : rawLines),
+    [rawLines, beats],
+  );
 
   const dim = ASPECTS[aspect];
   const result = useMemo(
@@ -202,6 +219,29 @@ function CaptionLabPage() {
                     ))}
                   </select>
                 </Field>
+                <Field label="Ritmo da música (beat sync)">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={beatSync}
+                        onChange={(e) => setBeatSync(e.target.checked)}
+                        className="size-4 accent-primary"
+                      />
+                      Encaixar na batida
+                    </label>
+                    <input
+                      type="number"
+                      min={40}
+                      max={200}
+                      value={bpm}
+                      disabled={!beatSync}
+                      onChange={(e) => setBpm(Math.max(40, Math.min(200, Number(e.target.value) || 120)))}
+                      className={`${selectCls} w-24 disabled:opacity-40`}
+                    />
+                    <span className="text-xs text-muted-foreground">BPM</span>
+                  </div>
+                </Field>
                 <Field label="Formato">
                   <select
                     value={aspect}
@@ -333,8 +373,8 @@ function CaptionLabPage() {
                             style={{
                               color: i === current.activeIndex ? result.style.accentCss : undefined,
                               display: "inline-block",
-                              transform: i === current.activeIndex && result.style.animation === "pop" ? "scale(1.12)" : undefined,
-                              transition: "transform 110ms ease-out",
+                              ...(i === current.activeIndex ? previewStyle(result.style.animation, i) : {}),
+                              transition: "transform 120ms ease-out, filter 120ms ease-out",
                               marginRight: "0.28em",
                             }}
                           >
