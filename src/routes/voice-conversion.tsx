@@ -8,19 +8,26 @@ import { StatusPanel } from "@/components/StatusPanel";
 import { ToolHistory } from "@/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
 import { VoiceForgePanel, type Persona } from "@/components/VoiceForgePanel";
+import {
+  VoicePicker,
+  TEST_SCRIPT,
+  type LocalVoice,
+  type RealisticVoice,
+  type VoiceSelection,
+} from "@/components/VoicePicker";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { apiGet, apiPostForm, type Job } from "@/lib/api";
 
-type RealisticVoice = { id: string; name: string; labels?: string; preview_url?: string };
 type Catalog = {
   engine_ready: boolean;
   forge_ready: boolean;
   realistic_voices: RealisticVoice[];
+  local_voices?: LocalVoice[];
   personas: Persona[];
   max_tts_chars: number;
+  test_script?: string;
 };
 
-type Engine = "elevenlabs" | "local" | "forge";
 type Mode = "media" | "text" | "forge";
 
 
@@ -51,8 +58,18 @@ function VoiceStudio() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [hasFile, setHasFile] = useState(false);
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
-  const [engine, setEngine] = useState<Engine>("elevenlabs");
-  const [ttsEngine, setTtsEngine] = useState<Engine>("elevenlabs");
+  const [mediaVoice, setMediaVoice] = useState<VoiceSelection>({
+    engine: "elevenlabs",
+    voiceId: "",
+    personaId: "",
+    targetVoice: "masc_grave",
+  });
+  const [ttsVoice, setTtsVoice] = useState<VoiceSelection>({
+    engine: "elevenlabs",
+    voiceId: "",
+    personaId: "",
+    targetVoice: "masc_grave",
+  });
   const [personas, setPersonas] = useState<Persona[]>([]);
   const mediaForm = useRef<HTMLFormElement>(null);
 
@@ -63,11 +80,21 @@ function VoiceStudio() {
         if (!alive) return;
         setCatalog(data);
         setPersonas(data.personas ?? []);
-        if (!data.engine_ready) {
-          const fallback: Engine = (data.personas ?? []).length > 0 ? "forge" : "local";
-          setEngine(fallback);
-          setTtsEngine("forge");
-        }
+        const firstVoice = data.realistic_voices?.[0]?.id ?? "";
+        const firstPersona = data.personas?.[0]?.id ?? "";
+        const hasPersona = (data.personas ?? []).length > 0;
+        setMediaVoice((prev) => ({
+          ...prev,
+          engine: data.engine_ready ? "elevenlabs" : hasPersona ? "forge" : "local",
+          voiceId: prev.voiceId || firstVoice,
+          personaId: prev.personaId || firstPersona,
+        }));
+        setTtsVoice((prev) => ({
+          ...prev,
+          engine: data.engine_ready ? "elevenlabs" : "forge",
+          voiceId: prev.voiceId || firstVoice,
+          personaId: prev.personaId || firstPersona,
+        }));
       })
       .catch(() => setCatalog(null));
     return () => {
@@ -78,6 +105,7 @@ function VoiceStudio() {
   const voices = catalog?.realistic_voices ?? [];
   const ready = catalog?.engine_ready ?? false;
   const forgeReady = (catalog?.forge_ready ?? false) && personas.length > 0;
+  const testScript = catalog?.test_script || TEST_SCRIPT;
 
   function processCard(card: DiscoveryCard) {
     const form = mediaForm.current ? new FormData(mediaForm.current) : new FormData();
@@ -95,27 +123,33 @@ function VoiceStudio() {
     };
   }
 
-  const voiceSelect = (id: string) => (
-    <SelectInput id={id} name="voice_id" disabled={!ready}>
-      {voices.map((v) => (
-        <option key={v.id} value={v.id}>
-          {v.name}
-          {v.labels ? ` — ${v.labels}` : ""}
-        </option>
-      ))}
-    </SelectInput>
+  const mediaPicker = (
+    <VoicePicker
+      value={mediaVoice}
+      onChange={setMediaVoice}
+      realisticVoices={voices}
+      personas={personas}
+      localVoices={catalog?.local_voices}
+      elevenReady={ready}
+      forgeReady={forgeReady}
+      allowLocal
+      testScript={testScript}
+    />
   );
 
-  const personaSelect = (id: string) => (
-    <SelectInput id={id} name="persona_id" disabled={personas.length === 0}>
-      {personas.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name}
-        </option>
-      ))}
-      {personas.length === 0 ? <option value="">Crie uma voz na aba “Criar voz”</option> : null}
-    </SelectInput>
+  const ttsPicker = (
+    <VoicePicker
+      value={ttsVoice}
+      onChange={setTtsVoice}
+      realisticVoices={voices}
+      personas={personas}
+      elevenReady={ready}
+      forgeReady={forgeReady}
+      allowLocal={false}
+      testScript={testScript}
+    />
   );
+
 
 
   return (
@@ -173,50 +207,8 @@ function VoiceStudio() {
                 )}
               </Field>
 
-              <Field label="Motor de voz">
-                {(id) => (
-                  <SelectInput
-                    id={id}
-                    name="engine"
-                    value={engine}
-                    onChange={(e) => setEngine(e.target.value as Engine)}
-                  >
-                    <option value="elevenlabs" disabled={!ready}>
-                      ElevenLabs — voz realista (speech-to-speech)
-                    </option>
-                    <option value="forge" disabled={!forgeReady}>
-                      Voice Forge — sua voz própria (sem custo)
-                    </option>
-                    <option value="local">Local FFmpeg — troca de timbre (sem custo)</option>
-                  </SelectInput>
-                )}
-              </Field>
+              {mediaPicker}
 
-              {engine === "elevenlabs" ? (
-                <Field label="Voz do novo narrador" hint="A narrativa, a entonação e as pausas do original são preservadas.">
-                  {voiceSelect}
-                </Field>
-              ) : engine === "forge" ? (
-                <Field
-                  label="Voz própria"
-                  hint="A fala original é reescrita com a assinatura acústica da sua voz — narrativa, ritmo e sincronia intactos."
-                >
-                  {personaSelect}
-                </Field>
-              ) : (
-                <Field label="Timbre alvo">
-                  {(id) => (
-                    <SelectInput id={id} name="target_voice" defaultValue="masc_grave">
-                      <option value="masc_grave">Masculino grave</option>
-                      <option value="masc_jovem">Masculino jovem</option>
-                      <option value="fem_suave">Feminino suave</option>
-                      <option value="fem_energetica">Feminino energética</option>
-                      <option value="narrador">Narrador documentário</option>
-
-                    </SelectInput>
-                  )}
-                </Field>
-              )}
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field label="Saída quando for vídeo">
@@ -273,31 +265,8 @@ function VoiceStudio() {
                 )}
               </Field>
 
-              <Field label="Motor da narração">
-                {(id) => (
-                  <SelectInput
-                    id={id}
-                    name="engine"
-                    value={ttsEngine}
-                    onChange={(e) => setTtsEngine(e.target.value as Engine)}
-                  >
-                    <option value="elevenlabs" disabled={!ready}>
-                      ElevenLabs — voz realista
-                    </option>
-                    <option value="forge" disabled={!forgeReady}>
-                      Voice Forge — sua voz própria (sem custo)
-                    </option>
-                  </SelectInput>
-                )}
-              </Field>
+              {ttsPicker}
 
-              {ttsEngine === "forge" ? (
-                <Field label="Voz própria" hint="Narração gerada no motor gratuito com a sua assinatura acústica.">
-                  {personaSelect}
-                </Field>
-              ) : (
-                <Field label="Voz da narração">{voiceSelect}</Field>
-              )}
 
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -333,7 +302,7 @@ function VoiceStudio() {
 
               <MutationSelect defaultValue="auto" label="Esterilização" hint="Áudio final sem rastro de origem." />
 
-              <SubmitButton busy={busy} disabled={!ready}>
+              <SubmitButton busy={busy} disabled={ttsVoice.engine === "elevenlabs" ? !ready : !forgeReady}>
                 {busy ? "Narrando…" : "Gerar narração"}
               </SubmitButton>
             </form>

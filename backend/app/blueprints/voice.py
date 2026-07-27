@@ -52,11 +52,31 @@ TIMINGS = ("strict", "natural")
 ENGINES = ("elevenlabs", "forge", "local")
 SAMPLE_RATE = 48000
 MEDIA_EXT = AUDIO_EXT | VIDEO_EXT
-MAX_TTS_CHARS = 40000
+MAX_TTS_CHARS = 500000
 PREVIEW_TEXT = (
     "Essa é a minha voz. Um timbre exclusivo, construído do zero para este canal, "
     "pronto para narrar qualquer conteúdo."
 )
+
+# Roteiro de teste pronto: longo o bastante para revelar respiração, ritmo,
+# graves, agudos, números, siglas e pontuação forte em uma única escuta.
+TEST_SCRIPT = (
+    "Testando a voz deste canal, do começo ao fim, sem cortes.\n\n"
+    "Presta atenção no que vou te contar agora, porque isso muda completamente a forma "
+    "como você enxerga o próximo vídeo que aparecer na sua tela. Em dois mil e vinte e "
+    "quatro, mais de setenta por cento do conteúdo que viralizou não tinha nada de "
+    "especial na imagem: o que segurava a pessoa era a voz. O tom, a pausa, a respiração "
+    "no lugar certo.\n\n"
+    "Repara na diferença: uma frase curta prende. Uma frase longa, bem construída, com "
+    "vírgulas no lugar certo, conduz a pessoa por dentro da história até ela esquecer que "
+    "está assistindo a um vídeo de trinta segundos.\n\n"
+    "E tem os detalhes técnicos: números como 3, 17, 250 mil e 1,8 milhão; siglas como "
+    "IA, CPU, TikTok e YouTube; perguntas — você faria isso? — e exclamações. Tudo isso "
+    "precisa sair limpo, natural, sem parecer robô.\n\n"
+    "Se você chegou até aqui e a voz continuou agradável, sem chiado e sem cansar o "
+    "ouvido, é essa a voz do canal. Salva ela e vamos pro próximo."
+)
+
 
 
 
@@ -93,7 +113,90 @@ def catalog():
         timings=list(TIMINGS),
         levels=list(LEVELS),
         max_tts_chars=MAX_TTS_CHARS,
+        test_script=TEST_SCRIPT,
+        local_voices=[
+            {"id": "masc_grave", "name": "Masculino grave"},
+            {"id": "masc_jovem", "name": "Masculino jovem"},
+            {"id": "fem_suave", "name": "Feminino suave"},
+            {"id": "fem_energetica", "name": "Feminino energética"},
+            {"id": "narrador", "name": "Narrador documentário"},
+        ],
     )
+
+
+@bp.post("/preview")
+def preview():
+    """Escuta rápida de qualquer voz do catálogo (ElevenLabs, Forge ou timbre local)."""
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    payload = dict(payload) if isinstance(payload, dict) else {}
+    engine = str(payload.get("engine") or "forge").lower()
+    if engine not in ENGINES:
+        return jsonify(error="Motor de voz inválido."), 400
+
+    text = str(payload.get("text") or TEST_SCRIPT).strip()[:1200]
+    if len(text) < 2:
+        return jsonify(error="Escreva um texto de teste."), 400
+
+    job_id = f"preview-{engine}-{int(time.time() * 1000)}"
+    dst = output_path("voice", job_id, ".mp3")
+
+    try:
+        if engine == "elevenlabs":
+            voice_id = str(payload.get("voice_id") or "").strip()
+            if not voice_engine.available():
+                return jsonify(error="Cadastre a chave ElevenLabs em /apis para testar as vozes realistas."), 400
+            if not voice_id:
+                return jsonify(error="Escolha uma voz realista."), 400
+            wav = output_path("voice", job_id, ".raw.wav")
+            voice_engine.text_to_speech(text, wav, voice_id=voice_id, job_id=job_id)
+            media.run(
+                [
+                    config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", str(wav), "-c:a", "libmp3lame", "-b:a", "192k", str(dst),
+                ],
+                job_id=None,
+            )
+            wav.unlink(missing_ok=True)
+            return jsonify(url=public_url(dst), engine=engine, voice_id=voice_id)
+
+        if not edge_tts.available():
+            return jsonify(
+                error="Motor gratuito indisponível: instale `edge-tts` no servidor e reinicie o viral-api."
+            ), 400
+
+        raw = output_path("voice", job_id, ".raw.wav")
+        if engine == "forge":
+            persona = voice_forge.get(str(payload.get("persona_id") or "").strip())
+            if persona is None:
+                return jsonify(error="Escolha (ou crie) uma voz própria no Forge."), 400
+            edge_tts.synthesize(text, raw, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate)
+            chain = voice_forge.filter_chain(persona, preserve_duration=False)
+            label = persona.name
+        else:
+            target = str(payload.get("target_voice") or "masc_grave")
+            if target not in VOICES:
+                return jsonify(error="Timbre alvo inválido."), 400
+            base_list = edge_tts.list_voices()
+            base = str(base_list[0]["id"]) if base_list else "pt-BR-AntonioNeural"
+            edge_tts.synthesize(text, raw, voice=base, job_id=job_id)
+            chain = build_timbre_chain(target, "natural")
+            label = target
+
+        media.run(
+            [
+                config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(raw), "-af", ",".join(chain),
+                "-c:a", "libmp3lame", "-b:a", "192k", str(dst),
+            ],
+            job_id=None,
+        )
+        raw.unlink(missing_ok=True)
+        return jsonify(url=public_url(dst), engine=engine, voice=label)
+    except (EdgeTTSError, VoiceEngineError, RuntimeError) as exc:
+        return jsonify(error=str(exc)), 400
+
+
+
 
 
 @bp.get("/voices")
@@ -131,6 +234,55 @@ def personas_delete(persona_id: str):
     if not voice_forge.delete(persona_id):
         return jsonify(error="Voz não encontrada."), 404
     return jsonify(ok=True)
+
+
+@bp.post("/personas/variants")
+def personas_variants():
+    """Gera vários modelos de voz derivados de uma mesma matéria-prima (sem salvar)."""
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    if not isinstance(payload, dict) or not payload:
+        return jsonify(error="Envie a voz base para gerar os modelos."), 400
+    payload = dict(payload)
+    base_payload = payload.get("base") if isinstance(payload.get("base"), dict) else payload
+    base_payload = dict(base_payload)
+    base_payload.setdefault("id", "forge_base")
+    base_payload.setdefault("name", "Voz base")
+    try:
+        base = voice_forge._from_dict(base_payload)
+        variants = voice_forge.generate_variants(
+            base,
+            count=int(payload.get("count") or 6),
+            intensity=float(payload.get("intensity") or 0.6),
+            seed=str(payload.get("seed") or "") or None,
+            base_voices=[str(v) for v in (payload.get("base_voices") or []) if v],
+        )
+    except (TypeError, ValueError) as exc:
+        return jsonify(error=f"Parâmetros inválidos: {exc}"), 400
+
+    if payload.get("save"):
+        variants = voice_forge.save_many(variants)
+
+    return jsonify(
+        saved=bool(payload.get("save")),
+        archetypes=voice_forge.ARCHETYPES,
+        variants=[v.dict() for v in variants],
+    )
+
+
+@bp.post("/personas/bulk")
+def personas_bulk():
+    """Salva de uma vez um conjunto de modelos gerados."""
+    payload = request.get_json(silent=True) or {}
+    items = payload.get("personas")
+    if not isinstance(items, list) or not items:
+        return jsonify(error="Envie a lista de vozes para salvar."), 400
+    try:
+        saved = voice_forge.save_many([i for i in items if isinstance(i, dict)])
+    except (TypeError, ValueError) as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(personas=[p.dict() for p in saved]), 201
+
+
 
 
 @bp.post("/personas/preview")
