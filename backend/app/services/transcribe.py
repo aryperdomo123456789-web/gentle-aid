@@ -133,6 +133,12 @@ def _post(
             return json.loads(resp.read().decode("utf-8", "ignore"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", "ignore")[:300]
+        if exc.code in (401, 403):
+            raise TranscribeError(
+                f"Chave de transcrição recusada ({exc.code}). Abra /apis, clique em 'Testar' na Groq "
+                f"(ou Whisper) e cadastre uma chave válida — o teste agora envia um áudio real. "
+                f"Detalhe do provedor: {detail}"
+            ) from exc
         raise TranscribeError(f"Transcrição recusada ({exc.code}): {detail}") from exc
     except urllib.error.URLError as exc:
         raise TranscribeError(f"Falha de rede na transcrição: {exc.reason}") from exc
