@@ -154,6 +154,10 @@ function AuthGate() {
     if (!auth.ready) return;
     if (!auth.user && location.pathname !== "/login") {
       void navigate({ to: "/login", replace: true });
+      return;
+    }
+    if (auth.user && location.pathname === "/login") {
+      void navigate({ to: "/", replace: true });
     }
   }, [auth.ready, auth.user, location.pathname, navigate]);
 
@@ -165,6 +169,20 @@ function AuthGate() {
           <p className="text-lg font-semibold">Carregando acesso seguro…</p>
           <p className="mt-2 text-sm text-muted-foreground">
             Verificando sua sessão e preparando o painel.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (auth.user && location.pathname === "/login") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="panel max-w-md p-6 text-center">
+          <div className="mx-auto mb-4 size-12 animate-pulse rounded-2xl bg-primary/20" />
+          <p className="text-lg font-semibold">Redirecionando…</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Sua sessão já está ativa e o painel está sendo aberto.
           </p>
         </div>
       </div>

@@ -1,11 +1,11 @@
-import { KeyRound, LockKeyhole, PencilLine, Search, Shield, Trash2, Users } from "lucide-react";
+import { LockKeyhole, PencilLine, Search, Shield, Trash2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { Field, SubmitButton, TextInput } from "@/components/form";
 import type { ManagedUser } from "@/lib/auth";
 import { useAuth } from "@/components/AuthProvider";
 
-export function AccountConsole({ onLogout }: { onLogout: () => void }) {
+export function AccountConsole() {
   const auth = useAuth();
   const [selectedId, setSelectedId] = useState(auth.user?.id ?? "");
   const [query, setQuery] = useState("");
@@ -58,7 +58,7 @@ export function AccountConsole({ onLogout }: { onLogout: () => void }) {
     setBusy(true);
     setNotice(null);
     try {
-      auth.updateUser({
+      await auth.updateUser({
         id: selectedUser.id,
         name: name.trim() || selectedUser.name,
         email: email.trim() || selectedUser.email,
@@ -74,13 +74,13 @@ export function AccountConsole({ onLogout }: { onLogout: () => void }) {
     }
   }
 
-  function handleDelete(user: ManagedUser) {
+  async function handleDelete(user: ManagedUser) {
     const ok = window.confirm(
       `Tem certeza que quer apagar "${user.name}" (${user.email})? Essa ação remove a conta do painel.`,
     );
     if (!ok) return;
     try {
-      auth.deleteUser(user.id);
+      await auth.deleteUser(user.id);
       setNotice("Usuário removido.");
       setSelectedId(auth.user?.id ?? "");
     } catch (error) {
@@ -105,15 +105,6 @@ export function AccountConsole({ onLogout }: { onLogout: () => void }) {
               gerenciar todas as contas cadastradas.
             </p>
           </div>
-
-          <button
-            type="button"
-            onClick={onLogout}
-            className="inline-flex items-center gap-2 rounded-full border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive transition-colors hover:border-destructive/70 hover:bg-destructive/15"
-          >
-            <KeyRound className="size-4" aria-hidden="true" />
-            Sair
-          </button>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">

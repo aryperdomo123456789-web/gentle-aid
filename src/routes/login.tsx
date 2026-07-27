@@ -38,12 +38,14 @@ function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const session = auth.login(email, password);
+      const session = await auth.login(email, password);
       if (!session) {
         setError("Credenciais inválidas. Verifique o acesso do dono ou do usuário.");
         return;
       }
       void navigate({ to: "/", replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao entrar no painel.");
     } finally {
       setBusy(false);
     }

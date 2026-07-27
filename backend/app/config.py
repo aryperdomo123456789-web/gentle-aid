@@ -59,6 +59,14 @@ class Config:
     def jobs_dir(self) -> Path:
         return self.storage_dir / "_jobs"
 
+    @property
+    def config_dir(self) -> Path:
+        return self.storage_dir / "_config"
+
+    @property
+    def auth_db_path(self) -> Path:
+        return self.config_dir / "auth.sqlite3"
+
     def tool_dir(self, tool: str) -> Path:
         mapping = {
             "youtube": "_youtube_jobs",
@@ -70,7 +78,7 @@ class Config:
         return self.storage_dir / mapping.get(tool, "_misc_jobs")
 
     def ensure_dirs(self) -> None:
-        dirs = [self.storage_dir, self.uploads_dir, self.jobs_dir]
+        dirs = [self.storage_dir, self.config_dir, self.uploads_dir, self.jobs_dir]
         dirs += [self.tool_dir(t) for t in ("youtube", "tiktok", "legendar", "voice", "canva")]
         for d in dirs:
             d.mkdir(parents=True, exist_ok=True)

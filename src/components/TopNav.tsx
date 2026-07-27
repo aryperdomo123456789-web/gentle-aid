@@ -33,8 +33,8 @@ export function TopNav() {
   const auth = useAuth();
   const navigate = useNavigate();
 
-  function handleLogout() {
-    auth.logout();
+  async function handleLogout() {
+    await auth.logout();
     void navigate({ to: "/login", replace: true });
   }
 

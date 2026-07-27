@@ -9,6 +9,7 @@ from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
 
 from .config import Config
+from .blueprints.auth import bp as auth_bp
 from .blueprints.apis import bp as apis_bp
 from .blueprints.canva_cleaner import bp as canva_bp
 from .blueprints.discover import bp as discover_bp
@@ -49,6 +50,9 @@ def create_app(config: Config | None = None) -> Flask:
     )
     app.config.from_object(cfg)
     app.config["MAX_CONTENT_LENGTH"] = cfg.max_upload_bytes
+    app.config["AUTH_DB_PATH"] = str(cfg.auth_db_path)
+    app.config["AUTH_COOKIE_SECURE"] = os.environ.get("AUTH_COOKIE_SECURE", "1")
+    app.secret_key = cfg.secret_key
 
     cfg.ensure_dirs()
 
@@ -59,7 +63,18 @@ def create_app(config: Config | None = None) -> Flask:
 
     api_keys.autofill_once()
 
-    for bp in (youtube_bp, tiktok_bp, legendar_bp, voice_bp, canva_bp, jobs_bp, apis_bp, radar_bp, discover_bp):
+    for bp in (
+        auth_bp,
+        youtube_bp,
+        tiktok_bp,
+        legendar_bp,
+        voice_bp,
+        canva_bp,
+        jobs_bp,
+        apis_bp,
+        radar_bp,
+        discover_bp,
+    ):
         app.register_blueprint(bp)
 
     @app.get("/api/health")

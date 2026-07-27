@@ -49,6 +49,7 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
     const res = await fetch(`${API_BASE}${path}`, {
       method: "GET",
       headers: { Accept: "application/json" },
+      credentials: "include",
       signal: ctrl.signal,
     });
     return await parse<T>(res);
@@ -69,6 +70,17 @@ export async function apiPostJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  return parse<T>(res);
+}
+
+export async function apiPutJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    credentials: "include",
     body: JSON.stringify(body),
   });
   return parse<T>(res);
@@ -78,6 +90,7 @@ export async function apiPostForm<T>(path: string, form: FormData): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { Accept: "application/json" },
+    credentials: "include",
     body: form,
   });
   return parse<T>(res);
@@ -87,6 +100,7 @@ export async function apiDelete<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "DELETE",
     headers: { Accept: "application/json" },
+    credentials: "include",
   });
   return parse<T>(res);
 }
