@@ -70,7 +70,7 @@ def run_job():
         "animation": animation,
         "uppercase": request.form.get("uppercase") in ("1", "true", "on"),
         "uppercase_set": request.form.get("uppercase") is not None,
-        "font_scale": _float("font_scale", 1.0, 0.6, 1.8),
+        "font_scale": _float("font_scale", 1.0, 0.35, 1.8),
         "margin_ratio": _float("margin_ratio", 0.14, 0.02, 0.45),
         "words_per_line": int(_float("words_per_line", preset["words_per_line"], 1, 10)),
         "accent": (request.form.get("accent") or "").strip(),
