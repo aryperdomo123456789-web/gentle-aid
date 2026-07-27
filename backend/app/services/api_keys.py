@@ -528,6 +528,38 @@ _DEFAULT_REMEDIATION = {
 }
 
 
+def _tiny_wav() -> bytes:
+    """WAV mono 8 kHz com ~0,3 s de silêncio — só para validar credencial de STT."""
+    import struct
+
+    sample_rate, samples = 8000, 2400
+    data = b"\x00\x00" * samples
+    header = b"RIFF" + struct.pack("<I", 36 + len(data)) + b"WAVEfmt "
+    header += struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16)
+    header += b"data" + struct.pack("<I", len(data))
+    return header + data
+
+
+def _audio_multipart(fields: dict[str, str]) -> tuple[bytes, str]:
+    """Monta o multipart/form-data com o áudio mínimo do probe de transcrição."""
+    import uuid
+
+    boundary = f"----viralprobe{uuid.uuid4().hex}"
+    parts: list[bytes] = []
+    for name, value in fields.items():
+        parts.append(
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n".encode()
+        )
+    parts.append(
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
+        f"filename=\"probe.wav\"\r\nContent-Type: audio/wav\r\n\r\n".encode()
+    )
+    parts.append(_tiny_wav())
+    parts.append(f"\r\n--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
+
 def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
     """Executa um único endpoint de verificação e devolve status/ok/mensagem."""
     import base64
