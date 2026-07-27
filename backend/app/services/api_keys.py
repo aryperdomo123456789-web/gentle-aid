@@ -105,17 +105,26 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://huggingface.co/docs",
         "usage": "Download de modelos RVC/Coqui e inferência serverless.",
         "prefix": "hf_",
-        "test": {"url": "https://huggingface.co/api/whoami-v2", "auth": "bearer"},
+        "format_hint": "Use um Access Token do tipo 'Read' (Settings → Access Tokens). Tokens fine-grained sem escopo de leitura respondem 401.",
+        "test": [
+            {"url": "https://huggingface.co/api/whoami-v2", "auth": "bearer"},
+            {"url": "https://huggingface.co/api/models?limit=1", "auth": "bearer"},
+        ],
     },
     {
         "id": "cohere",
         "name": "Cohere",
         "category": "Rerank",
         "env": "COHERE_API_KEY",
-        "docs": "https://docs.cohere.com/",
+        "docs": "https://docs.cohere.com/reference/checkapikey",
         "usage": "Reranking de candidatos de pesquisa e de trechos virais.",
-        "test": {"url": "https://api.cohere.com/v1/models", "auth": "bearer"},
+        "format_hint": "Chaves de trial da Cohere não têm acesso a /v1/models; o teste usa o endpoint oficial check-api-key.",
+        "test": [
+            {"url": "https://api.cohere.com/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
+            {"url": "https://api.cohere.com/v1/models", "auth": "bearer"},
+        ],
     },
+
     {
         "id": "tavily",
         "name": "Tavily",
