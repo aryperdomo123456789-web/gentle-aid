@@ -56,6 +56,14 @@ def test_provider(provider_id: str):
     return jsonify(result=result, provider=api_keys.describe(provider_id))
 
 
+@bp.post("/import")
+def import_keys():
+    """Varre .env, app antigo e configs legadas e preenche o cofre sozinho."""
+    payload = request.get_json(silent=True) or {}
+    report = api_keys.autofill(force=bool(payload.get("force")))
+    return jsonify(report=report, providers=api_keys.list_all())
+
+
 @bp.post("/test-all")
 def test_all():
     results = {}
