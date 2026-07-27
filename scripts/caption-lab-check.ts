@@ -4,7 +4,10 @@
  */
 import {
   ASPECTS,
+  beatsFromBpm,
   DEMO_SRT,
+  RAINBOW,
+  snapLinesToBeats,
   buildAss,
   diagnose,
   groupWords,
