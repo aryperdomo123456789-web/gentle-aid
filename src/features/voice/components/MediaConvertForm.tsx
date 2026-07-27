@@ -1,7 +1,9 @@
 import type { ReactNode, RefObject } from "react";
 
 import type { DiscoveryCard } from "@/components/DiscoveryPanel";
-import { Field, FileDrop, SelectInput, SubmitButton, TextInput } from "@/components/form";
+import { Field, FileDrop, SelectInput, TextInput } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
+
 import { LinkInspector, type InspectedCard } from "@/components/LinkInspector";
 import { MutationSelect } from "@/components/MutationSelect";
 import { AudioFormatField, MEDIA_ACCEPT, MEDIA_HINT } from "./AudioFormatField";
