@@ -36,3 +36,11 @@ deploy/generated/
 .env
 fabrica_clips/
 frontend_dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+backend/api_keys.json
