@@ -65,9 +65,15 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
   const [draft, setDraft] = useState<Persona>(BLANK);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState("");
-  const [busy, setBusy] = useState<"" | "preview" | "save">("");
+  const [busy, setBusy] = useState<"" | "preview" | "save" | "variants" | "bulk">("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [variants, setVariants] = useState<Persona[]>([]);
+  const [variantCount, setVariantCount] = useState(6);
+  const [variantIntensity, setVariantIntensity] = useState(0.6);
+  const [variantAudio, setVariantAudio] = useState<Record<string, string>>({});
+  const [variantBusy, setVariantBusy] = useState<string>("");
+
 
   async function load() {
     try {
