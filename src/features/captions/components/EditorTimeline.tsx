@@ -56,7 +56,7 @@ export function EditorTimeline({
       aria-label="Linha do tempo"
       className="flex flex-col gap-2 border-t border-border bg-card/60 px-3 py-2 sm:px-4"
     >
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onToggle}
@@ -170,10 +170,13 @@ export function EditorTimeline({
             </div>
 
             {/* Faixa de áudio */}
-            <div className="mt-1.5 flex h-7 items-center gap-2 rounded-md border border-dashed border-border/60 px-2 text-[11px] text-muted-foreground">
+            <div className="mt-1.5 flex h-7 items-center gap-2 overflow-hidden rounded-md border border-dashed border-border/60 px-2 text-[11px] text-muted-foreground">
               <Music4 className="size-3.5 shrink-0" />
-              Áudio original preservado — a esterilização mantém a narrativa
+              <span className="truncate">
+                Áudio original preservado — a esterilização mantém a narrativa
+              </span>
             </div>
+
 
             {/* Playhead */}
             <div
