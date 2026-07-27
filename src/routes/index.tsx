@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Field, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
+import { ToolHistory } from "@/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { apiPostJson, type Job } from "@/lib/api";
@@ -142,6 +143,7 @@ function YoutubeBypass() {
           emptyHint="Nenhum job em execução. Envie um lote para acompanhar o log do FFmpeg em tempo real."
         />
       }
+      below={<ToolHistory tool="youtube" title="Histórico · YouTube Bypass" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
     />
   );
 }

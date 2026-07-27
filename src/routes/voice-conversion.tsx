@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Field, FileDrop, SelectInput, SubmitButton } from "@/components/form";
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
+import { ToolHistory } from "@/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { apiPostForm, type Job } from "@/lib/api";
@@ -111,6 +112,7 @@ function VoiceConversion() {
           emptyHint="Envie um áudio para iniciar a conversão de timbre."
         />
       }
+      below={<ToolHistory tool="voice" title="Histórico · Voz V2V" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
     />
   );
 }

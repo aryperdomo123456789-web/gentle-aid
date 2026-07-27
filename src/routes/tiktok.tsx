@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Field, SelectInput, SubmitButton, TextInput } from "@/components/form";
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
+import { ToolHistory } from "@/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { apiGet, apiPostJson, friendlyError, type Job } from "@/lib/api";
@@ -194,6 +195,7 @@ function TikTokDashboard() {
           emptyHint="Escolha um viral do radar ou cole um link para iniciar a clonagem."
         />
       }
+      below={<ToolHistory tool="tiktok" title="Histórico · TikTok Clone" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
     />
   );
 }
