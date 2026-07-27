@@ -293,10 +293,13 @@ Traga de 5 a 7 nichos, do mais provável ao menos provável. Português do Brasi
 
 
 def _llm_json(prompt: str, timeout: int = 60) -> tuple[dict[str, Any] | None, str | None]:
-    for provider, url, model in _LLM_ROUTES:
+    routes = {pid: (url, model) for pid, url, model in _LLM_ROUTES}
+    for provider in api_keys.rank_providers(list(routes)):
+        url, model = routes[provider]
         key = api_keys.get_key(provider)
         if not key:
             continue
+
         try:
             data = _http_json(
                 url,
