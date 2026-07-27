@@ -23,7 +23,17 @@ export type Animation =
   | "typewriter"
   | "highlight"
   | "boxed"
-  | "shake";
+  | "shake"
+  | "beat"
+  | "zoom"
+  | "slide"
+  | "blur"
+  | "wave"
+  | "glitch"
+  | "neon"
+  | "rainbow"
+  | "stamp"
+  | "flip";
 
 export type Position = "bottom" | "center" | "top";
 
@@ -38,6 +48,16 @@ export const ANIMATIONS: Animation[] = [
   "highlight",
   "boxed",
   "shake",
+  "beat",
+  "zoom",
+  "slide",
+  "blur",
+  "wave",
+  "glitch",
+  "neon",
+  "rainbow",
+  "stamp",
+  "flip",
 ];
 
 export const POSITIONS: Record<Position, number> = { bottom: 2, center: 5, top: 8 };
