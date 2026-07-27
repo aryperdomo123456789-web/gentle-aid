@@ -344,30 +344,102 @@ function RadarGlobal() {
             </ul>
           </section>
         ) : null}
+        {cloneTarget ? (
+          <section className="panel mt-6 p-5">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <Wand2 className="size-4 text-primary" aria-hidden="true" /> Esteira de clonagem
+                </h2>
+                <p className="mt-1 truncate text-xs text-muted-foreground">
+                  {cloneTarget.title} · mutação {cloneLevel}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/historico"
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface/60"
+                >
+                  Ver histórico
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cloner.reset();
+                    setCloneTarget(null);
+                  }}
+                  disabled={cloner.busy}
+                  className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                >
+                  <X className="size-3.5" aria-hidden="true" /> Fechar
+                </button>
+              </div>
+            </div>
+            <StatusPanel
+              job={cloner.job}
+              error={cloner.error}
+              busy={cloner.busy}
+              emptyHint="Aguardando o download e a esterilização do viral selecionado…"
+            />
+          </section>
+        ) : null}
       </main>
     </div>
   );
 }
 
-function VideoList({ videos }: { videos: Video[] }) {
+function VideoList({
+  videos,
+  onClone,
+  busy,
+  activeUrl,
+}: {
+  videos: Video[];
+  onClone: (video: Video) => void;
+  busy: boolean;
+  activeUrl: string | null;
+}) {
   if (!videos.length) return <p className="text-sm text-muted-foreground">Rode o radar para listar virais.</p>;
   return (
     <ul className="space-y-2">
-      {videos.slice(0, 20).map((v, i) => (
-        <li
-          key={`${v.id}-${i}`}
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2"
-        >
-          <div className="min-w-0 flex-1">
-            <a href={v.url} target="_blank" rel="noreferrer" className="block truncate text-sm font-medium hover:underline">
-              {v.title}
-            </a>
-            <p className="text-xs text-muted-foreground">
-              @{v.author} · {v.views_human} views · {v.is_short ? "short" : "longo"} · {v.source}
-            </p>
-          </div>
-        </li>
-      ))}
+      {videos.slice(0, 20).map((v, i) => {
+        const running = busy && activeUrl === v.url;
+        return (
+          <li
+            key={`${v.id}-${i}`}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2"
+          >
+            <div className="min-w-0 flex-1">
+              <a
+                href={v.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block truncate text-sm font-medium hover:underline"
+              >
+                {v.title}
+              </a>
+              <p className="text-xs text-muted-foreground">
+                @{v.author} · {v.views_human} views · {v.is_short ? "short" : "longo"} · {v.source}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onClone(v)}
+              disabled={busy}
+              title="Baixar, esterilizar e entregar o clone virgem"
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-primary/20 disabled:opacity-50"
+            >
+              {running ? (
+                <Loader2 className="size-3.5 animate-spin text-primary" aria-hidden="true" />
+              ) : (
+                <Wand2 className="size-3.5 text-primary" aria-hidden="true" />
+              )}
+              {running ? "Clonando…" : "Clonar"}
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
+
