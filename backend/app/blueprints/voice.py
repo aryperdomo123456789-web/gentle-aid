@@ -220,6 +220,18 @@ def personas_list():
     )
 
 
+@bp.post("/personas/reset")
+def personas_reset():
+    """Recria as vozes de fábrica (útil quando novos presets são adicionados no código)."""
+    voice_forge.reset_factory_presets()
+    return jsonify(
+        forge_ready=edge_tts.available(),
+        personas=voice_forge.list_personas(),
+        base_voices=edge_tts.list_voices(),
+        bounds=voice_forge.BOUNDS,
+    )
+
+
 @bp.post("/personas")
 def personas_save():
     payload = request.get_json(silent=True) or request.form.to_dict()
