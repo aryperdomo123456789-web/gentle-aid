@@ -92,9 +92,49 @@ def _llm(prompt: str, timeout: int = 120) -> str | None:
     return None
 
 
+# Whisper devolve o idioma ora como código ("pt"), ora por extenso
+# ("portuguese"/"português"). Sem normalizar, o motor traduzia pt→pt à toa.
+_LANG_ALIASES = {
+    "pt": ("pt", "por", "portuguese", "português", "portugues", "pt-br", "pt_pt"),
+    "en": ("en", "eng", "english", "inglês", "ingles"),
+    "es": ("es", "spa", "spanish", "espanhol", "español"),
+    "fr": ("fr", "fra", "french", "francês", "frances", "français"),
+    "it": ("it", "ita", "italian", "italiano"),
+    "de": ("de", "deu", "ger", "german", "alemão", "alemao", "deutsch"),
+    "ja": ("ja", "jpn", "japanese", "japonês", "japones"),
+    "ko": ("ko", "kor", "korean", "coreano"),
+    "zh": ("zh", "chi", "zho", "chinese", "chinês", "chines", "mandarin"),
+    "ru": ("ru", "rus", "russian", "russo"),
+    "ar": ("ar", "ara", "arabic", "árabe", "arabe"),
+    "hi": ("hi", "hin", "hindi", "híndi"),
+    "tr": ("tr", "tur", "turkish", "turco"),
+    "id": ("id", "ind", "indonesian", "indonésio", "indonesio"),
+}
+
+
+def normalize_language(value: str | None) -> str:
+    """Qualquer forma de nomear o idioma → código curto (`pt`, `en`, …)."""
+    raw = (value or "").strip().lower().replace("_", "-")
+    if not raw or raw == "auto":
+        return ""
+    for code, aliases in _LANG_ALIASES.items():
+        if raw in aliases or raw.split("-", 1)[0] == code:
+            return code
+    return raw.split("-", 1)[0]
+
+
+def same_language(detected: str | None, target: str) -> bool:
+    target_code = normalize_language(target)
+    if not target_code:
+        return True  # "auto" = redublar no mesmo idioma
+    source = normalize_language(detected)
+    return bool(source) and source == target_code
+
+
 def llm_available() -> bool:
     """Há alguma chave de LLM capaz de traduzir o roteiro?"""
     return any(api_keys.get_key(provider) for provider in _LLM_ROUTES)
+
 
 
 def missing_llm_message(target: str) -> str:
