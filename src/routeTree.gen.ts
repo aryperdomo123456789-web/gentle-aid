@@ -14,6 +14,7 @@ import { Route as TiktokRouteImport } from './routes/tiktok'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LegendarRouteImport } from './routes/legendar'
+import { Route as LabLegendaRouteImport } from './routes/lab-legenda'
 import { Route as LabRouteImport } from './routes/lab'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as ContaRouteImport } from './routes/conta'
@@ -45,6 +46,11 @@ const LoginRoute = LoginRouteImport.update({
 const LegendarRoute = LegendarRouteImport.update({
   id: '/legendar',
   path: '/legendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabLegendaRoute = LabLegendaRouteImport.update({
+  id: '/lab-legenda',
+  path: '/lab-legenda',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LabRoute = LabRouteImport.update({
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/conta': typeof ContaRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/lab': typeof LabRoute
+  '/lab-legenda': typeof LabLegendaRoute
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/conta': typeof ContaRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/lab': typeof LabRoute
+  '/lab-legenda': typeof LabLegendaRoute
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/conta': typeof ContaRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/lab': typeof LabRoute
+  '/lab-legenda': typeof LabLegendaRoute
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/conta'
     | '/historico'
     | '/lab'
+    | '/lab-legenda'
     | '/legendar'
     | '/login'
     | '/radar'
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/conta'
     | '/historico'
     | '/lab'
+    | '/lab-legenda'
     | '/legendar'
     | '/login'
     | '/radar'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/conta'
     | '/historico'
     | '/lab'
+    | '/lab-legenda'
     | '/legendar'
     | '/login'
     | '/radar'
@@ -178,6 +190,7 @@ export interface RootRouteChildren {
   ContaRoute: typeof ContaRoute
   HistoricoRoute: typeof HistoricoRouteWithChildren
   LabRoute: typeof LabRoute
+  LabLegendaRoute: typeof LabLegendaRoute
   LegendarRoute: typeof LegendarRoute
   LoginRoute: typeof LoginRoute
   RadarRoute: typeof RadarRoute
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/legendar'
       fullPath: '/legendar'
       preLoaderRoute: typeof LegendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab-legenda': {
+      id: '/lab-legenda'
+      path: '/lab-legenda'
+      fullPath: '/lab-legenda'
+      preLoaderRoute: typeof LabLegendaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lab': {
@@ -293,6 +313,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContaRoute: ContaRoute,
   HistoricoRoute: HistoricoRouteWithChildren,
   LabRoute: LabRoute,
+  LabLegendaRoute: LabLegendaRoute,
   LegendarRoute: LegendarRoute,
   LoginRoute: LoginRoute,
   RadarRoute: RadarRoute,
