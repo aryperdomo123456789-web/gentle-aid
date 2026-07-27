@@ -35,6 +35,8 @@ const ANIM_CLASS: Record<string, string> = {
  * enviado ao servidor enquanto você testa — o render final no aaPanel usa
  * exatamente os mesmos parâmetros mostrados aqui.
  */
+export type CaptionStageApi = { seek: (time: number) => void; toggle: () => void };
+
 export function CaptionStage({
   src,
   poster,
@@ -42,6 +44,10 @@ export function CaptionStage({
   preset,
   transcript,
   onYChange,
+  onTick,
+  onReady,
+  hideControls = false,
+  className,
 }: {
   src: string | null;
   poster: string | null;
@@ -49,6 +55,10 @@ export function CaptionStage({
   preset: CaptionPreset | null;
   transcript: string;
   onYChange: (y: number) => void;
+  onTick?: (time: number, duration: number, playing: boolean) => void;
+  onReady?: (api: CaptionStageApi) => void;
+  hideControls?: boolean;
+  className?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -99,6 +109,16 @@ export function CaptionStage({
     if (videoRef.current) videoRef.current.currentTime = value;
   }, []);
 
+  useEffect(() => {
+    onReady?.({ seek, toggle });
+  }, [onReady, seek, toggle]);
+
+  useEffect(() => {
+    onTick?.(time, duration, playing);
+  }, [onTick, time, duration, playing]);
+
+
+
   const applyPointer = useCallback(
     (clientY: number) => {
       const rect = stageRef.current?.getBoundingClientRect();
@@ -130,10 +150,10 @@ export function CaptionStage({
   const boxed = view?.boxed || animation === "boxed";
 
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", className)}>
       <div
         ref={stageRef}
-        className="relative aspect-[9/16] w-full max-h-[62vh] overflow-hidden rounded-2xl border border-border bg-black mx-auto"
+        className="relative mx-auto aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden rounded-2xl border border-border bg-black shadow-2xl"
         style={{ backgroundImage: poster && !src ? `url(${poster})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }}
       >
         {src ? (
@@ -224,6 +244,7 @@ export function CaptionStage({
         </span>
       </div>
 
+      {hideControls ? null : (
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -255,6 +276,7 @@ export function CaptionStage({
           {formatClock(time)} / {formatClock(duration)}
         </span>
       </div>
+      )}
     </div>
   );
 }
