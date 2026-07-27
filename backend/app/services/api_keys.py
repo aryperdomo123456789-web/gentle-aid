@@ -357,6 +357,26 @@ def get_key(provider_id: str) -> str | None:
     return key or None
 
 
+def last_test_ok(provider_id: str) -> bool | None:
+    """True/False conforme o último teste; None quando nunca foi testado."""
+    with _lock:
+        stored = _load().get(provider_id, {})
+    result = stored.get("last_test")
+    if not isinstance(result, dict) or "ok" not in result:
+        return None
+    return bool(result["ok"])
+
+
+def rank_providers(provider_ids: list[str]) -> list[str]:
+    """Ordena provedores: saudáveis primeiro, não testados depois, falhando por último."""
+    order = {True: 0, None: 1, False: 2}
+    return sorted(
+        [pid for pid in provider_ids if get_key(pid)],
+        key=lambda pid: order[last_test_ok(pid)],
+    )
+
+
+
 def set_key(provider_id: str, key: str, note: str = "") -> dict[str, Any]:
     with _lock:
         data = _load()
