@@ -276,6 +276,8 @@ def build_command(
     extra_audio_filters: list[str] | None = None,
 ) -> tuple[list[str], SterilizationReport]:
     identity = _fake_identity(rng)
+    suffix = dst.suffix.lower()
+    mp4_family = suffix in {".mp4", ".mov", ".m4a", ".m4v"}
     vf = list(extra_video_filters or []) + build_video_filters(level, info, rng)
 
     speed_filter = next((f for f in vf if f.startswith("setpts=PTS/")), "")
@@ -285,6 +287,7 @@ def build_command(
     chosen_bitrate = pick_bitrate(bitrate, rng)
     gop = rng.choice((48, 50, 60, 72, 90))
     preset = rng.choice(("veryfast", "faster", "fast"))
+
 
     cmd: list[str] = [
         config.ffmpeg_bin,
