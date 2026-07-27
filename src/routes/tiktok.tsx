@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
 import { Field, SelectInput, SubmitButton, TextInput } from "@/components/form";
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
@@ -196,8 +197,15 @@ function TikTokDashboard() {
         />
       }
       below={
-        <ToolHistory
-          tool="tiktok"
+        <div className="space-y-6">
+          <DiscoveryPanel
+            defaultPlatform="tiktok"
+            actionLabel="Codificar 1:1"
+            onAction={(card: DiscoveryCard) => clone(card.url)}
+            actionBusyUrl={busy ? cloneUrl : null}
+          />
+          <ToolHistory
+            tool="tiktok"
           title="Histórico · TikTok Clone"
           refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
         />
