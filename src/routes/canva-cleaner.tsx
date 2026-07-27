@@ -93,10 +93,13 @@ function CanvaCleaner() {
             A remoção total de metadados (ISO, encoder, Canva, GPS, XMP) é sempre aplicada e não
             pode ser desligada — o arquivo final recebe identidade forjada e hash inédito.
           </p>
+          <JobSettingsGuard
+            busy={busy}
+            disabled={!hasFile}
+            label="Executar limpeza"
+            busyLabel="Limpando e recodificando…"
+          />
 
-          <SubmitButton busy={busy} disabled={!hasFile}>
-            {busy ? "Limpando e recodificando…" : "Executar limpeza"}
-          </SubmitButton>
         </form>
       }
       right={
