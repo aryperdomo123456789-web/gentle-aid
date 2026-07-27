@@ -1,17 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
   Flame,
+  Loader2,
   RefreshCw,
   Radar as RadarIcon,
   Sparkles,
   TrendingUp,
+  Wand2,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Field, SelectInput, TextInput } from "@/components/form";
+import { MUTATION_LEVELS } from "@/components/MutationSelect";
+import { StatusPanel } from "@/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
-import { apiGet, friendlyError } from "@/lib/api";
+import { apiGet, apiPostJson, friendlyError, type Job } from "@/lib/api";
+import { useJobRunner } from "@/hooks/use-job-runner";
 
 export const Route = createFileRoute("/radar")({
   head: () => ({
