@@ -80,6 +80,10 @@ function Legendar() {
             </Field>
           </div>
 
+          <MutationSelect defaultValue="media" />
+
+
+
           <Field
             label="Transcrição (opcional)"
             hint="Deixe vazio para transcrição automática no servidor. Aceita texto simples ou SRT."

@@ -90,6 +90,14 @@ function VoiceConversion() {
             </Field>
           </div>
 
+          <MutationSelect
+            defaultValue="leve"
+            label="Esterilização do áudio"
+            hint="Remove metadados/ID3 herdados, reescreve o timbre e entrega um arquivo de hash inédito."
+          />
+
+
+
           <SubmitButton busy={busy} disabled={!hasFile}>
             {busy ? "Convertendo timbre…" : "Converter voz"}
           </SubmitButton>
