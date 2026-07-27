@@ -254,9 +254,11 @@ export function JobSettingsGuard({
       </div>
 
       <button
-        type="submit"
+        type={manual ? "button" : "submit"}
+        onClick={manual ? onStart : undefined}
         disabled={busy || disabled || locked}
         title={locked ? "Salve as configurações antes de iniciar" : undefined}
+
         className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60 ${
           variant === "electric"
             ? "bg-electric text-electric-foreground hover:opacity-90"
