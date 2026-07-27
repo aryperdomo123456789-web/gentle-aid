@@ -1,4 +1,4 @@
-import { apiGet, apiPostForm } from "@/lib/http";
+import { apiGet, apiPostForm, apiPostJson } from "@/lib/http";
 import type { Job } from "@/types/job";
 import type { VoiceCatalog } from "./types";
 
@@ -12,6 +12,10 @@ export const VOICE_ENDPOINT = {
 
 export function fetchVoiceCatalog(): Promise<VoiceCatalog> {
   return apiGet<VoiceCatalog>("/api/voice/catalog");
+}
+
+export function resetVoicePersonas(): Promise<VoiceCatalog> {
+  return apiPostJson<VoiceCatalog>("/api/voice/personas/reset", {});
 }
 
 export function submitVoiceJob(path: string, form: FormData): Promise<Job> {
