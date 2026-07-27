@@ -272,14 +272,28 @@ def convert():
 # --------------------------------------------------------------------------- #
 @bp.post("/tts")
 def tts():
-    if not voice_engine.available():
-        return jsonify(
-            error="Narração por texto exige a chave ElevenLabs. Cadastre em /apis (provedor ElevenLabs)."
-        ), 400
+    engine = (request.form.get("engine") or ("elevenlabs" if voice_engine.available() else "forge")).lower()
+    if engine not in ("elevenlabs", "forge"):
+        return jsonify(error="Motor de narração inválido."), 400
 
     voice_id = (request.form.get("voice_id") or "").strip()
-    if not voice_id:
-        return jsonify(error="Escolha uma voz para a narração."), 400
+    persona_id = (request.form.get("persona_id") or "").strip()
+    persona = voice_forge.get(persona_id) if persona_id else None
+
+    if engine == "elevenlabs":
+        if not voice_engine.available():
+            return jsonify(
+                error="Narração por texto exige a chave ElevenLabs. Cadastre em /apis (provedor ElevenLabs)."
+            ), 400
+        if not voice_id:
+            return jsonify(error="Escolha uma voz para a narração."), 400
+    else:
+        if not edge_tts.available():
+            return jsonify(
+                error="Motor gratuito indisponível: instale `edge-tts` no servidor e reinicie o viral-api."
+            ), 400
+        if persona is None:
+            return jsonify(error="Escolha (ou crie) uma voz própria no Forge."), 400
 
     try:
         text = clean_text(request.form.get("text"), max_length=MAX_TTS_CHARS, field="text")
@@ -298,16 +312,21 @@ def tts():
         "voice",
         meta={
             "mode": "tts",
-            "engine": "elevenlabs",
-            "target": voice_id,
+            "engine": engine,
+            "target": persona.name if (engine == "forge" and persona) else voice_id,
+            "persona": persona.id if persona else None,
             "format": fmt,
             "mutation": mutation,
             "chars": len(text),
         },
     )
     settings = _settings_from_form()
-    jobs.submit(job["job_id"], lambda jid: _work_tts(jid, text, voice_id, fmt, mutation, speed, settings))
+    jobs.submit(
+        job["job_id"],
+        lambda jid: _work_tts(jid, text, engine, voice_id, fmt, mutation, speed, settings, persona),
+    )
     return jsonify(job), 202
+
 
 
 # --------------------------------------------------------------------------- #
