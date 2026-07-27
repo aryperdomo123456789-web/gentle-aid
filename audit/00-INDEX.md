@@ -26,6 +26,7 @@ O problema mais provavel na Central de APIs nao parece ser apenas "chave ausente
 - `audit/05-seguranca-env.md`
 - `audit/06-checklist-deploy.md`
 - `audit/07-plano-producao-voz.md`
+- `audit/08-corrigir-dublagem-ia.md`
 
 ## Leitura rapida
 
