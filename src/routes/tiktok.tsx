@@ -178,6 +178,7 @@ function TikTokDashboard() {
               {(id) => (
                 <TextInput
                   id={id}
+                  name="url"
                   type="url"
                   value={cloneUrl}
                   onChange={(e) => setCloneUrl(e.target.value)}
@@ -187,11 +188,12 @@ function TikTokDashboard() {
             </Field>
             <Field
               label="Nível de esterilização"
-              hint="Aplicado a qualquer clone, inclusive nos disparados pelo radar acima."
+              hint="Aplicado ao clone que você confirmar abaixo."
             >
               {(id) => (
                 <SelectInput
                   id={id}
+                  name="intensity"
                   value={intensity}
                   onChange={(e) => setIntensity(e.target.value)}
                 >
@@ -203,7 +205,12 @@ function TikTokDashboard() {
                 </SelectInput>
               )}
             </Field>
-            <JobSettingsGuard busy={busy} label="Clonar viral" busyLabel="Clonando…" />
+            <JobSettingsGuard
+              busy={busy}
+              disabled={!cloneUrl.trim()}
+              label="Clonar viral"
+              busyLabel="Clonando…"
+            />
           </form>
         </div>
       }
