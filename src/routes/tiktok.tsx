@@ -71,17 +71,25 @@ function TikTokDashboard() {
     }
   }
 
-  function clone(url: string, sourceCard?: DiscoveryCard) {
+  /** Nada roda direto: o link só é carregado no formulário para conferência. */
+  function pick(url: string, card?: DiscoveryCard) {
     setCloneUrl(url);
+    setSourceCard(card ?? null);
+  }
+
+  function clone() {
+    const url = cloneUrl.trim();
+    if (!url) return;
     run(() =>
       apiPostJson<Job>("/api/tiktok/clone", {
         url,
         nicho,
         intensity,
-        ...(sourceCard ? { source_card: sourceCard } : {}),
+        ...(sourceCard && sourceCard.url === url ? { source_card: sourceCard } : {}),
       }),
     );
   }
+
 
   return (
     <ToolShell
