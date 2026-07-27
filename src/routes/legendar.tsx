@@ -94,7 +94,7 @@ function Legendar() {
             </Field>
           </div>
 
-          <MutationSelect defaultValue="media" />
+          <MutationSelect defaultValue="auto" />
 
           <Field
             label="Transcrição (opcional)"

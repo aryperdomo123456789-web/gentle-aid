@@ -34,7 +34,7 @@ from typing import Any
 from ..config import config
 
 # Níveis suportados por todas as ferramentas.
-LEVELS = ("off", "leve", "media", "agressiva", "extrema")
+LEVELS = ("auto", "off", "leve", "media", "agressiva", "extrema")
 DEFAULT_LEVEL = "media"
 
 # Identidades falsas plausíveis para o campo encoder/handler.
@@ -286,6 +286,23 @@ def pick_bitrate(profile: str, rng: random.Random) -> str:
     return f"{rng.randint(3600, 7400)}k"
 
 
+def resolve_level(level: str, info: Probe) -> str:
+    """Escolhe o melhor preset quando o operador deixa em modo automático."""
+    if level != "auto":
+        return level if level in LEVELS else DEFAULT_LEVEL
+
+    duration = max(float(info.duration or 0.0), 0.0)
+    if not info.has_video:
+        return "leve" if info.has_audio else "off"
+    if duration <= 120:
+        return "media"
+    if duration <= 900:
+        return "leve"
+    if duration <= 1800:
+        return "off"
+    return "off"
+
+
 # --------------------------------------------------------------------------
 # Pipeline principal
 # --------------------------------------------------------------------------
@@ -331,8 +348,6 @@ def build_command(
         "0",
         "-filter_complex_threads",
         "0",
-        "-max_muxing_queue_size",
-        "4096",
         "-i",
         str(src),
     ]
@@ -410,6 +425,7 @@ def build_command(
 
     if mp4_family:
         cmd += ["-movflags", "+faststart"]
+    cmd += ["-max_muxing_queue_size", "4096"]
     cmd.append(str(dst))
 
 
@@ -468,6 +484,7 @@ def sterilize(
         level = DEFAULT_LEVEL
 
     info = probe(src)
+    level = resolve_level(level, info)
     before = file_hashes(src)
     seed = random.SystemRandom().randint(0, 2**31)
     timeout = max(7200, int(info.duration * 2) + 3600) if info.duration > 0 else 4 * 3600

@@ -84,7 +84,7 @@ function CanvaCleaner() {
                 </SelectInput>
               )}
             </Field>
-            <MutationSelect defaultValue="media" label="Nível de esterilização" hint="" />
+            <MutationSelect defaultValue="auto" label="Nível de esterilização" hint="" />
           </div>
 
           <p className="rounded-xl border border-border bg-background/40 p-3 text-xs text-muted-foreground">

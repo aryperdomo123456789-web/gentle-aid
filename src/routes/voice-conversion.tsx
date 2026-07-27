@@ -105,7 +105,7 @@ function VoiceConversion() {
           </div>
 
           <MutationSelect
-            defaultValue="leve"
+            defaultValue="auto"
             label="Esterilização do áudio"
             hint="Remove metadados/ID3 herdados, reescreve o timbre e entrega um arquivo de hash inédito."
           />

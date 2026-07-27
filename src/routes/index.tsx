@@ -48,7 +48,7 @@ function YoutubeBypass() {
   const [links, setLinks] = useState("");
   const [nicho, setNicho] = useState(NICHOS[0]);
   const [keyword, setKeyword] = useState("");
-  const [intensity, setIntensity] = useState("media");
+  const [intensity, setIntensity] = useState("auto");
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
 
   function processCard(card: DiscoveryCard) {

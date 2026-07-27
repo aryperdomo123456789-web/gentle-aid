@@ -48,7 +48,7 @@ function TikTokDashboard() {
   const [radarBusy, setRadarBusy] = useState(false);
   const [radarError, setRadarError] = useState<string | null>(null);
   const [cloneUrl, setCloneUrl] = useState("");
-  const [intensity, setIntensity] = useState("media");
+  const [intensity, setIntensity] = useState("auto");
 
   async function loadRadar(e: React.FormEvent) {
     e.preventDefault();

@@ -2,6 +2,7 @@ import { Field, SelectInput } from "@/components/form";
 
 /** Níveis de esterilização compartilhados por todas as ferramentas. */
 export const MUTATION_LEVELS = [
+  { value: "auto", label: "Auto inteligente — escolhe o melhor perfil" },
   { value: "off", label: "Desativado — só limpeza de metadados" },
   { value: "leve", label: "Leve — mutação mínima, qualidade máxima" },
   { value: "media", label: "Média — recomendado (crop, EQ, PTS, áudio)" },
@@ -11,7 +12,7 @@ export const MUTATION_LEVELS = [
 
 export function MutationSelect({
   name = "mutation",
-  defaultValue = "media",
+  defaultValue = "auto",
   label = "Nível de esterilização",
   hint = "Todo arquivo sai virgem: metadados destruídos, identidade forjada e hash inédito. O nível controla só a intensidade da mutação estrutural.",
 }: {

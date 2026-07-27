@@ -145,7 +145,7 @@ function RadarGlobal() {
   const [loading, setLoading] = useState(false);
   const [forecasting, setForecasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cloneLevel, setCloneLevel] = useState("media");
+  const [cloneLevel, setCloneLevel] = useState("auto");
   const [cloneTarget, setCloneTarget] = useState<Video | null>(null);
   const [watchTarget, setWatchTarget] = useState<Video | null>(null);
   const cloner = useJobRunner();
