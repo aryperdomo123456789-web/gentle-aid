@@ -35,17 +35,19 @@ backend/
     blueprints/           youtube, tiktok, legendar, voice, canva_cleaner, jobs
     services/             jobs (fila + persistência), media (FFmpeg), validation
 deploy/
-  install.sh              instalação/atualização em um comando
-  nginx-viralpro.conf     config do site no aaPanel
-  viral-api.service       systemd (Gunicorn)
-  viral-web.service       systemd (Node/frontend)
+  install.sh                   instalação completa em um comando
+  update.sh                    atualização após push no GitHub
+  nginx-site.conf.template     config do site no aaPanel (renderizada)
+  viral-api.service.template   systemd (Gunicorn)
+  viral-web.service.template   systemd (Node/frontend)
+  generated/                   arquivos renderizados p/ seu domínio (gitignored)
 src/                      frontend React
 ```
 
 Armazenamento em disco (caminho absoluto):
 
 ```
-/www/wwwroot/viralpro.vr766.com/fabrica_clips/
+/www/wwwroot/viral.vr766.com/fabrica_clips/
   _uploads/  _jobs/  _youtube_jobs/  _tiktok_jobs/
   _legenda_jobs/  _voice_jobs/  _canva_jobs/
 ```
@@ -54,35 +56,66 @@ Cada job grava um JSON com status, log, metadados e hashes MD5 antes/depois.
 Os downloads são servidos por rotas **relativas** (`/downloads/...`), atendidas
 direto pelo Nginx via `alias` — sem CORS e sem caminho absoluto no HTML.
 
-## Deploy no aaPanel (via GitHub)
+## Deploy no aaPanel (via GitHub) — 3 comandos
+
+Pré-requisitos no painel: **Nginx**, **Node.js 20+** (App Store) e o site criado
+com SSL. Depois, no terminal do servidor como root:
 
 ```bash
-# 1. no servidor, dentro do diretório do site
-cd /www/wwwroot/viralpro.vr766.com
+# 1. clonar dentro do diretório do site
+cd /www/wwwroot/viral.vr766.com
 git clone https://github.com/<seu-usuario>/<seu-repo>.git .
 
-# 2. instala tudo (ffmpeg, venv, deps, build do frontend, systemd)
-bash deploy/install.sh
+# 2. instalar TUDO (ffmpeg, .env, venv, deps, storage, build, systemd, nginx)
+bash deploy/install.sh viral.vr766.com
 
-# 3. Nginx: cole deploy/nginx-viralpro.conf no config do site pelo painel
+# 3. colar no painel a config gerada em:
+#    deploy/generated/nginx-viral.vr766.com.conf
+#    (Site > viral.vr766.com > Arquivo de configuração — mantenha as linhas de SSL)
 ```
 
-Atualizações depois disso:
+Teste final:
 
 ```bash
-cd /www/wwwroot/viralpro.vr766.com && git pull && bash deploy/install.sh
+curl -s https://viral.vr766.com/api/health
 ```
 
-### Variáveis de ambiente (`.env` na raiz, opcional)
+O instalador é idempotente e faz sozinho: instala ffmpeg/python/git, gera `.env`
+com `SECRET_KEY` aleatória, cria a venv, valida a importação do Flask, cria a
+árvore `fabrica_clips/`, builda o frontend, registra e sobe `viral-api` e
+`viral-web` no systemd, renderiza o Nginx para o seu domínio e roda health check.
+
+### Atualizar depois de um push no GitHub
+
+```bash
+cd /www/wwwroot/viral.vr766.com && bash deploy/update.sh
+```
+
+### Operação
+
+```bash
+systemctl status viral-api viral-web
+journalctl -u viral-api -f     # logs da API/FFmpeg
+journalctl -u viral-web -f     # logs do frontend
+systemctl restart viral-api viral-web
+```
+
+### Variáveis de ambiente
+
+Geradas automaticamente em `.env` (referência completa em `.env.example`):
 
 ```
-VIRAL_ROOT=/www/wwwroot/viralpro.vr766.com
-SECRET_KEY=troque-isto
-MAX_UPLOAD_MB=500
+VIRAL_ROOT=/www/wwwroot/viral.vr766.com
+VIRAL_STORAGE=/www/wwwroot/viral.vr766.com/fabrica_clips
+SECRET_KEY=<aleatória>
+MAX_UPLOAD_MB=1024
 VIRAL_WORKERS=2
-FFMPEG_BIN=ffmpeg
-YTDLP_BIN=yt-dlp
+GUNICORN_BIND=127.0.0.1:8000
 ```
+
+Chaves de provedores (OpenAI, DeepSeek, Groq, Tavily, ElevenLabs…) não precisam
+ir no `.env`: cadastre pela aba **Central de APIs**, que grava no cofre
+`fabrica_clips/_config/api_keys.json` (fora do Git).
 
 ## Desenvolvimento local
 
