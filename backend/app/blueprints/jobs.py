@@ -23,6 +23,7 @@ def list_all():
         "total": len(items),
         "done": sum(1 for j in items if j.get("status") == "done"),
         "error": sum(1 for j in items if j.get("status") == "error"),
+        "cancelled": sum(1 for j in items if j.get("status") == "cancelled"),
         "running": sum(1 for j in items if j.get("status") in {"running", "queued"}),
         "bytes": sum(int(j.get("size_bytes") or 0) for j in items),
     }
@@ -43,3 +44,11 @@ def remove(job_id: str):
         return jsonify(error="Job não encontrado."), 404
     jobs.delete(job_id)
     return jsonify(ok=True, job_id=job_id)
+
+
+@bp.post("/<job_id>/cancel")
+def cancel(job_id: str):
+    if not jobs.get(job_id):
+        return jsonify(error="Job não encontrado."), 404
+    job = jobs.request_cancel(job_id)
+    return jsonify(ok=True, job=job or jobs.get(job_id))

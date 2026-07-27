@@ -92,7 +92,16 @@ def run(
     thread.start()
 
     started = time.monotonic()
+    cancel_event = jobs.cancel_event(job_id) if job_id else None
     while True:
+        if cancel_event and cancel_event.is_set():
+            proc.kill()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            thread.join(timeout=5)
+            raise jobs.JobCancelled("Processamento cancelado pelo operador.")
         code = proc.poll()
         if code is not None:
             break

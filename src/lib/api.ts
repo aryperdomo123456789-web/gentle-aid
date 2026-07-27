@@ -106,7 +106,7 @@ export function friendlyError(err: unknown): string {
 }
 
 /** Status normalizado de um job de processamento. */
-export type JobStatus = "queued" | "running" | "done" | "error";
+export type JobStatus = "queued" | "running" | "done" | "error" | "cancelled";
 
 /** Relatório de esterilização devolvido pelo backend. */
 export type SterilizationReport = {

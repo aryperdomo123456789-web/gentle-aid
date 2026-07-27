@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, StopCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { StatusPill } from "@/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
-import { apiGet, downloadUrl, friendlyError, type Job } from "@/lib/api";
+import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError, type Job } from "@/lib/api";
 
 export const Route = createFileRoute("/historico")({
   head: () => ({
@@ -40,6 +41,8 @@ function Historico() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("todos");
+  const [dialog, setDialog] = useState<{ job: Job; kind: "cancel" | "delete" } | null>(null);
+  const [busyJobId, setBusyJobId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,6 +61,41 @@ function Historico() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void load();
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [load]);
+
+  async function cancel(jobId: string) {
+    setBusyJobId(jobId);
+    setError(null);
+    try {
+      await apiPostJson(`/api/jobs/${jobId}/cancel`, {});
+      await load();
+    } catch (err) {
+      setError(friendlyError(err));
+      await load();
+    } finally {
+      setBusyJobId(null);
+    }
+  }
+
+  async function remove(jobId: string) {
+    setBusyJobId(jobId);
+    setError(null);
+    try {
+      await apiDelete(`/api/jobs/${jobId}`);
+      await load();
+    } catch (err) {
+      setError(friendlyError(err));
+      await load();
+    } finally {
+      setBusyJobId(null);
+    }
+  }
 
   const visible = filter === "todos" ? jobs : jobs.filter((j) => j.tool === filter);
 
@@ -139,6 +177,17 @@ function Historico() {
                 </div>
                 <div className="flex items-center gap-3">
                   <StatusPill status={job.status} />
+                  {job.status === "queued" || job.status === "running" ? (
+                    <button
+                      type="button"
+                      onClick={() => setDialog({ job, kind: "cancel" })}
+                      disabled={busyJobId === job.job_id}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50 disabled:opacity-50"
+                    >
+                      <StopCircle className="size-3.5" aria-hidden="true" />
+                      Cancelar
+                    </button>
+                  ) : null}
                   <Link
                     to="/historico/$jobId"
                     params={{ jobId: job.job_id }}
@@ -155,6 +204,15 @@ function Historico() {
                       Baixar
                     </a>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setDialog({ job, kind: "delete" })}
+                    disabled={busyJobId === job.job_id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-destructive/50 disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3.5" aria-hidden="true" />
+                    Excluir
+                  </button>
                 </div>
               </div>
 
@@ -178,6 +236,36 @@ function Historico() {
           ))}
         </div>
       </main>
+
+      <ConfirmActionDialog
+        open={Boolean(dialog)}
+        onOpenChange={(open) => {
+          if (!open) setDialog(null);
+        }}
+        title={
+          dialog?.kind === "cancel"
+            ? `Cancelar job ${dialog.job.job_id}?`
+            : `Excluir job ${dialog?.job.job_id ?? ""}?`
+        }
+        description={
+          dialog?.kind === "cancel"
+            ? `Tem certeza que quer cancelar ${dialog.job.filename ?? dialog.job.job_id}? O job vai parar e ficar marcado como cancelado.`
+            : `Tem certeza que quer apagar ${dialog?.job.filename ?? dialog?.job.job_id}? Isso remove o job, os arquivos gerados e qualquer rastro do servidor.`
+        }
+        confirmLabel={dialog?.kind === "cancel" ? "Sim, cancelar" : "Sim, apagar"}
+        destructive={dialog?.kind === "delete"}
+        busy={Boolean(dialog && busyJobId === dialog.job.job_id)}
+        onConfirm={async () => {
+          if (!dialog) return;
+          const current = dialog;
+          setDialog(null);
+          if (current.kind === "cancel") {
+            await cancel(current.job.job_id);
+          } else {
+            await remove(current.job.job_id);
+          }
+        }}
+      />
     </div>
   );
 }

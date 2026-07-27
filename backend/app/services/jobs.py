@@ -15,7 +15,13 @@ from ..config import config
 
 _lock = threading.Lock()
 _jobs: dict[str, dict[str, Any]] = {}
+_cancel_events: dict[str, threading.Event] = {}
+_futures: dict[str, Any] = {}
 _executor = ThreadPoolExecutor(max_workers=config.max_workers)
+
+
+class JobCancelled(RuntimeError):
+    """Sinaliza que o operador cancelou o job de forma explícita."""
 
 
 def _now() -> str:
@@ -54,6 +60,7 @@ def create_job(tool: str, meta: dict[str, Any] | None = None) -> dict[str, Any]:
     }
     with _lock:
         _jobs[job_id] = job
+        _cancel_events[job_id] = threading.Event()
     persist(job_id)
     return job
 
@@ -88,6 +95,49 @@ def register_artifact(job_id: str, path: Path, kind: str) -> None:
             artifacts.append(entry)
         job["artifacts"] = artifacts
     persist(job_id)
+
+
+def cancel_event(job_id: str) -> threading.Event:
+    with _lock:
+        event = _cancel_events.get(job_id)
+        if event is None:
+            event = threading.Event()
+            _cancel_events[job_id] = event
+        return event
+
+
+def is_cancelled(job_id: str) -> bool:
+    return cancel_event(job_id).is_set()
+
+
+def request_cancel(job_id: str) -> dict[str, Any] | None:
+    job = get(job_id)
+    if not job:
+        return None
+
+    cancel_event(job_id).set()
+    if job.get("status") in {"done", "error", "cancelled"}:
+        return job
+
+    update(
+        job_id,
+        status="cancelled",
+        message="Job cancelado pelo operador.",
+        finished_at=_now(),
+    )
+    return get(job_id)
+
+
+def wait(job_id: str, timeout: float = 8.0) -> None:
+    future = None
+    with _lock:
+        future = _futures.get(job_id)
+    if future is None:
+        return
+    try:
+        future.result(timeout=timeout)
+    except Exception:  # noqa: BLE001
+        return
 
 
 def get(job_id: str) -> dict[str, Any] | None:
@@ -135,24 +185,43 @@ def submit(job_id: str, work: Callable[[str], None]) -> None:
     """Executa o trabalho pesado fora do request, capturando qualquer falha."""
 
     def runner() -> None:
+        if is_cancelled(job_id):
+            update(
+                job_id,
+                status="cancelled",
+                message="Job cancelado antes de iniciar.",
+                finished_at=_now(),
+            )
+            return
         update(job_id, status="running", message="Processando…")
         try:
             work(job_id)
             job = get(job_id) or {}
-            if job.get("status") not in {"error", "done"}:
+            if job.get("status") not in {"error", "done", "cancelled"}:
                 update(job_id, status="done", message="Concluído.", progress=100, finished_at=_now())
+        except JobCancelled:
+            update(job_id, status="cancelled", message="Job cancelado pelo operador.", finished_at=_now())
         except Exception as exc:  # noqa: BLE001 - toda falha vira status de job
             log(job_id, f"ERRO: {exc}")
             update(job_id, status="error", message=str(exc), finished_at=_now())
+        finally:
+            with _lock:
+                _futures.pop(job_id, None)
 
-    _executor.submit(runner)
+    future = _executor.submit(runner)
+    with _lock:
+        _futures[job_id] = future
 
 
 def delete(job_id: str) -> None:
     """Remove o job do registro em memória, o JSON e os arquivos gerados."""
+    request_cancel(job_id)
+    wait(job_id, timeout=10.0)
     job = get(job_id)
     with _lock:
         _jobs.pop(job_id, None)
+        _cancel_events.pop(job_id, None)
+        _futures.pop(job_id, None)
     paths: list[Path] = [_job_file(job_id)]
     if job:
         for raw in job.get("artifacts") or []:

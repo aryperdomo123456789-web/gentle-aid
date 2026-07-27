@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { Download, Eye, RefreshCw, Trash2 } from "lucide-react";
+import { Download, Eye, RefreshCw, StopCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { JobMediaPreview } from "./JobMediaPreview";
 import { StatusPill } from "./StatusPanel";
-import { apiDelete, apiGet, downloadUrl, friendlyError, type Job } from "@/lib/api";
+import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError, type Job } from "@/lib/api";
 
 function formatBytes(bytes?: number): string {
   if (!bytes) return "—";
@@ -61,6 +62,8 @@ export function ToolHistory({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<Job | null>(null);
+  const [dialog, setDialog] = useState<{ job: Job; kind: "cancel" | "delete" } | null>(null);
+  const [busyJobId, setBusyJobId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,13 +83,39 @@ export function ToolHistory({
     void load();
   }, [load, refreshKey]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void load();
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [load]);
+
+  async function cancel(jobId: string) {
+    setBusyJobId(jobId);
+    setError(null);
+    try {
+      await apiPostJson(`/api/jobs/${jobId}/cancel`, {});
+      await load();
+    } catch (err) {
+      setError(friendlyError(err));
+      await load();
+    } finally {
+      setBusyJobId(null);
+    }
+  }
+
   async function remove(jobId: string) {
-    setJobs((prev) => prev.filter((j) => j.job_id !== jobId));
+    setBusyJobId(jobId);
+    setError(null);
     try {
       await apiDelete(`/api/jobs/${jobId}`);
+      if (preview?.job_id === jobId) setPreview(null);
+      await load();
     } catch (err) {
       setError(friendlyError(err));
       void load();
+    } finally {
+      setBusyJobId(null);
     }
   }
 
@@ -164,6 +193,17 @@ export function ToolHistory({
               </div>
               <div className="flex items-center gap-2">
                 <StatusPill status={job.status} />
+                {job.status === "queued" || job.status === "running" ? (
+                  <button
+                    type="button"
+                    onClick={() => setDialog({ job, kind: "cancel" })}
+                    disabled={busyJobId === job.job_id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50 disabled:opacity-50"
+                  >
+                    <StopCircle className="size-3.5" aria-hidden="true" />
+                    Cancelar
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setPreview(job)}
@@ -192,9 +232,10 @@ export function ToolHistory({
                 ) : null}
                 <button
                   type="button"
-                  onClick={() => void remove(job.job_id)}
+                  onClick={() => setDialog({ job, kind: "delete" })}
                   aria-label={`Excluir job ${job.job_id}`}
-                  className="rounded-full border border-border bg-surface/60 p-1.5 text-muted-foreground hover:border-destructive/50 hover:text-foreground"
+                  disabled={busyJobId === job.job_id}
+                  className="rounded-full border border-border bg-surface/60 p-1.5 text-muted-foreground hover:border-destructive/50 hover:text-foreground disabled:opacity-50"
                 >
                   <Trash2 className="size-3.5" aria-hidden="true" />
                 </button>
@@ -235,6 +276,36 @@ export function ToolHistory({
           </div>
         </div>
       ) : null}
+
+      <ConfirmActionDialog
+        open={Boolean(dialog)}
+        onOpenChange={(open) => {
+          if (!open) setDialog(null);
+        }}
+        title={
+          dialog?.kind === "cancel"
+            ? `Cancelar job ${dialog.job.job_id}?`
+            : `Excluir job ${dialog?.job.job_id ?? ""}?`
+        }
+        description={
+          dialog?.kind === "cancel"
+            ? `Tem certeza que quer cancelar ${dialog.job.filename ?? dialog.job.job_id}? O processamento vai parar e o job ficará marcado como cancelado.`
+            : `Tem certeza que quer apagar ${dialog?.job.filename ?? dialog?.job.job_id}? Isso remove o job, os arquivos gerados e qualquer rastro do servidor.`
+        }
+        confirmLabel={dialog?.kind === "cancel" ? "Sim, cancelar" : "Sim, apagar"}
+        destructive={dialog?.kind === "delete"}
+        busy={Boolean(dialog && busyJobId === dialog.job.job_id)}
+        onConfirm={async () => {
+          if (!dialog) return;
+          const current = dialog;
+          setDialog(null);
+          if (current.kind === "cancel") {
+            await cancel(current.job.job_id);
+          } else {
+            await remove(current.job.job_id);
+          }
+        }}
+      />
     </section>
   );
 }

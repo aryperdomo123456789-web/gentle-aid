@@ -6,7 +6,7 @@ const POLL_INTERVAL_MS = 1500;
 const MAX_RUN_MS = 12 * 60 * 60 * 1000;
 
 /**
- * Executa um job e faz polling em /api/jobs/<id> até done/error.
+ * Executa um job e faz polling em /api/jobs/<id> até done/error/cancelled.
  */
 export function useJobRunner() {
   const [job, setJob] = useState<Job | null>(null);
@@ -25,7 +25,7 @@ export function useJobRunner() {
       try {
         const next = await apiGet<Job>(`/api/jobs/${jobId}`);
         setJob(next);
-        if (next.status === "done" || next.status === "error") {
+        if (next.status === "done" || next.status === "error" || next.status === "cancelled") {
           setBusy(false);
           if (next.status === "error") setError(next.message ?? "O job falhou.");
           startedAt.current = null;
@@ -56,7 +56,11 @@ export function useJobRunner() {
       try {
         const started = await request();
         setJob(started);
-        if (started.status === "done" || started.status === "error") {
+        if (
+          started.status === "done" ||
+          started.status === "error" ||
+          started.status === "cancelled"
+        ) {
           setBusy(false);
           if (started.status === "error") setError(started.message ?? "O job falhou.");
           startedAt.current = null;

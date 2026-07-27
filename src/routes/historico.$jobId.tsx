@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, StopCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { JobMediaPreview } from "@/components/JobMediaPreview";
 import { StatusPanel } from "@/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
-import { API_BASE, apiGet, downloadUrl, friendlyError, type Job } from "@/lib/api";
+import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError, type Job } from "@/lib/api";
 
 export const Route = createFileRoute("/historico/$jobId")({
   head: () => ({
@@ -33,6 +34,8 @@ function JobDetail() {
   const navigate = useNavigate();
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<"cancel" | "delete" | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -49,14 +52,30 @@ function JobDetail() {
     return () => clearInterval(t);
   }, [load]);
 
-  async function remove() {
-    if (!confirm("Excluir este job e seus arquivos do servidor?")) return;
+  async function cancel() {
+    setBusy(true);
+    setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/jobs/${jobId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Não foi possível excluir o job.");
+      await apiPostJson(`/api/jobs/${jobId}/cancel`, {});
+      await load();
+    } catch (err) {
+      setError(friendlyError(err));
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiDelete(`/api/jobs/${jobId}`);
       void navigate({ to: "/historico" });
     } catch (err) {
       setError(friendlyError(err));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -81,6 +100,16 @@ function JobDetail() {
             <p className="font-mono text-xs text-muted-foreground">{jobId}</p>
           </div>
           <div className="flex items-center gap-2">
+            {job?.status === "queued" || job?.status === "running" ? (
+              <button
+                type="button"
+                onClick={() => setDialog("cancel")}
+                disabled={busy}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                <StopCircle className="size-4" aria-hidden="true" /> Cancelar
+              </button>
+            ) : null}
             {job?.download_url ? (
               <a
                 href={downloadUrl(job.download_url)}
@@ -92,7 +121,8 @@ function JobDetail() {
             ) : null}
             <button
               type="button"
-              onClick={() => void remove()}
+              onClick={() => setDialog("delete")}
+              disabled={busy}
               className="inline-flex items-center gap-2 rounded-full border border-destructive/50 bg-destructive/10 px-4 py-2 text-xs font-semibold"
             >
               <Trash2 className="size-4 text-destructive" aria-hidden="true" /> Excluir
@@ -191,6 +221,35 @@ function JobDetail() {
           </section>
         </div>
       </main>
+
+      <ConfirmActionDialog
+        open={Boolean(dialog)}
+        onOpenChange={(open) => {
+          if (!open) setDialog(null);
+        }}
+        title={
+          dialog === "cancel"
+            ? `Cancelar job ${job?.job_id ?? ""}?`
+            : `Excluir job ${job?.job_id ?? ""}?`
+        }
+        description={
+          dialog === "cancel"
+            ? `Tem certeza que quer cancelar ${job?.filename ?? job?.job_id}? O processamento vai parar e o job ficará marcado como cancelado.`
+            : `Tem certeza que quer apagar ${job?.filename ?? job?.job_id}? Isso remove o job, os arquivos gerados e qualquer rastro do servidor.`
+        }
+        confirmLabel={dialog === "cancel" ? "Sim, cancelar" : "Sim, apagar"}
+        destructive={dialog === "delete"}
+        busy={busy}
+        onConfirm={async () => {
+          const current = dialog;
+          setDialog(null);
+          if (current === "cancel") {
+            await cancel();
+          } else {
+            await remove();
+          }
+        }}
+      />
     </div>
   );
 }

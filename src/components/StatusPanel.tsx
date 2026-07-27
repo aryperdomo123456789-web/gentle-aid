@@ -8,6 +8,7 @@ const STATUS_LABEL: Record<string, string> = {
   running: "Processando",
   done: "Concluído",
   error: "Erro",
+  cancelled: "Cancelado",
 };
 
 export function StatusPanel({
@@ -107,6 +108,7 @@ export function StatusPill({ status }: { status: string }) {
     running: "border-electric/50 bg-electric/10 text-foreground",
     done: "border-success/50 bg-success/15 text-foreground",
     error: "border-destructive/50 bg-destructive/15 text-foreground",
+    cancelled: "border-border bg-muted/50 text-muted-foreground",
   };
   return (
     <span
