@@ -243,19 +243,26 @@ PROVIDERS: list[dict[str, Any]] = [
         "name": "Whisper API",
         "category": "Transcrição",
         "env": "WHISPER_API_KEY",
-        "docs": "https://platform.openai.com/docs/api-reference/audio",
+        "docs": "https://whisper-api.com/docs/",
         "usage": "Fallback de transcrição quando a Groq falha ou estoura limite.",
-        "format_hint": "Aceita chave OpenAI (sk-...) ou endpoint compatível definido em WHISPER_API_BASE.",
-        "remediation": "Cole uma chave OpenAI (sk-...) ou aponte WHISPER_API_BASE para o endpoint compatível (ex.: https://api.groq.com/openai/v1) antes de testar de novo.",
+        "format_hint": "Chave do whisper-api.com (header X-API-Key). Para usar OpenAI ou outro endpoint compatível, defina WHISPER_API_BASE.",
+        "remediation": "Copie a chave do dashboard em whisper-api.com/login, ou aponte WHISPER_API_BASE para um endpoint compatível com a OpenAI.",
         "test": [
+            # whisper-api.com: base https://api.whisper-api.com, autenticação por X-API-Key.
+            {
+                "url": "https://api.whisper-api.com/transcriptions",
+                "auth": "header",
+                "header": "X-API-Key",
+            },
+            # Endpoint compatível com OpenAI, quando configurado.
             {
                 "url": os.environ.get("WHISPER_API_BASE", "https://api.openai.com/v1").rstrip("/") + "/models",
                 "auth": "bearer",
             },
-            # Fallback: muitos deploys reaproveitam a Groq como endpoint Whisper.
             {"url": "https://api.groq.com/openai/v1/models", "auth": "bearer"},
         ],
     },
+
     {
         "id": "tikapi",
         "name": "TikAPI",
