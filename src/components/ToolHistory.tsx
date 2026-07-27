@@ -5,43 +5,16 @@ import { useCallback, useEffect, useState } from "react";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { JobMediaPreview } from "./JobMediaPreview";
 import { StatusPill } from "./StatusPanel";
-import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError, type Job } from "@/lib/api";
-
-function formatBytes(bytes?: number): string {
-  if (!bytes) return "—";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
-}
-
-function formatDate(iso?: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-}
-
-function sourceLabel(job: Job): string | null {
-  if (job.source_kind === "upload") return `Envio local · ${job.source_label ?? "arquivo local"}`;
-  if (job.source_kind === "download")
-    return `URL · ${job.source_label ?? job.source_url ?? "remota"}`;
-  const rawCard = job.meta?.source_card;
-  if (!rawCard || typeof rawCard !== "object" || Array.isArray(rawCard)) return null;
-  const card = rawCard as { title?: string };
-  if (card?.title) return `Card · ${card.title}`;
-  return null;
-}
-
-function hasPreview(job: Job): boolean {
-  if (job.download_url || (job.outputs?.length ?? 0) > 0) return true;
-  const rawCard = job.meta?.source_card;
-  return Boolean(rawCard && typeof rawCard === "object" && !Array.isArray(rawCard));
-}
+import { cancelJob, deleteJob, fetchJobList } from "@/features/jobs/api";
+import {
+  formatDurationMs,
+  hasPreview,
+  isCancellable,
+  sourceLabel,
+  stageLabel,
+} from "@/features/jobs/job-utils";
+import { formatBytes, formatDateTime } from "@/lib/format";
+import { downloadUrl, friendlyError, type Job } from "@/lib/api";
 
 /**
  * Histórico local da ferramenta — mesmo padrão do legado:
@@ -69,8 +42,8 @@ export function ToolHistory({
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<{ jobs: Job[] }>(`/api/jobs?tool=${encodeURIComponent(tool)}`);
-      setJobs((data.jobs ?? []).slice(0, limit));
+      const data = await fetchJobList({ tool, limit });
+      setJobs(data.jobs.slice(0, limit));
     } catch (err) {
       setError(friendlyError(err));
       setJobs([]);
@@ -94,7 +67,7 @@ export function ToolHistory({
     setBusyJobId(jobId);
     setError(null);
     try {
-      await apiPostJson(`/api/jobs/${jobId}/cancel`, {});
+      await cancelJob(jobId);
       await load();
     } catch (err) {
       setError(friendlyError(err));
@@ -108,7 +81,7 @@ export function ToolHistory({
     setBusyJobId(jobId);
     setError(null);
     try {
-      await apiDelete(`/api/jobs/${jobId}`);
+      await deleteJob(jobId);
       if (preview?.job_id === jobId) setPreview(null);
       await load();
     } catch (err) {
@@ -169,7 +142,7 @@ export function ToolHistory({
               <div className="min-w-0 flex-1">
                 <p className="break-words text-sm font-medium sm:truncate">{job.filename ?? job.job_id}</p>
                 <p className="break-words text-xs text-muted-foreground sm:truncate">
-                  {formatDate(job.created_at)} · {formatBytes(job.size_bytes)}
+                  {formatDateTime(job.created_at)} · {formatBytes(job.size_bytes)}
                   {job.md5_after ? (
                     <>
                       {" · "}
@@ -177,7 +150,13 @@ export function ToolHistory({
                     </>
                   ) : null}
                   {job.outputs && job.outputs.length > 1 ? ` · ${job.outputs.length} arquivos` : ""}
+                  {` · ${formatDurationMs(job.duration_ms)}`}
                 </p>
+                {stageLabel(job.stage) && !job.terminal ? (
+                  <p className="mt-1 text-[11px] uppercase tracking-wide text-primary">
+                    Etapa: {stageLabel(job.stage)}
+                  </p>
+                ) : null}
                 {typeof job.meta?.source_card === "object" && job.meta.source_card ? (
                   <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
                     {(job.meta.source_card as { title?: string; desc?: string }).title ??
@@ -193,7 +172,7 @@ export function ToolHistory({
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <StatusPill status={job.status} />
-                {job.status === "queued" || job.status === "running" ? (
+                {isCancellable(job) ? (
                   <button
                     type="button"
                     onClick={() => setDialog({ job, kind: "cancel" })}
@@ -258,7 +237,7 @@ export function ToolHistory({
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold">{preview.filename ?? preview.job_id}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {preview.tool} · {formatDate(preview.created_at)}
+                  {preview.tool} · {formatDateTime(preview.created_at)}
                 </p>
                 {sourceLabel(preview) ? (
                   <p className="truncate text-xs text-muted-foreground">{sourceLabel(preview)}</p>
