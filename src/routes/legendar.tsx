@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
 import { Field, FileDrop, SelectInput, TextArea } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
@@ -337,7 +338,7 @@ function Legendar() {
           </span>
           <button
             type="button"
-            onClick={exportVideo}
+            onClick={() => setPanel("exportar")}
             disabled={busy}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60 sm:px-4"
           >
@@ -648,6 +649,29 @@ function Legendar() {
 
             {panel === "esterilizar" ? (
               <MutationSelect value={mutation} onChange={setMutation} />
+            ) : null}
+
+            {panel === "exportar" ? (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Confira o resumo e salve as configurações. A renderização só libera depois da
+                  conferência.
+                </p>
+                <JobSettingsGuard
+                  busy={busy}
+                  disabled={!file && !card}
+                  entries={exportEntries}
+                  signature={exportSignature}
+                  onStart={exportVideo}
+                  label="Exportar legendado"
+                  busyLabel="Renderizando…"
+                />
+                {!file && !card ? (
+                  <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+                    Envie um vídeo em Uploads ou escolha um na Pesquisa antes de exportar.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
 
             {panel === "jobs" ? (
