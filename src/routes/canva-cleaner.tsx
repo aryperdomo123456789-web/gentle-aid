@@ -68,28 +68,14 @@ function CanvaCleaner() {
                 </SelectInput>
               )}
             </Field>
-            <Field label="Mutação temporal">
-              {(id) => (
-                <SelectInput id={id} name="mutation" defaultValue="media">
-                  <option value="off">Desligada</option>
-                  <option value="leve">Leve — corta 1 frame nas pontas</option>
-                  <option value="media">Média — speed 1.01x + micro-crop</option>
-                  <option value="agressiva">Agressiva — speed, crop, ruído e EQ</option>
-                </SelectInput>
-              )}
-            </Field>
+            <MutationSelect defaultValue="media" label="Nível de esterilização" hint="" />
           </div>
 
-          <label className="flex items-center gap-3 rounded-xl border border-border bg-background/40 p-3 text-sm">
-            <input
-              type="checkbox"
-              name="strip_metadata"
-              value="1"
-              defaultChecked
-              className="size-4 accent-[var(--primary)]"
-            />
-            Remover todos os metadados (ISO, encoder, Canva, GPS)
-          </label>
+          <p className="rounded-xl border border-border bg-background/40 p-3 text-xs text-muted-foreground">
+            A remoção total de metadados (ISO, encoder, Canva, GPS, XMP) é sempre aplicada e não pode
+            ser desligada — o arquivo final recebe identidade forjada e hash inédito.
+          </p>
+
 
           <SubmitButton busy={busy} disabled={!hasFile}>
             {busy ? "Limpando e recodificando…" : "Executar limpeza"}
