@@ -373,3 +373,170 @@ def test_provider(provider_id: str) -> dict[str, Any]:
     }
     _record_test(provider_id, result)
     return result
+
+
+# --- Auto-preenchimento (importação de chaves existentes) --------------------
+# Nomes alternativos que o projeto legado usava para a mesma chave.
+ALIASES: dict[str, list[str]] = {
+    "deepseek": ["DEEPSEEK_KEY", "DEEPSEEK_TOKEN", "DEEP_SEEK_API_KEY"],
+    "gemini": ["GOOGLE_API_KEY", "GOOGLE_GEMINI_API_KEY", "GEMINI_KEY"],
+    "groq": ["GROQ_KEY", "GROQ_TOKEN"],
+    "openrouter": ["OPENROUTER_KEY", "OPEN_ROUTER_API_KEY"],
+    "mistral": ["MISTRAL_KEY"],
+    "siliconflow": ["SILICON_FLOW_API_KEY", "SILICONFLOW_KEY"],
+    "huggingface": ["HF_TOKEN", "HUGGINGFACEHUB_API_TOKEN", "HUGGING_FACE_TOKEN"],
+    "cohere": ["COHERE_KEY", "CO_API_KEY"],
+    "tavily": ["TAVILY_KEY"],
+    "exa": ["EXA_KEY", "EXA_SEARCH_API_KEY"],
+    "firecrawl": ["FIRECRAWL_KEY"],
+    "jina": ["JINA_TOKEN", "JINA_READER_KEY"],
+    "langfuse": ["LANGFUSE_SK", "LANGFUSE_PUBLIC_KEY"],
+    "cloudflare": ["CF_API_TOKEN", "CLOUDFLARE_TOKEN"],
+    "whisper": ["WHISPER_KEY", "OPENAI_API_KEY"],
+    "tikapi": ["TIKAPI_API_KEY", "TIK_API_KEY"],
+    "lamatok": ["LAMATOK_KEY", "LAMATOK_TOKEN"],
+}
+
+# Assinatura por prefixo — pega a chave mesmo com nome de variável desconhecido.
+_PREFIX_OWNER = {
+    "gsk_": "groq",
+    "sk-or-": "openrouter",
+    "tvly-": "tavily",
+    "fc-": "firecrawl",
+    "hf_": "huggingface",
+    "jina_": "jina",
+    "sk-lf-": "langfuse",
+}
+
+_KV = None  # regex compilada sob demanda
+_autofill_done = False
+
+
+def _scan_paths() -> list:
+    """Arquivos onde as chaves podem estar (env, app antigo, configs legadas)."""
+    from pathlib import Path
+
+    extra = os.environ.get("VIRAL_KEY_SCAN_PATHS", "")
+    roots = [config.app_root, config.storage_dir / "_config"]
+    roots += [Path("/www/wwwroot/viral.vr766.com"), Path("/www/wwwroot/viral.vr766.com.bak")]
+    roots += [Path(p) for p in extra.split(":") if p.strip()]
+
+    names = [
+        ".env", ".env.local", ".env.production", "env", "config.env",
+        "api_keys.env", "keys.env", "chaves.txt", "apis.txt",
+        "api_keys.json", "config.json", "keys.json", "secrets.json",
+        "config.py", "settings.py", "webapp.py",
+    ]
+    found = []
+    for root in roots:
+        try:
+            if not root.exists():
+                continue
+        except OSError:
+            continue
+        for name in names:
+            f = root / name
+            if f.is_file() and f.stat().st_size < 2_000_000:
+                found.append(f)
+    return found
+
+
+def _harvest(text: str) -> dict[str, str]:
+    """Extrai pares NOME=valor / "nome": "valor" de qualquer formato texto."""
+    global _KV
+    import re
+
+    if _KV is None:
+        _KV = re.compile(
+            r'["\']?([A-Za-z_][A-Za-z0-9_]{2,60})["\']?\s*[:=]\s*["\']?'
+            r'([A-Za-z0-9_\-\.]{12,200})["\']?'
+        )
+    out: dict[str, str] = {}
+    for name, value in _KV.findall(text):
+        upper = name.upper()
+        if value.lower() in {"none", "null", "true", "false", "change-me-in-env"}:
+            continue
+        out.setdefault(upper, value)
+    return out
+
+
+def autofill(force: bool = False) -> dict[str, Any]:
+    """Preenche o cofre com chaves encontradas no ambiente e em arquivos legados."""
+    harvested: dict[str, str] = {}
+    sources: dict[str, str] = {}
+
+    for key, value in os.environ.items():
+        if value and len(value) >= 12:
+            harvested.setdefault(key.upper(), value)
+            sources.setdefault(key.upper(), "ambiente")
+
+    for path in _scan_paths():
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for name, value in _harvest(text).items():
+            if name not in harvested:
+                harvested[name] = value
+                sources[name] = str(path)
+
+    with _lock:
+        data = _load()
+        imported, skipped = [], []
+
+        for provider in PROVIDERS:
+            pid = provider["id"]
+            existing = (data.get(pid) or {}).get("key")
+            if existing and not force:
+                skipped.append(pid)
+                continue
+
+            candidates = [provider["env"]] + ALIASES.get(pid, [])
+            value = next((harvested[c.upper()] for c in candidates if harvested.get(c.upper())), None)
+            origin = next((sources[c.upper()] for c in candidates if harvested.get(c.upper())), "")
+
+            if not value:
+                # fallback: procura por assinatura de prefixo
+                prefixes = [p for p, owner in _PREFIX_OWNER.items() if owner == pid]
+                for name, val in harvested.items():
+                    if any(val.startswith(p) for p in prefixes):
+                        value, origin = val, sources.get(name, "")
+                        break
+
+            if not value:
+                continue
+            prefix = provider.get("prefix")
+            if prefix and not value.startswith(prefix):
+                continue
+
+            entry = data.get(pid, {})
+            entry.update({
+                "key": value.strip(),
+                "note": entry.get("note") or f"Importado automaticamente de {origin or 'ambiente'}",
+                "updated_at": _now(),
+            })
+            entry.pop("last_test", None)
+            data[pid] = entry
+            imported.append(pid)
+
+        if imported:
+            _save(data)
+
+    return {
+        "imported": imported,
+        "skipped": skipped,
+        "scanned": [str(p) for p in _scan_paths()],
+        "total_configured": sum(1 for p in list_all() if p["configured"]),
+    }
+
+
+def autofill_once() -> None:
+    """Roda uma vez por processo, no boot da aplicação."""
+    global _autofill_done
+    if _autofill_done:
+        return
+    _autofill_done = True
+    try:
+        autofill(force=False)
+    except Exception:  # noqa: BLE001 — nunca derruba o boot
+        pass
