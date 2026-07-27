@@ -86,7 +86,7 @@ function TikTokDashboard() {
       subtitle="Radar de tendências por nicho e região, extração de métricas e clonagem 1:1 de virais com esterilização completa de metadados."
       left={
         <div className="space-y-6">
-          <form onSubmit={loadRadar} className="grid gap-5 sm:grid-cols-2">
+          <form onSubmit={loadRadar} className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
             <Field label="Nicho">
               {(id) => (
                 <TextInput
@@ -132,7 +132,7 @@ function TikTokDashboard() {
                 {trends.map((t) => (
                   <li
                     key={t.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background/50 p-4"
+                    className="flex flex-col gap-3 rounded-xl border border-border bg-background/50 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-4"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{t.title}</p>

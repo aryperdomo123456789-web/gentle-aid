@@ -28,7 +28,7 @@ export function StatusPanel({
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <Terminal className="size-4 text-primary" aria-hidden="true" />
           Status do processamento
@@ -63,7 +63,7 @@ export function StatusPanel({
         </section>
       ) : null}
 
-      <div className="min-h-40 flex-1 overflow-auto rounded-xl border border-border bg-background/70 p-3">
+      <div className="min-h-40 max-h-[45vh] flex-1 overflow-auto overflow-x-hidden rounded-xl border border-border bg-background/70 p-3">
         {lines.length === 0 ? (
           <p className="font-mono text-xs text-muted-foreground">
             {busy ? "Iniciando FFmpeg…" : emptyHint}
@@ -95,8 +95,8 @@ export function StatusPanel({
         aria-disabled={!job?.download_url}
         className={
           job?.download_url
-            ? "inline-flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-success-foreground transition-opacity hover:opacity-90"
-            : "pointer-events-none inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm font-semibold text-muted-foreground"
+            ? "inline-flex items-center justify-center gap-2 min-h-12 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-success-foreground transition-opacity hover:opacity-90"
+            : "pointer-events-none inline-flex items-center justify-center gap-2 min-h-12 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm font-semibold text-muted-foreground"
         }
       >
         <Download className="size-4" aria-hidden="true" />
@@ -109,9 +109,9 @@ export function StatusPanel({
 function HashRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="truncate font-mono text-foreground">{value}</dd>
+    <div className="flex flex-col gap-1 rounded-lg border border-border bg-background/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-all font-mono text-foreground sm:truncate sm:text-right">{value}</dd>
     </div>
   );
 }

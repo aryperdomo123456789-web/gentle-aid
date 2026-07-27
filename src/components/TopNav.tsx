@@ -40,64 +40,68 @@ export function TopNav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 md:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4 md:gap-4 md:px-8">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
+          <Link to="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
             <span
-              className="flex size-9 items-center justify-center rounded-xl text-sm font-bold text-primary-foreground"
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-primary-foreground"
               style={{ backgroundImage: "var(--gradient-viral)" }}
               aria-hidden="true"
             >
               EV
             </span>
-            <div className="leading-tight">
-              <p className="font-display text-base font-bold tracking-tight">
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate font-display text-sm font-bold tracking-tight sm:text-base">
                 Ecossistema <span className="text-gradient-viral">Viral</span>
-              </p>
-              <p className="text-xs text-muted-foreground">
+              </span>
+              <span className="hidden truncate text-xs text-muted-foreground sm:block">
                 Pipeline FFmpeg · desvio algorítmico · aaPanel
-              </p>
-            </div>
-          </div>
+              </span>
+            </span>
+          </Link>
 
           {auth.user ? (
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                <Shield className="size-3.5 text-success" aria-hidden="true" />
-                {auth.user.name} · {auth.user.role === "owner" ? "dono" : "usuário"}
+            <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2">
+              <span className="hidden max-w-[220px] items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:inline-flex">
+                <Shield className="size-3.5 shrink-0 text-success" aria-hidden="true" />
+                <span className="truncate">
+                  {auth.user.name} · {auth.user.role === "owner" ? "dono" : "usuário"}
+                </span>
               </span>
-              <span className="hidden rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs font-mono text-muted-foreground md:inline-flex">
+              <span className="hidden max-w-[240px] truncate rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs font-mono text-muted-foreground lg:inline-flex">
                 {auth.user.email}
               </span>
               <Link
                 to="/conta"
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50"
+                aria-label="Conta"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50"
               >
-                <UserCog className="size-3.5" aria-hidden="true" />
-                Conta
+                <UserCog className="size-4 shrink-0" aria-hidden="true" />
+                <span className="hidden sm:inline">Conta</span>
               </Link>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-destructive/50 hover:text-destructive"
+                aria-label="Sair"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-destructive/50 hover:text-destructive"
               >
-                <LogOut className="size-3.5" aria-hidden="true" />
-                Sair
+                <LogOut className="size-4 shrink-0" aria-hidden="true" />
+                <span className="hidden sm:inline">Sair</span>
               </button>
             </div>
           ) : null}
         </div>
 
-        <nav aria-label="Ferramentas" className="-mx-1 pb-1">
-          <ul className="flex flex-wrap items-center gap-2 px-1">
+        <nav aria-label="Ferramentas" className="-mx-3 overflow-x-auto pb-1 sm:-mx-1 sm:overflow-visible">
+          <ul className="flex w-max items-center gap-2 px-3 sm:w-auto sm:flex-wrap sm:px-1">
             {TOOLS.map(({ to, label, icon: Icon }) => (
-              <li key={to}>
+              <li key={to} className="shrink-0">
                 <Link
                   to={to}
                   activeOptions={{ exact: to === "/" }}
-                  className="flex items-center gap-2 rounded-full border border-border/80 bg-surface/70 px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground data-[status=active]:border-transparent data-[status=active]:bg-primary data-[status=active]:text-primary-foreground"
+                  className="flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border/80 bg-surface/70 px-3.5 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground data-[status=active]:border-transparent data-[status=active]:bg-primary data-[status=active]:text-primary-foreground sm:px-4 sm:text-sm"
                 >
-                  <Icon className="size-4" aria-hidden="true" />
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
                   {label}
                 </Link>
               </li>

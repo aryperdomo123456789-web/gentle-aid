@@ -149,14 +149,14 @@ export function VoicePicker({
         </p>
       </header>
 
-      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-background/50 p-1">
+      <div className="scroll-x flex gap-2 overflow-x-auto rounded-xl border border-border bg-background/50 p-1 sm:flex-wrap sm:overflow-visible">
         {engines.map(([id, label, enabled]) => (
           <button
             key={id}
             type="button"
             disabled={!enabled}
             onClick={() => switchEngine(id)}
-            className={`flex-1 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors disabled:opacity-40 ${
+            className={`min-h-10 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-[11px] sm:flex-1 font-semibold transition-colors disabled:opacity-40 ${
               value.engine === id
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"

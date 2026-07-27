@@ -163,12 +163,12 @@ export function ToolHistory({
         {jobs.map((job) => (
           <li
             key={job.job_id}
-            className="rounded-xl border border-border bg-background/40 px-4 py-3"
+            className="min-w-0 rounded-xl border border-border bg-background/40 px-3 py-3 sm:px-4"
           >
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{job.filename ?? job.job_id}</p>
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="break-words text-sm font-medium sm:truncate">{job.filename ?? job.job_id}</p>
+                <p className="break-words text-xs text-muted-foreground sm:truncate">
                   {formatDate(job.created_at)} · {formatBytes(job.size_bytes)}
                   {job.md5_after ? (
                     <>
@@ -191,7 +191,7 @@ export function ToolHistory({
                   </p>
                 ) : null}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <StatusPill status={job.status} />
                 {job.status === "queued" || job.status === "running" ? (
                   <button

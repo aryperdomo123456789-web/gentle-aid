@@ -230,13 +230,13 @@ function RadarGlobal() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+      <main className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <header className="mb-6">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-muted-foreground">
             <RadarIcon className="size-3.5 text-primary" aria-hidden="true" /> Radar Global ·
             /api/radar
           </span>
-          <h1 className="mt-3 text-3xl font-bold md:text-4xl">Radar Global de Tendências</h1>
+          <h1 className="mt-3 text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Radar Global de Tendências</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
             Radar congelado. Só "Varrer radar" atualiza.
           </p>
@@ -257,7 +257,7 @@ function RadarGlobal() {
             e.preventDefault();
             void load(true);
           }}
-          className="panel mb-6 grid gap-4 p-5 sm:grid-cols-[1fr_180px_auto_auto]"
+          className="panel mb-6 grid gap-4 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_180px_auto_auto] md:items-end"
         >
           <Field label="Nicho (opcional)">
             {(id) => (
@@ -310,7 +310,7 @@ function RadarGlobal() {
         ) : null}
 
         {data?.intelligence?.length ? (
-          <section className="panel mb-6 p-5">
+          <section className="panel mb-6 min-w-0 p-4 sm:p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -334,15 +334,15 @@ function RadarGlobal() {
                 Atualizar inteligência
               </button>
             </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
               {data.intelligence.slice(0, 6).map((item) => (
                 <article
                   key={item.topic}
                   className="rounded-2xl border border-border bg-background/50 p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold">{item.topic}</h3>
+                    <div className="min-w-0">
+                      <h3 className="break-words text-sm font-semibold">{item.topic}</h3>
                       <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
                         {item.horizon} · {item.sources.length} fonte(s)
                       </p>
@@ -408,7 +408,7 @@ function RadarGlobal() {
         ) : null}
 
         {forecast ? (
-          <section className="panel mb-8 p-5">
+          <section className="panel mb-8 min-w-0 p-4 sm:p-5">
             <header className="mb-4 flex flex-wrap items-center gap-2">
               <Sparkles className="size-4 text-primary" aria-hidden="true" />
               <h2 className="text-lg font-semibold">Previsão de nichos</h2>
@@ -416,14 +416,14 @@ function RadarGlobal() {
                 motor: {forecast.engine}
               </span>
             </header>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
               {forecast.forecast.map((f, i) => (
                 <article
                   key={`${f.nicho}-${i}`}
                   className="rounded-xl border border-border bg-background/50 p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold">{f.nicho}</h3>
+                    <h3 className="min-w-0 break-words text-sm font-semibold">{f.nicho}</h3>
                     <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
                       {f.confianca}%
                     </span>
@@ -456,8 +456,8 @@ function RadarGlobal() {
           </section>
         ) : null}
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="panel p-5">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
+          <section className="panel min-w-0 p-4 sm:p-5">
             <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
               <TrendingUp className="size-4 text-primary" aria-hidden="true" /> Buscas em alta (
               {data?.region ?? region})
@@ -493,19 +493,19 @@ function RadarGlobal() {
             )}
           </section>
 
-          <section className="panel p-5">
+          <section className="panel min-w-0 p-4 sm:p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 text-lg font-semibold">
                 <Activity className="size-4 text-electric" aria-hidden="true" /> Vídeos com tração
                 real
               </h2>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <label className="flex w-full items-center gap-2 text-xs text-muted-foreground sm:w-auto">
                 Mutação
                 <SelectInput
                   aria-label="Nível de esterilização do clone"
                   value={cloneLevel}
                   onChange={(e) => setCloneLevel(e.target.value)}
-                  className="h-9 w-44 text-xs"
+                  className="h-9 w-full text-xs sm:w-44"
                 >
                   {MUTATION_LEVELS.map((l) => (
                     <option key={l.value} value={l.value}>
@@ -530,11 +530,11 @@ function RadarGlobal() {
         </div>
 
         {data?.web?.results?.length ? (
-          <section className="panel mt-6 p-5">
+          <section className="panel mt-6 min-w-0 p-4 sm:p-5">
             <h2 className="mb-3 text-lg font-semibold">
               Pesquisa web{data.web.chosen ? ` · melhor fonte: ${data.web.chosen}` : ""}
             </h2>
-            <ul className="grid gap-3 md:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               {data.web.results.map((r) => (
                 <li key={r.url} className="rounded-lg border border-border bg-background/50 p-3">
                   <a
@@ -555,13 +555,13 @@ function RadarGlobal() {
           </section>
         ) : null}
         {cloneTarget ? (
-          <section className="panel mt-6 p-5">
+          <section className="panel mt-6 min-w-0 p-4 sm:p-5">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="flex items-center gap-2 text-lg font-semibold">
                   <Wand2 className="size-4 text-primary" aria-hidden="true" /> Esteira de clonagem
                 </h2>
-                <p className="mt-1 truncate text-xs text-muted-foreground">
+                <p className="mt-1 break-words text-xs text-muted-foreground">
                   {cloneTarget.title} · mutação {cloneLevel}
                 </p>
               </div>
@@ -599,17 +599,17 @@ function RadarGlobal() {
             role="dialog"
             aria-modal="true"
             aria-label={`Assistir ${watchTarget.title}`}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background/90 p-2 backdrop-blur-sm sm:p-4"
             onClick={() => setWatchTarget(null)}
           >
             <div
               className="w-full max-w-5xl overflow-hidden rounded-3xl border border-border bg-surface shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
+              <div className="flex items-start justify-between gap-3 border-b border-border px-3 py-3 sm:px-4">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{watchTarget.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="break-words text-sm font-semibold sm:truncate">{watchTarget.title}</p>
+                  <p className="break-words text-xs text-muted-foreground sm:truncate">
                     @{watchTarget.author} · {watchTarget.views_human} visualizações ·{" "}
                     {watchTarget.source}
                   </p>
@@ -664,13 +664,13 @@ function VideoList({
         return (
           <li
             key={`${v.id}-${i}`}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2"
+            className="flex flex-col gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3"
           >
             <div className="min-w-0 flex-1">
               <button
                 type="button"
                 onClick={() => onWatch(v)}
-                className="block truncate text-left text-sm font-medium hover:underline"
+                className="block w-full break-words text-left text-sm font-medium hover:underline"
               >
                 {v.title}
               </button>
@@ -679,7 +679,7 @@ function VideoList({
                 {v.source}
               </p>
             </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
               <button
                 type="button"
                 onClick={() => onWatch(v)}

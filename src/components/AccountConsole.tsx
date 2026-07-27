@@ -89,15 +89,15 @@ export function AccountConsole() {
   }
 
   return (
-    <section className="grid w-full gap-6 lg:grid-cols-[1.02fr_0.98fr]">
-      <div className="panel space-y-6 px-6 py-7 md:px-8">
+    <section className="grid w-full gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
+      <div className="panel min-w-0 space-y-6 px-4 py-6 sm:px-6 sm:py-7 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium">
               <Shield className="size-3.5" />
               Sessão ativa
             </span>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight text-foreground">
+            <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               {auth.isOwner ? "Console do dono" : "Minha conta"}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -107,7 +107,7 @@ export function AccountConsole() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
           <SummaryTile label="Usuário ativo" value={auth.user?.email ?? "-"} />
           <SummaryTile label="Perfil" value={auth.user?.role === "owner" ? "Dono" : "Usuário"} />
           <SummaryTile
@@ -232,7 +232,7 @@ export function AccountConsole() {
           </div>
 
           {auth.isOwner ? (
-            <div className="min-w-[220px]">
+            <div className="w-full sm:min-w-[220px]">
               <Field label="Buscar">
                 {(id) => (
                   <TextInput

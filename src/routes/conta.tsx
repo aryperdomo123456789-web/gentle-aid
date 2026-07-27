@@ -20,7 +20,7 @@ function AccountPage() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto w-full max-w-[1600px] px-4 py-8 md:px-8">
+      <main className="mx-auto w-full max-w-[1600px] px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <AccountConsole />
       </main>
     </div>

@@ -197,14 +197,14 @@ function ApisPage() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto w-full max-w-[1600px] px-4 py-8 md:px-8">
+      <main className="mx-auto w-full max-w-[1600px] px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-foreground">
               <KeyRound className="size-3.5" aria-hidden="true" />
               Cofre · /api/apis
             </span>
-            <h1 className="mt-3 text-3xl font-bold md:text-4xl">Central de APIs</h1>
+            <h1 className="mt-3 text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Central de APIs</h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               Todas as integrações do pipeline em um só lugar. Substitua uma chave que estourou o
               limite, remova a que não usa mais e teste a conectividade sem sair do painel — as
@@ -329,7 +329,7 @@ function ApisPage() {
           </section>
         ) : null}
 
-        <dl className="mb-6 grid gap-3 sm:grid-cols-3">
+        <dl className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Stat label="Integrações mapeadas" value={String(providers.length)} />
           <Stat label="Com chave ativa" value={`${configured}/${providers.length}`} />
           <Stat
@@ -346,8 +346,8 @@ function ApisPage() {
           </p>
         ) : null}
 
-        <nav aria-label="Filtrar por categoria" className="mb-6 -mx-1 overflow-x-auto pb-1">
-          <ul className="flex min-w-max gap-2 px-1">
+        <nav aria-label="Filtrar por categoria" className="scroll-x -mx-3 mb-6 overflow-x-auto pb-1 sm:-mx-1">
+          <ul className="flex min-w-max gap-2 px-3 sm:px-1">
             {categories.map((cat) => (
               <li key={cat}>
                 <button
@@ -355,8 +355,8 @@ function ApisPage() {
                   onClick={() => setFilter(cat)}
                   className={
                     cat === filter
-                      ? "rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-                      : "rounded-full border border-border/80 bg-surface/70 px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                      ? "min-h-10 whitespace-nowrap rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                      : "min-h-10 whitespace-nowrap rounded-full border border-border/80 bg-surface/70 px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
                   }
                 >
                   {cat}
@@ -391,14 +391,14 @@ function ApisPage() {
             </button>
           </div>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2">
             {visible.map((provider) => (
               <ProviderCard key={provider.id} provider={provider} onChange={replace} />
             ))}
           </div>
         )}
       </main>
-      <footer className="mx-auto w-full max-w-[1600px] px-4 pb-10 text-xs text-muted-foreground md:px-8">
+      <footer className="mx-auto w-full max-w-[1600px] px-3 pb-10 text-xs sm:px-4 text-muted-foreground md:px-8">
         Chaves gravadas em <code className="font-mono">fabrica_clips/_config/api_keys.json</code>{" "}
         (permissão 600, fora do Git). Variáveis de ambiente continuam valendo como fallback.
       </footer>
@@ -494,10 +494,10 @@ function ProviderCard({
   const inputId = `key-${provider.id}`;
 
   return (
-    <article className="panel flex flex-col gap-4 p-5">
-      <header className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">{provider.name}</h2>
+    <article className="panel flex min-w-0 flex-col gap-4 p-4 sm:p-5">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        <div className="min-w-0">
+          <h2 className="break-words text-base font-semibold">{provider.name}</h2>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <p className="text-xs text-muted-foreground">{provider.category}</p>
             <span
@@ -566,21 +566,21 @@ function ProviderCard({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="Cole aqui a chave de substituição"
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:border-primary"
+          className="w-full min-h-11 rounded-lg border border-border bg-background px-3 py-2 font-mono text-base outline-none focus:border-primary sm:text-sm"
         />
         <input
           type="text"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Anotação (ex.: conta de produção, plano pago)"
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          className="w-full min-h-11 rounded-lg border border-border bg-background px-3 py-2 text-base outline-none focus:border-primary sm:text-sm"
         />
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => void save()}
             disabled={!value.trim() || busy !== null}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold sm:flex-none text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {busy === "save" ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -593,7 +593,7 @@ function ProviderCard({
             type="button"
             onClick={() => void test()}
             disabled={busy !== null || !provider.configured}
-            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:border-primary/50 disabled:opacity-50"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium sm:flex-none transition-colors hover:border-primary/50 disabled:opacity-50"
           >
             {busy === "test" ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -606,7 +606,7 @@ function ProviderCard({
             type="button"
             onClick={() => void remove()}
             disabled={busy !== null || provider.source !== "cofre"}
-            className="inline-flex items-center gap-2 rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium sm:flex-none text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
           >
             <Trash2 className="size-4" aria-hidden="true" />
             Remover
@@ -615,7 +615,7 @@ function ProviderCard({
             href={provider.docs}
             target="_blank"
             rel="noreferrer noopener"
-            className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm sm:ml-auto text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
             Documentação
             <ExternalLink className="size-3.5" aria-hidden="true" />
@@ -632,9 +632,9 @@ function ProviderCard({
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2">
+    <div className="flex flex-col gap-1 rounded-lg border border-border bg-background/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className={`truncate text-right ${mono ? "font-mono" : ""}`}>{value}</dd>
+      <dd className={`min-w-0 break-all sm:truncate sm:text-right ${mono ? "font-mono" : ""}`}>{value}</dd>
     </div>
   );
 }
