@@ -108,6 +108,7 @@ PROVIDERS: list[dict[str, Any]] = [
         "usage": "Download de modelos RVC/Coqui e inferência serverless.",
         "prefix": "hf_",
         "format_hint": "Use um Access Token do tipo 'Read' (Settings → Access Tokens). Tokens fine-grained sem escopo de leitura respondem 401.",
+        "remediation": "Gere um novo token em huggingface.co/settings/tokens com tipo 'Read' e cole aqui — o token atual foi revogado.",
         "test": [
             {"url": "https://huggingface.co/api/whoami-v2", "auth": "bearer"},
             {"url": "https://huggingface.co/api/models?limit=1", "auth": "bearer"},
@@ -121,6 +122,7 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://docs.cohere.com/reference/checkapikey",
         "usage": "Reranking de candidatos de pesquisa e de trechos virais.",
         "format_hint": "Chaves de trial da Cohere não têm acesso a /v1/models; o teste usa o endpoint oficial check-api-key.",
+        "remediation": "Gere uma nova chave em dashboard.cohere.com → API Keys (Trial serve) e cole aqui.",
         "test": [
             {"url": "https://api.cohere.com/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
             {"url": "https://api.cohere.ai/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
