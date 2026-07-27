@@ -155,9 +155,6 @@ function AuthGate() {
     if (!auth.user && location.pathname !== "/login") {
       void navigate({ to: "/login", replace: true });
     }
-    if (auth.user && location.pathname === "/login") {
-      void navigate({ to: "/", replace: true });
-    }
   }, [auth.ready, auth.user, location.pathname, navigate]);
 
   if (!auth.ready) {
