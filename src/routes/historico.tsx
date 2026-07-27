@@ -222,27 +222,29 @@ function Historico() {
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="font-display text-sm font-semibold break-words">
-                    {TOOL_LABEL[job.tool] ?? job.tool}
+                    {toolLabel(job.tool)}
                     <span className="ml-2 break-all font-mono text-xs text-muted-foreground">
                       {job.job_id}
                     </span>
                   </p>
                   <p className="break-words text-xs text-muted-foreground">
-                    {job.filename ?? "—"} · {job.created_at ?? "sem data"}
+                    {job.filename ?? "—"} · {formatDateTime(job.created_at)} ·{" "}
+                    {formatBytes(job.size_bytes)} · {formatDurationMs(job.duration_ms)}
                   </p>
-                  {job.source_kind || job.meta?.source_card ? (
+                  {stageLabel(job.stage) ? (
+                    <p className="mt-1 text-[11px] uppercase tracking-wide text-primary">
+                      Etapa: {stageLabel(job.stage)}
+                    </p>
+                  ) : null}
+                  {sourceLabel(job) ? (
                     <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                      {job.source_kind === "upload"
-                        ? `Origem: upload${job.source_label ? ` · ${job.source_label}` : ""}`
-                        : job.source_kind === "download"
-                          ? `Origem: URL${job.source_label ? ` · ${job.source_label}` : ""}`
-                          : "Origem: card rastreado"}
+                      Origem rastreada: {sourceLabel(job)}
                     </p>
                   ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <StatusPill status={job.status} />
-                  {job.status === "queued" || job.status === "running" ? (
+                  {isCancellable(job) ? (
                     <button
                       type="button"
                       onClick={() => setDialog({ job, kind: "cancel" })}
@@ -331,6 +333,15 @@ function Historico() {
           }
         }}
       />
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface/50 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="font-display text-lg font-semibold">{value}</p>
     </div>
   );
 }
