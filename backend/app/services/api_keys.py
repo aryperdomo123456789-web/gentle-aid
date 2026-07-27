@@ -45,6 +45,7 @@ PROVIDERS: list[dict[str, Any]] = [
         "usage": "Geração de roteiros, títulos e análise multimodal de clipes.",
         "prefix": "AIza",
         "format_hint": "A chave do Gemini (AI Studio) começa com 'AIza'. Tokens 'AQ.' ou 'ya29.' são credenciais OAuth do Google Cloud e não funcionam aqui.",
+        "remediation": "Pegue a chave em aistudio.google.com/apikey (começa com AIza) e cole no campo abaixo.",
         # Doc oficial: autenticação por header x-goog-api-key.
         "test": [
             {
@@ -403,6 +404,26 @@ _HTTP_MESSAGES = {
     429: "Limite de requisições atingido (429).",
 }
 
+# Quanto menor, mais informativa é a falha para o usuário.
+_FAILURE_RANK = {403: 1, 402: 2, 401: 3, 400: 4, 429: 5, 404: 6, 0: 9}
+
+_ACTION_BY_STATUS = {
+    400: "replace_key",
+    401: "replace_key",
+    402: "billing",
+    403: "scope",
+    429: "wait",
+    0: "network",
+}
+
+_DEFAULT_REMEDIATION = {
+    "replace_key": "Gere uma nova chave no painel do provedor e cole no campo abaixo.",
+    "billing": "A chave é válida, mas a conta está sem créditos — recarregue no provedor.",
+    "scope": "A chave existe mas não tem permissão/plano para este recurso. Gere outra com escopo maior.",
+    "wait": "Limite de requisições atingido — espere alguns minutos e teste de novo.",
+    "network": "O servidor não conseguiu alcançar o provedor. Verifique DNS/firewall do aaPanel.",
+}
+
 
 def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
     """Executa um único endpoint de verificação e devolve status/ok/mensagem."""
@@ -412,6 +433,19 @@ def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
     headers = {"Accept": "application/json", "User-Agent": "EcossistemaViral/1.0"}
     body = None
     method = spec.get("method", "GET")
+
+    for env_name in spec.get("requires_env", []) or []:
+        if not os.environ.get(env_name):
+            return {
+                "ok": None,
+                "status": 0,
+                "message": f"Defina {env_name} no .env para validar por este método.",
+                "skipped": True,
+            }
+    for header_name, env_name in (spec.get("extra_headers_env") or {}).items():
+        value = os.environ.get(env_name, "")
+        if value:
+            headers[header_name] = value
 
     auth = spec.get("auth")
     if auth == "bearer":
@@ -490,20 +524,35 @@ def test_provider(provider_id: str) -> dict[str, Any]:
         return result
 
     started = time.perf_counter()
+    attempts: list[dict[str, Any]] = []
     attempt: dict[str, Any] = {}
     for candidate in specs:
         attempt = _run_probe(candidate, key)
+        attempts.append(attempt)
         if attempt.get("ok"):
             break
+
+    if not attempt.get("ok"):
+        # Mantém a tentativa mais informativa (ignora probes puladas por falta de env).
+        real = [a for a in attempts if not a.get("skipped")] or attempts
+        attempt = min(real, key=lambda a: _FAILURE_RANK.get(a.get("status", 0), 50))
 
     message = attempt.get("message", "Falha desconhecida.")
     if attempt.get("ok") is False and hint:
         message = f"{message} {hint}"
 
+    action = None
+    remediation = None
+    if attempt.get("ok") is False:
+        action = _ACTION_BY_STATUS.get(attempt.get("status", 0), "check")
+        remediation = provider.get("remediation") or _DEFAULT_REMEDIATION.get(action)
+
     result = {
         "ok": attempt.get("ok"),
         "status": attempt.get("status", 0),
         "message": message,
+        "action": action,
+        "remediation": remediation,
         "latency_ms": int((time.perf_counter() - started) * 1000),
         "at": _now(),
     }
