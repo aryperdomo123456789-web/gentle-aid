@@ -21,7 +21,8 @@ export const Route = createFileRoute("/canva-cleaner")({
       { property: "og:title", content: "Canva Cleaner — limpeza pós-Canva" },
       {
         property: "og:description",
-        content: "Esterilização de metadados e re-encode H.264/AAC para vídeos exportados do Canva.",
+        content:
+          "Esterilização de metadados e re-encode H.264/AAC para vídeos exportados do Canva.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -74,10 +75,9 @@ function CanvaCleaner() {
           </div>
 
           <p className="rounded-xl border border-border bg-background/40 p-3 text-xs text-muted-foreground">
-            A remoção total de metadados (ISO, encoder, Canva, GPS, XMP) é sempre aplicada e não pode
-            ser desligada — o arquivo final recebe identidade forjada e hash inédito.
+            A remoção total de metadados (ISO, encoder, Canva, GPS, XMP) é sempre aplicada e não
+            pode ser desligada — o arquivo final recebe identidade forjada e hash inédito.
           </p>
-
 
           <SubmitButton busy={busy} disabled={!hasFile}>
             {busy ? "Limpando e recodificando…" : "Executar limpeza"}
@@ -92,7 +92,13 @@ function CanvaCleaner() {
           emptyHint="Envie um vídeo para acompanhar a limpeza, o re-encode e os hashes MD5 antes/depois."
         />
       }
-      below={<ToolHistory tool="canva" title="Histórico · Canva Cleaner" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
+      below={
+        <ToolHistory
+          tool="canva"
+          title="Histórico · Canva Cleaner"
+          refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
+        />
+      }
     />
   );
 }

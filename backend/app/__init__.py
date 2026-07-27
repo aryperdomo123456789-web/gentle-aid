@@ -30,8 +30,9 @@ def create_app(config: Config | None = None) -> Flask:
 
     cfg.ensure_dirs()
 
-    # Importa automaticamente as chaves de API que já existem no servidor
-    # (.env, app antigo, configs legadas) para o cofre da Central de APIs.
+    # O autofill completo pode varrer árvores grandes e atrasar o boot.
+    # Ele fica disponível como fluxo explícito na Central de APIs e, se o
+    # operador quiser, pode ser habilitado no boot via variável de ambiente.
     from .services import api_keys
 
     api_keys.autofill_once()

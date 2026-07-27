@@ -69,8 +69,8 @@ function Historico() {
           <div>
             <h1 className="text-3xl font-bold md:text-4xl">Central de Histórico</h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Todos os jobs executados no servidor, com status de hash, metadados sanitizados e links de download
-              servidos pelo Nginx.
+              Todos os jobs executados no servidor, com status de hash, metadados sanitizados e
+              links de download servidos pelo Nginx.
             </p>
           </div>
           <button
@@ -102,7 +102,9 @@ function Historico() {
         </div>
 
         {error ? (
-          <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">{error}</p>
+          <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
+            {error}
+          </p>
         ) : null}
 
         {!error && visible.length === 0 && !loading ? (
@@ -118,7 +120,9 @@ function Historico() {
                 <div className="min-w-0">
                   <p className="font-display text-sm font-semibold">
                     {TOOL_LABEL[job.tool] ?? job.tool}
-                    <span className="ml-2 font-mono text-xs text-muted-foreground">{job.job_id}</span>
+                    <span className="ml-2 font-mono text-xs text-muted-foreground">
+                      {job.job_id}
+                    </span>
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {job.filename ?? "—"} · {job.created_at ?? "sem data"}

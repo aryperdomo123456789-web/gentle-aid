@@ -49,7 +49,9 @@ export function StatusPanel({
 
       <div className="min-h-40 flex-1 overflow-auto rounded-xl border border-border bg-background/70 p-3">
         {lines.length === 0 ? (
-          <p className="font-mono text-xs text-muted-foreground">{busy ? "Iniciando FFmpeg…" : emptyHint}</p>
+          <p className="font-mono text-xs text-muted-foreground">
+            {busy ? "Iniciando FFmpeg…" : emptyHint}
+          </p>
         ) : (
           <ol className="space-y-1 font-mono text-xs text-muted-foreground">
             {lines.map((line, i) => (
@@ -70,7 +72,6 @@ export function StatusPanel({
           <HashRow label="SHA-256 final" value={job.sha256_after} />
         </dl>
       ) : null}
-
 
       <a
         href={job?.download_url ? downloadUrl(job.download_url) : undefined}

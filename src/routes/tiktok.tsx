@@ -71,7 +71,6 @@ function TikTokDashboard() {
     run(() => apiPostJson<Job>("/api/tiktok/clone", { url, nicho, intensity }));
   }
 
-
   return (
     <ToolShell
       badge="Ferramenta 2 · /api/tiktok"
@@ -109,7 +108,9 @@ function TikTokDashboard() {
           </form>
 
           {radarError ? (
-            <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">{radarError}</p>
+            <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">
+              {radarError}
+            </p>
           ) : null}
 
           <div className="space-y-3">
@@ -183,7 +184,6 @@ function TikTokDashboard() {
               )}
             </Field>
             <SubmitButton busy={busy}>{busy ? "Clonando…" : "Clonar viral"}</SubmitButton>
-
           </form>
         </div>
       }
@@ -195,7 +195,13 @@ function TikTokDashboard() {
           emptyHint="Escolha um viral do radar ou cole um link para iniciar a clonagem."
         />
       }
-      below={<ToolHistory tool="tiktok" title="Histórico · TikTok Clone" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
+      below={
+        <ToolHistory
+          tool="tiktok"
+          title="Histórico · TikTok Clone"
+          refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
+        />
+      }
     />
   );
 }

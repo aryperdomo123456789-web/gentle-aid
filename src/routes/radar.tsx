@@ -101,7 +101,6 @@ function RadarGlobal() {
     [cloneLevel, cloner],
   );
 
-
   const load = useCallback(
     async (refresh = false) => {
       setLoading(true);
@@ -144,12 +143,14 @@ function RadarGlobal() {
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
         <header className="mb-6">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-muted-foreground">
-            <RadarIcon className="size-3.5 text-primary" aria-hidden="true" /> Radar Global · /api/radar
+            <RadarIcon className="size-3.5 text-primary" aria-hidden="true" /> Radar Global ·
+            /api/radar
           </span>
           <h1 className="mt-3 text-3xl font-bold md:text-4xl">Radar Global de Tendências</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Sinais reais em tempo real — buscas em alta no Google Trends, vídeos com tração no YouTube e TikTok e
-            pesquisa web (Tavily/Exa) — mais a previsão de nichos que devem estourar nos próximos meses.
+            Sinais reais em tempo real — buscas em alta no Google Trends, vídeos com tração no
+            YouTube e TikTok e pesquisa web (Tavily/Exa) — mais a previsão de nichos que devem
+            estourar nos próximos meses.
           </p>
         </header>
 
@@ -196,13 +197,18 @@ function RadarGlobal() {
             disabled={forecasting}
             className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-primary/50 bg-primary/10 px-5 text-sm font-semibold disabled:opacity-60"
           >
-            <Sparkles className={`size-4 text-primary ${forecasting ? "animate-pulse" : ""}`} aria-hidden="true" />
+            <Sparkles
+              className={`size-4 text-primary ${forecasting ? "animate-pulse" : ""}`}
+              aria-hidden="true"
+            />
             {forecasting ? "Prevendo…" : "Prever nichos"}
           </button>
         </form>
 
         {error ? (
-          <p className="mb-6 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">{error}</p>
+          <p className="mb-6 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
+            {error}
+          </p>
         ) : null}
 
         {data ? (
@@ -234,7 +240,10 @@ function RadarGlobal() {
             </header>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {forecast.forecast.map((f, i) => (
-                <article key={`${f.nicho}-${i}`} className="rounded-xl border border-border bg-background/50 p-4">
+                <article
+                  key={`${f.nicho}-${i}`}
+                  className="rounded-xl border border-border bg-background/50 p-4"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-semibold">{f.nicho}</h3>
                     <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
@@ -249,14 +258,19 @@ function RadarGlobal() {
                     <ul className="mt-3 space-y-1 text-xs">
                       {f.angulos.map((a) => (
                         <li key={a} className="flex gap-2">
-                          <Flame className="mt-0.5 size-3 shrink-0 text-electric" aria-hidden="true" />
+                          <Flame
+                            className="mt-0.5 size-3 shrink-0 text-electric"
+                            aria-hidden="true"
+                          />
                           <span>{a}</span>
                         </li>
                       ))}
                     </ul>
                   ) : null}
                   {f.hashtags?.length ? (
-                    <p className="mt-3 font-mono text-[11px] text-muted-foreground">{f.hashtags.join(" ")}</p>
+                    <p className="mt-3 font-mono text-[11px] text-muted-foreground">
+                      {f.hashtags.join(" ")}
+                    </p>
                   ) : null}
                 </article>
               ))}
@@ -267,7 +281,8 @@ function RadarGlobal() {
         <div className="grid gap-6 lg:grid-cols-2">
           <section className="panel p-5">
             <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
-              <TrendingUp className="size-4 text-primary" aria-hidden="true" /> Buscas em alta ({data?.region ?? region})
+              <TrendingUp className="size-4 text-primary" aria-hidden="true" /> Buscas em alta (
+              {data?.region ?? region})
             </h2>
             {!data?.searches?.length ? (
               <p className="text-sm text-muted-foreground">Sem dados de busca no momento.</p>
@@ -278,9 +293,16 @@ function RadarGlobal() {
                     key={s.term}
                     className="flex items-start gap-3 rounded-lg border border-border bg-background/50 px-3 py-2"
                   >
-                    <span className="font-mono text-xs text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
                     <div className="min-w-0">
-                      <a href={s.search_url} target="_blank" rel="noreferrer" className="text-sm font-medium hover:underline">
+                      <a
+                        href={s.search_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-medium hover:underline"
+                      >
                         {s.term}
                       </a>
                       <p className="text-xs text-muted-foreground">
@@ -296,7 +318,8 @@ function RadarGlobal() {
           <section className="panel p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 text-lg font-semibold">
-                <Activity className="size-4 text-electric" aria-hidden="true" /> Vídeos com tração real
+                <Activity className="size-4 text-electric" aria-hidden="true" /> Vídeos com tração
+                real
               </h2>
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 Mutação
@@ -315,14 +338,17 @@ function RadarGlobal() {
               </label>
             </div>
             <VideoList
-              videos={[...(data?.niche_videos ?? []), ...(data?.tiktok ?? []), ...(data?.youtube_trending ?? [])]}
+              videos={[
+                ...(data?.niche_videos ?? []),
+                ...(data?.tiktok ?? []),
+                ...(data?.youtube_trending ?? []),
+              ]}
               onClone={cloneVideo}
               busy={cloner.busy}
               activeUrl={cloneTarget?.url ?? null}
             />
           </section>
         </div>
-
 
         {data?.web?.results?.length ? (
           <section className="panel mt-6 p-5">
@@ -332,7 +358,12 @@ function RadarGlobal() {
             <ul className="grid gap-3 md:grid-cols-2">
               {data.web.results.map((r) => (
                 <li key={r.url} className="rounded-lg border border-border bg-background/50 p-3">
-                  <a href={r.url} target="_blank" rel="noreferrer" className="text-sm font-medium hover:underline">
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium hover:underline"
+                  >
                     {r.title}
                   </a>
                   <p className="mt-1 text-xs text-muted-foreground">{r.snippet}</p>
@@ -399,7 +430,8 @@ function VideoList({
   busy: boolean;
   activeUrl: string | null;
 }) {
-  if (!videos.length) return <p className="text-sm text-muted-foreground">Rode o radar para listar virais.</p>;
+  if (!videos.length)
+    return <p className="text-sm text-muted-foreground">Rode o radar para listar virais.</p>;
   return (
     <ul className="space-y-2">
       {videos.slice(0, 20).map((v, i) => {
@@ -442,4 +474,3 @@ function VideoList({
     </ul>
   );
 }
-

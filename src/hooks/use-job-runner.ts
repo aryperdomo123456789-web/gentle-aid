@@ -16,31 +16,28 @@ export function useJobRunner() {
     timer.current = null;
   }, []);
 
-  const poll = useCallback(
-    (jobId: string, attempt = 0) => {
-      timer.current = setTimeout(async () => {
-        try {
-          const next = await apiGet<Job>(`/api/jobs/${jobId}`);
-          setJob(next);
-          if (next.status === "done" || next.status === "error") {
-            setBusy(false);
-            if (next.status === "error") setError(next.message ?? "O job falhou.");
-            return;
-          }
-          if (attempt > 600) {
-            setBusy(false);
-            setError("Tempo limite excedido aguardando o processamento.");
-            return;
-          }
-          poll(jobId, attempt + 1);
-        } catch (err) {
+  const poll = useCallback((jobId: string, attempt = 0) => {
+    timer.current = setTimeout(async () => {
+      try {
+        const next = await apiGet<Job>(`/api/jobs/${jobId}`);
+        setJob(next);
+        if (next.status === "done" || next.status === "error") {
           setBusy(false);
-          setError(friendlyError(err));
+          if (next.status === "error") setError(next.message ?? "O job falhou.");
+          return;
         }
-      }, 1500);
-    },
-    [],
-  );
+        if (attempt > 600) {
+          setBusy(false);
+          setError("Tempo limite excedido aguardando o processamento.");
+          return;
+        }
+        poll(jobId, attempt + 1);
+      } catch (err) {
+        setBusy(false);
+        setError(friendlyError(err));
+      }
+    }, 1500);
+  }, []);
 
   const run = useCallback(
     async (request: () => Promise<Job>) => {

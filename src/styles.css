@@ -117,7 +117,8 @@
 
   --gradient-viral: linear-gradient(135deg, var(--primary), var(--electric));
   --shadow-card: 0 18px 40px -24px oklch(0 0 0 / 80%);
-  --shadow-glow: 0 0 0 1px color-mix(in oklab, var(--primary) 35%, transparent),
+  --shadow-glow:
+    0 0 0 1px color-mix(in oklab, var(--primary) 35%, transparent),
     0 16px 48px -20px color-mix(in oklab, var(--primary) 55%, transparent);
 }
 
@@ -141,7 +142,8 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    background-image: radial-gradient(
+    background-image:
+      radial-gradient(
         ellipse 80% 60% at 12% -10%,
         color-mix(in oklab, var(--primary) 22%, transparent),
         transparent

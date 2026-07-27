@@ -31,11 +31,17 @@ export function TextInput({ className, ...props }: React.InputHTMLAttributes<HTM
   return <input {...props} className={cn(control, className)} />;
 }
 
-export function TextArea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function TextArea({
+  className,
+  ...props
+}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={cn(control, "min-h-32 font-mono", className)} />;
 }
 
-export function SelectInput({ className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+export function SelectInput({
+  className,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={cn(control, className)} />;
 }
 

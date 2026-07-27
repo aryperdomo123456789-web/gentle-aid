@@ -35,7 +35,10 @@ export function ToolShell({
           <section aria-label="Controles" className="panel p-6">
             {left}
           </section>
-          <section aria-label="Status do processamento" className="panel p-6 lg:sticky lg:top-36 lg:self-start">
+          <section
+            aria-label="Status do processamento"
+            className="panel p-6 lg:sticky lg:top-36 lg:self-start"
+          >
             {right}
           </section>
         </div>

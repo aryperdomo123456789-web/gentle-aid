@@ -21,7 +21,8 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Ecossistema Viral — Download e Bypass de YouTube" },
       {
         property: "og:description",
-        content: "Download em lote, limpeza de metadados e mutação FFmpeg para TikTok, Reels e Shorts.",
+        content:
+          "Download em lote, limpeza de metadados e mutação FFmpeg para TikTok, Reels e Shorts.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -129,7 +130,6 @@ function YoutubeBypass() {
             )}
           </Field>
 
-
           <SubmitButton busy={busy}>
             {busy ? "Processando lote…" : "Disparar bypass em lote"}
           </SubmitButton>
@@ -143,7 +143,13 @@ function YoutubeBypass() {
           emptyHint="Nenhum job em execução. Envie um lote para acompanhar o log do FFmpeg em tempo real."
         />
       }
-      below={<ToolHistory tool="youtube" title="Histórico · YouTube Bypass" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
+      below={
+        <ToolHistory
+          tool="youtube"
+          title="Histórico · YouTube Bypass"
+          refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
+        />
+      }
     />
   );
 }

@@ -115,7 +115,9 @@ GUNICORN_BIND=127.0.0.1:8000
 
 Chaves de provedores (OpenAI, DeepSeek, Groq, Tavily, ElevenLabs…) não precisam
 ir no `.env`: cadastre pela aba **Central de APIs**, que grava no cofre
-`fabrica_clips/_config/api_keys.json` (fora do Git).
+`fabrica_clips/_config/api_keys.json` (fora do Git). O autofill pesado no boot
+fica desativado por padrão; se quiser reativá-lo, use
+`VIRAL_AUTO_IMPORT_ON_BOOT=1`.
 
 ## Desenvolvimento local
 

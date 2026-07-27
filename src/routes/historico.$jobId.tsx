@@ -16,7 +16,10 @@ export const Route = createFileRoute("/historico/$jobId")({
           "Timeline completa do job: etapas de FFmpeg, relatório de esterilização, hashes e download do arquivo final.",
       },
       { property: "og:title", content: "Detalhe do Job — Jobs Center" },
-      { property: "og:description", content: "Timeline, hashes e relatório de esterilização do job." },
+      {
+        property: "og:description",
+        content: "Timeline, hashes e relatório de esterilização do job.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -62,7 +65,10 @@ function JobDetail() {
     <div className="min-h-screen">
       <TopNav />
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
-        <Link to="/historico" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          to="/historico"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="size-4" aria-hidden="true" /> Voltar ao Jobs Center
         </Link>
 
@@ -101,7 +107,9 @@ function JobDetail() {
               <Row label="Finalizado em" value={job?.finished_at} />
               <Row
                 label="Tamanho"
-                value={job?.size_bytes ? `${(job.size_bytes / 1024 / 1024).toFixed(2)} MB` : undefined}
+                value={
+                  job?.size_bytes ? `${(job.size_bytes / 1024 / 1024).toFixed(2)} MB` : undefined
+                }
               />
               {meta.map(([k, v]) => (
                 <Row key={k} label={k} value={typeof v === "string" ? v : JSON.stringify(v)} />

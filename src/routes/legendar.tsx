@@ -83,13 +83,17 @@ function Legendar() {
 
           <MutationSelect defaultValue="media" />
 
-
-
           <Field
             label="Transcrição (opcional)"
             hint="Deixe vazio para transcrição automática no servidor. Aceita texto simples ou SRT."
           >
-            {(id) => <TextArea id={id} name="srt" placeholder="1\n00:00:00,000 --> 00:00:02,000\nSeu texto" />}
+            {(id) => (
+              <TextArea
+                id={id}
+                name="srt"
+                placeholder="1\n00:00:00,000 --> 00:00:02,000\nSeu texto"
+              />
+            )}
           </Field>
 
           <SubmitButton busy={busy} disabled={!hasFile}>
@@ -105,7 +109,13 @@ function Legendar() {
           emptyHint="Envie um vídeo para acompanhar a renderização das legendas."
         />
       }
-      below={<ToolHistory tool="legendar" title="Histórico · Legendas" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
+      below={
+        <ToolHistory
+          tool="legendar"
+          title="Histórico · Legendas"
+          refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
+        />
+      }
     />
   );
 }

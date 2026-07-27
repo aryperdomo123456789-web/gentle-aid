@@ -10,7 +10,6 @@ import {
   Loader2,
   DownloadCloud,
   RefreshCw,
-
   Save,
   Trash2,
   Wrench,
@@ -101,9 +100,6 @@ function ApisPage() {
   const [scanning, setScanning] = useState(false);
   const [scan, setScan] = useState<ScanReport | null>(null);
 
-
-
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -168,13 +164,14 @@ function ApisPage() {
       }>("/api/apis/import", "POST", { force, repair });
       setProviders(data.providers ?? []);
       const n = data.report?.imported?.length ?? 0;
-      const envInfo = data.report?.env_file ? ` Espelhadas com permissão 600 em ${data.report.env_file}.` : "";
+      const envInfo = data.report?.env_file
+        ? ` Espelhadas com permissão 600 em ${data.report.env_file}.`
+        : "";
       setImportReport(
         n > 0
           ? `${n} chave(s) importada(s) automaticamente: ${data.report.imported.join(", ")}.${envInfo}`
           : `Nenhuma chave encontrada. Foram lidos ${data.report?.scanned ?? 0} arquivo(s) em: ${(data.report?.roots ?? []).join(", ")}. Use "Diagnóstico" para ver os detalhes.`,
       );
-
     } catch (err) {
       setError(friendlyError(err));
     } finally {
@@ -194,9 +191,6 @@ function ApisPage() {
       setScanning(false);
     }
   }
-
-
-
 
   return (
     <div className="min-h-screen">
@@ -267,7 +261,6 @@ function ApisPage() {
               Diagnóstico
             </button>
 
-
             <button
               type="button"
               onClick={() => void testAll()}
@@ -334,13 +327,14 @@ function ApisPage() {
           </section>
         ) : null}
 
-
-
-
         <dl className="mb-6 grid gap-3 sm:grid-cols-3">
           <Stat label="Integrações mapeadas" value={String(providers.length)} />
           <Stat label="Com chave ativa" value={`${configured}/${providers.length}`} />
-          <Stat label="Com falha no último teste" value={String(failing)} tone={failing ? "bad" : "good"} />
+          <Stat
+            label="Com falha no último teste"
+            value={String(failing)}
+            tone={failing ? "bad" : "good"}
+          />
         </dl>
 
         {error ? (
@@ -377,11 +371,13 @@ function ApisPage() {
           </p>
         ) : providers.length === 0 ? (
           <div className="panel p-6 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Nenhuma integração retornada pelo backend.</p>
+            <p className="font-medium text-foreground">
+              Nenhuma integração retornada pelo backend.
+            </p>
             <p className="mt-2">
               O painel busca <code className="font-mono">/api/apis</code>. Se a resposta falhar, o
-              serviço Flask (<code className="font-mono">viral-api</code>) está parado ou o Nginx não
-              está encaminhando <code className="font-mono">/api</code> para o Gunicorn.
+              serviço Flask (<code className="font-mono">viral-api</code>) está parado ou o Nginx
+              não está encaminhando <code className="font-mono">/api</code> para o Gunicorn.
             </p>
             <button
               type="button"
@@ -401,9 +397,8 @@ function ApisPage() {
         )}
       </main>
       <footer className="mx-auto w-full max-w-[1600px] px-4 pb-10 text-xs text-muted-foreground md:px-8">
-        Chaves gravadas em{" "}
-        <code className="font-mono">fabrica_clips/_config/api_keys.json</code> (permissão 600, fora
-        do Git). Variáveis de ambiente continuam valendo como fallback.
+        Chaves gravadas em <code className="font-mono">fabrica_clips/_config/api_keys.json</code>{" "}
+        (permissão 600, fora do Git). Variáveis de ambiente continuam valendo como fallback.
       </footer>
     </div>
   );
@@ -547,7 +542,6 @@ function ProviderCard({
       ) : null}
 
       <div className="space-y-3 rounded-xl border border-border bg-background/40 p-3">
-
         <label htmlFor={inputId} className="block text-xs font-medium text-muted-foreground">
           Nova chave {provider.prefix ? `(começa com ${provider.prefix})` : ""}
         </label>

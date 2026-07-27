@@ -100,7 +100,9 @@ export function ToolHistory({
       </div>
 
       {error ? (
-        <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs">{error}</p>
+        <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs">
+          {error}
+        </p>
       ) : null}
 
       {!error && jobs.length === 0 && !loading ? (

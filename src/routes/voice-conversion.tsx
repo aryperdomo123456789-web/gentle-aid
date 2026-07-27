@@ -97,8 +97,6 @@ function VoiceConversion() {
             hint="Remove metadados/ID3 herdados, reescreve o timbre e entrega um arquivo de hash inédito."
           />
 
-
-
           <SubmitButton busy={busy} disabled={!hasFile}>
             {busy ? "Convertendo timbre…" : "Converter voz"}
           </SubmitButton>
@@ -112,7 +110,13 @@ function VoiceConversion() {
           emptyHint="Envie um áudio para iniciar a conversão de timbre."
         />
       }
-      below={<ToolHistory tool="voice" title="Histórico · Voz V2V" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
+      below={
+        <ToolHistory
+          tool="voice"
+          title="Histórico · Voz V2V"
+          refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
+        />
+      }
     />
   );
 }

@@ -91,8 +91,6 @@ export async function apiDelete<T>(path: string): Promise<T> {
   return parse<T>(res);
 }
 
-
-
 export function downloadUrl(path: string): string {
   if (!path) return "#";
   if (/^https?:\/\//.test(path)) return path;
@@ -153,4 +151,3 @@ export type Job = {
   log?: string[];
   meta?: Record<string, unknown>;
 };
-

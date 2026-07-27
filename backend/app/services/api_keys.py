@@ -686,6 +686,14 @@ _PREFIX_OWNER = {
 
 _KV = None  # regex compilada sob demanda
 _autofill_done = False
+_BOOT_AUTOFILL_ENV = "VIRAL_AUTO_IMPORT_ON_BOOT"
+
+
+def _autofill_worker() -> None:
+    try:
+        autofill(force=False)
+    except Exception:  # noqa: BLE001 — autofill nunca pode quebrar o app
+        pass
 
 
 
@@ -1065,12 +1073,21 @@ def autofill(force: bool = False, repair: bool = False) -> dict[str, Any]:
 
 
 def autofill_once() -> None:
-    """Roda uma vez por processo, no boot da aplicação."""
+    """Roda uma vez por processo, no boot da aplicação.
+
+    O autofill completo pode varrer caminhos grandes e fazer probes de rede.
+    Por padrão ele fica desativado no boot e só roda quando explicitamente
+    habilitado via ``VIRAL_AUTO_IMPORT_ON_BOOT=1``. A Central de APIs continua
+    com o fluxo manual de importação exatamente como antes.
+    """
     global _autofill_done
     if _autofill_done:
         return
     _autofill_done = True
+    enabled = os.environ.get(_BOOT_AUTOFILL_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+    if not enabled:
+        return
     try:
-        autofill(force=False)
+        threading.Thread(target=_autofill_worker, daemon=True).start()
     except Exception:  # noqa: BLE001 — nunca derruba o boot
         pass
