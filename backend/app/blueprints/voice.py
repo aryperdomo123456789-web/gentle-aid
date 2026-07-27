@@ -881,6 +881,9 @@ def _work_dub(
 
     work_dir = output_path("voice", job_id, ".tmp").parent
     track = work_dir / f"{job_id}_dubtrack.wav"
+    raw_track = track
+    signed: Path | None = None
+    muxed: Path | None = None
     base_voice = persona.base_voice if (engine == "forge" and persona) else voice_id
     try:
         dubbing.build_track(
@@ -888,28 +891,29 @@ def _work_dub(
             engine=engine, voice=base_voice, job_id=job_id, total_duration=info.duration,
         )
     except (EdgeTTSError, VoiceEngineError, dubbing.DubbingError) as exc:
+        _sweep(raw_track, src)
         raise RuntimeError(str(exc)) from exc
 
-    if persona is not None:
-        signed = work_dir / f"{job_id}_dubvoice.wav"
-        track = dubbing.apply_persona(track, signed, persona, job_id)
+    try:
+        if persona is not None:
+            signed = work_dir / f"{job_id}_dubvoice.wav"
+            track = dubbing.apply_persona(track, signed, persona, job_id)
 
-    jobs.stage(job_id, "mixando", "Montando a trilha dublada com a mídia final.", progress=88)
-    voice_label = persona.name if persona else voice_id
+        jobs.stage(job_id, "mixando", "Montando a trilha dublada com a mídia final.", progress=88)
+        voice_label = persona.name if persona else voice_id
 
-    if keep_video and info.has_video:
-        muxed = work_dir / f"{job_id}_dubmux.mp4"
-        dubbing.mix_with_background(src, track, muxed, keep_ambience=keep_ambience, job_id=job_id)
-        dst = output_path("voice", job_id, ".mp4")
-        report = media.sterilize(muxed, dst, job_id=job_id, level=mutation)
-        muxed.unlink(missing_ok=True)
-        message = f"Vídeo dublado com a voz '{voice_label}', sincronizado e esterilizado."
-    else:
-        dst = output_path("voice", job_id, FORMATS[fmt])
-        report = media.sterilize(track, dst, job_id=job_id, level=mutation, audio_only=True)
-        message = f"Narração dublada com a voz '{voice_label}' e áudio sem rastro."
-
-    track.unlink(missing_ok=True)
-    src.unlink(missing_ok=True)
+        if keep_video and info.has_video:
+            muxed = work_dir / f"{job_id}_dubmux.mp4"
+            dubbing.mix_with_background(src, track, muxed, keep_ambience=keep_ambience, job_id=job_id)
+            dst = output_path("voice", job_id, ".mp4")
+            report = media.sterilize(muxed, dst, job_id=job_id, level=mutation)
+            message = f"Vídeo dublado com a voz '{voice_label}', sincronizado e esterilizado."
+        else:
+            dst = output_path("voice", job_id, FORMATS[fmt])
+            report = media.sterilize(track, dst, job_id=job_id, level=mutation, audio_only=True)
+            message = f"Narração dublada com a voz '{voice_label}' e áudio sem rastro."
+    finally:
+        # Limpa trilha bruta, trilha assinada, mux e a origem — mesmo em falha.
+        _sweep(muxed, signed, raw_track, track, src)
     jobs.update(job_id, transcript=[s.dict() for s in segments][:400])
     deliver(job_id, dst, report, message=message)
