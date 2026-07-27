@@ -100,6 +100,7 @@ export function DiscoveryPanel({
         onSubmit={submit}
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
       >
+        <div className="sm:col-span-2 lg:col-span-1">
         <Field label="Busca">
           {(id) => (
             <TextInput
@@ -111,6 +112,7 @@ export function DiscoveryPanel({
             />
           )}
         </Field>
+        </div>
         <Field label="Plataforma">
           {(id) => (
             <SelectInput id={id} value={platform} onChange={(e) => setPlatform(e.target.value)}>
@@ -133,7 +135,9 @@ export function DiscoveryPanel({
             </SelectInput>
           )}
         </Field>
-        <SubmitButton busy={busy}>{busy ? "Buscando…" : "Buscar virais"}</SubmitButton>
+        <div className="sm:col-span-2 lg:col-span-1">
+          <SubmitButton busy={busy}>{busy ? "Buscando…" : "Buscar virais"}</SubmitButton>
+        </div>
       </form>
 
       {error ? (
