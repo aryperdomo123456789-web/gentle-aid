@@ -63,10 +63,7 @@ export function JobMediaPreview({ job }: { job: Job }) {
     <div className="space-y-4">
       <div
         className={`mx-auto overflow-hidden rounded-2xl border border-border bg-black/90 ${previewAspectClass(orientation)}`}
-        style={{
-          width: "min(92vw, 32rem)",
-          height: "min(92vw, 32rem)",
-        }}
+        style={{ width: "100%", maxWidth: "32rem" }}
       >
         {playable ? (
           playableIsVideo ? (
@@ -107,12 +104,12 @@ export function JobMediaPreview({ job }: { job: Job }) {
 
       {source ? (
         <section className="rounded-2xl border border-border bg-background/50 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col-reverse items-start gap-4 sm:flex-row sm:justify-between">
             <div className="min-w-0 flex-1">
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
                 Fonte original
               </p>
-              <h3 className="mt-1 truncate text-base font-semibold">
+              <h3 className="mt-1 break-words text-base font-semibold">
                 {source.title ?? job.filename ?? job.job_id}
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -146,7 +143,7 @@ export function JobMediaPreview({ job }: { job: Job }) {
             ) : null}
           </div>
 
-          <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
             <Meta label="Plataforma" value={source.platform} />
             <Meta label="Autor" value={source.author ?? source.nickname} />
             <Meta label="Visualizações" value={source.views_label} />
@@ -162,7 +159,7 @@ export function JobMediaPreview({ job }: { job: Job }) {
               href={source.url}
               target="_blank"
               rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-4 py-2 text-xs font-semibold hover:border-primary/50"
+              className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/70 px-4 py-2 text-xs font-semibold hover:border-primary/50"
             >
               <ExternalLink className="size-3.5" aria-hidden="true" />
               Abrir origem
@@ -213,7 +210,7 @@ function Meta({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="rounded-lg border border-border bg-background/60 px-3 py-2">
       <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div className="truncate font-medium">{value}</div>
+      <div className="break-words font-medium">{value}</div>
     </div>
   );
 }
