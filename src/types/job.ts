@@ -43,9 +43,59 @@ export type JobOutput = {
   md5_after?: string;
 };
 
+/** Evento estruturado do rastro do job (mesmo padrão em todas as ferramentas). */
+export type JobEventLevel = "lifecycle" | "stage" | "info" | "audit" | "artifact" | "error";
+
+export type JobEvent = {
+  ts: string;
+  level: JobEventLevel | string;
+  stage: string;
+  message: string;
+};
+
+/** Linha da trilha de auditoria append-only (sobrevive à exclusão do job). */
+export type JobAuditEntry = {
+  ts: string;
+  action: string;
+  job_id: string;
+  tool?: string;
+  detail?: string;
+};
+
+export type JobTrace = {
+  job_id: string;
+  status?: JobStatus;
+  stage?: string | null;
+  events: JobEvent[];
+  log: string[];
+  artifacts: { path: string; kind: string }[];
+  audit: JobAuditEntry[];
+};
+
+/** Estatísticas agregadas devolvidas pela Central de Jobs. */
+export type JobToolStats = {
+  total: number;
+  done: number;
+  error: number;
+  cancelled: number;
+  running: number;
+  bytes: number;
+};
+
+export type JobStats = JobToolStats & {
+  total_all?: number;
+  by_tool?: Record<string, JobToolStats>;
+};
+
 export type Job = {
   job_id: string;
   tool: string;
+  tool_label?: string;
+  stage?: string | null;
+  updated_at?: string;
+  duration_ms?: number | null;
+  terminal?: boolean;
+  events?: JobEvent[];
   status: JobStatus;
   message?: string;
   progress?: number;
