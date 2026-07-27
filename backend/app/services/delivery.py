@@ -117,11 +117,9 @@ def deliver(
         "sha256_after": report.sha256_after,
         "sterilization": report.as_dict(),
         "audit_summary": report.audit_summary,
-        "finished_at": None,
     }
     if extra:
         payload.update(extra)
-    payload.pop("finished_at", None)
     jobs.register_artifact(job_id, dst, "output")
     for step in report.steps:
         jobs.log(job_id, f"✔ {step}", level="audit", stage="esterilizando")
