@@ -176,7 +176,8 @@ def preview():
             target = str(payload.get("target_voice") or "masc_grave")
             if target not in VOICES:
                 return jsonify(error="Timbre alvo inválido."), 400
-            base = (edge_tts.list_voices() or ["pt-BR-AntonioNeural"])[0]
+            base_list = edge_tts.list_voices()
+            base = str(base_list[0]["id"]) if base_list else "pt-BR-AntonioNeural"
             edge_tts.synthesize(text, raw, voice=base, job_id=job_id)
             chain = build_timbre_chain(target, "natural")
             label = target
