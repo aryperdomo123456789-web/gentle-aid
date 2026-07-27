@@ -867,9 +867,18 @@ def _parse_legacy_catalog(text: str) -> dict[str, str]:
     return out
 
 
+_ALT_CANDIDATES: dict[str, list[tuple[str, str]]] = {}
+
+
 def _collect() -> tuple[dict[str, str], dict[str, str]]:
     harvested: dict[str, str] = {}
     sources: dict[str, str] = {}
+    alts: dict[str, list[tuple[str, str]]] = {}
+
+    def remember(pid: str, value: str, origin: str) -> None:
+        bucket = alts.setdefault(pid, [])
+        if value not in [v for v, _ in bucket]:
+            bucket.append((value, origin))
 
     for key, value in os.environ.items():
         if value and len(value) >= 12:
@@ -887,16 +896,21 @@ def _collect() -> tuple[dict[str, str], dict[str, str]]:
                 sources[name] = str(path)
         for pid, value in _parse_legacy_catalog(text).items():
             marker = f"__SIG__{pid}"
+            remember(pid, value, f"{path} (catálogo legado)")
             if marker not in harvested:
                 harvested[marker] = value
                 sources[marker] = f"{path} (catálogo legado)"
         for pid, value in _harvest_signatures(text).items():
             marker = f"__SIG__{pid}"
+            remember(pid, value, str(path))
             if marker not in harvested:
                 harvested[marker] = value
                 sources[marker] = str(path)
 
+    _ALT_CANDIDATES.clear()
+    _ALT_CANDIDATES.update(alts)
     return harvested, sources
+
 
 
 def sync_env(data: dict[str, dict[str, Any]] | None = None) -> str | None:
