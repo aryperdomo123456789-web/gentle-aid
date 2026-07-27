@@ -80,6 +80,9 @@ def run_job():
     }
 
     source_url = (request.form.get("url") or "").strip()
+    aspect = (request.form.get("aspect") or "auto").strip().lower()
+    if aspect not in ("auto", "9:16", "16:9", "1:1"):
+        aspect = "auto"
     job = jobs.create_job(
         "legendar",
         meta={
@@ -88,6 +91,7 @@ def run_job():
             "position": position,
             "animation": animation if animation != "auto" else preset["animation"],
             "mutation": mutation,
+            "aspect": aspect,
             "url": source_url,
             **({"source_card": source_card} if source_card else {}),
         },
