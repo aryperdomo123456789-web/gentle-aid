@@ -332,11 +332,16 @@ def build_command(
         if mp4_family:
             cmd += ["-video_track_timescale", identity["timescale"]]
 
-
     if info.has_audio:
-        cmd += ["-c:a", "aac", "-b:a", f"{rng.choice((128, 160, 192))}k", "-ar", "48000"]
+        if suffix == ".wav":
+            cmd += ["-c:a", "pcm_s16le", "-ar", "48000"]
+        elif suffix == ".mp3":
+            cmd += ["-c:a", "libmp3lame", "-b:a", f"{rng.choice((192, 256, 320))}k", "-ar", "48000"]
+        else:
+            cmd += ["-c:a", "aac", "-b:a", f"{rng.choice((128, 160, 192))}k", "-ar", "48000"]
     else:
         cmd += ["-an"]
+
 
     # Extermínio total dos metadados de origem + identidade forjada.
     cmd += [
