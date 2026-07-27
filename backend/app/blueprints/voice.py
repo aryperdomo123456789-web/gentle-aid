@@ -232,7 +232,8 @@ def script_styles():
 @bp.post("/script/analyze")
 def script_analyze():
     """Diagnóstico local do roteiro (roda sem nenhuma chave de API)."""
-    payload = parse_json_object(request)
+    raw = request.get_json(silent=True) or request.form.to_dict()
+    payload = dict(raw) if isinstance(raw, dict) else {}
     try:
         text = clean_text(payload.get("text"), max_length=MAX_TTS_CHARS, field="text")
     except ValidationError as exc:
@@ -243,7 +244,8 @@ def script_analyze():
 @bp.post("/script/fix")
 def script_fix():
     """Correção/reescrita do roteiro no estilo escolhido."""
-    payload = parse_json_object(request)
+    raw = request.get_json(silent=True) or request.form.to_dict()
+    payload = dict(raw) if isinstance(raw, dict) else {}
     try:
         text = clean_text(payload.get("text"), max_length=MAX_TTS_CHARS, field="text")
     except ValidationError as exc:
