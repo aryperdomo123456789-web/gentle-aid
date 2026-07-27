@@ -54,17 +54,27 @@ src = "\n".join(
     for l in src.split("\n")
 )
 
-# comenta 'location /' antigos e o root estático para não conflitar
+# comenta 'location /', regras estáticas por extensão e includes do aaPanel que
+# roubam os assets (.js/.css) do frontend Node
+STEAL = (
+    re.compile(r'^location\s+/\s*\{'),
+    re.compile(r'^location\s+[~^=][^\{]*\{'),
+)
+INCLUDES = re.compile(r'^\s*include\s+.*(enable-php|rewrite/|pathinfo)', re.I)
+
 lines, out, depth, commenting = src.split("\n"), [], 0, False
 for line in lines:
     stripped = line.strip()
-    if not commenting and re.match(r'location\s+/\s*\{', stripped):
+    if not commenting and any(p.match(stripped) for p in STEAL):
         commenting, depth = True, 0
     if commenting:
         depth += line.count("{") - line.count("}")
         out.append("    # [viral] " + line.strip())
         if depth <= 0:
             commenting = False
+        continue
+    if INCLUDES.match(line):
+        out.append("    # [viral] " + stripped)
         continue
     out.append(line)
 src = "\n".join(out)
