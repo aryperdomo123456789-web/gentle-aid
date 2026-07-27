@@ -30,6 +30,65 @@ FALLBACK_VOICES = [
     {"id": "es-MX-JorgeNeural", "name": "Jorge (es-MX)", "labels": "masculino · latino"},
 ]
 
+# Locales oferecidos no catálogo e usados pela dublagem multi-idioma.
+LOCALE_PREFIXES = ("pt", "en", "es", "fr", "it", "de", "ja", "ko", "zh", "ru", "ar", "hi", "tr", "id")
+
+# Matéria-prima por idioma: (voz masculina, voz feminina).
+# A dublagem precisa falar o idioma alvo com um locutor nativo — uma voz pt-BR
+# lendo inglês sai com sotaque quebrado e derruba a retenção.
+LANG_VOICES: dict[str, tuple[str, str]] = {
+    "pt": ("pt-BR-AntonioNeural", "pt-BR-FranciscaNeural"),
+    "en": ("en-US-GuyNeural", "en-US-AriaNeural"),
+    "es": ("es-MX-JorgeNeural", "es-ES-ElviraNeural"),
+    "fr": ("fr-FR-HenriNeural", "fr-FR-DeniseNeural"),
+    "it": ("it-IT-DiegoNeural", "it-IT-ElsaNeural"),
+    "de": ("de-DE-ConradNeural", "de-DE-KatjaNeural"),
+    "ja": ("ja-JP-KeitaNeural", "ja-JP-NanamiNeural"),
+    "ko": ("ko-KR-InJoonNeural", "ko-KR-SunHiNeural"),
+    "zh": ("zh-CN-YunxiNeural", "zh-CN-XiaoxiaoNeural"),
+    "ru": ("ru-RU-DmitryNeural", "ru-RU-SvetlanaNeural"),
+    "ar": ("ar-EG-ShakirNeural", "ar-EG-SalmaNeural"),
+    "hi": ("hi-IN-MadhurNeural", "hi-IN-SwaraNeural"),
+    "tr": ("tr-TR-AhmetNeural", "tr-TR-EmelNeural"),
+    "id": ("id-ID-ArdiNeural", "id-ID-GadisNeural"),
+}
+
+# Vozes femininas conhecidas do catálogo pt-BR/pt-PT usadas como base das personas.
+_FEMALE_HINTS = (
+    "francisca", "thalita", "brenda", "elza", "giovanna", "leila", "leticia", "manuela",
+    "yara", "raquel", "fernanda", "aria", "jenny", "michelle", "ana", "elvira", "dalia",
+    "denise", "elsa", "katja", "nanami", "sunhi", "xiaoxiao", "svetlana", "salma", "swara",
+    "emel", "gadis",
+)
+
+
+def language_of(voice_id: str) -> str:
+    """`pt-BR-AntonioNeural` → `pt`."""
+    return (voice_id or "").split("-", 1)[0].lower()
+
+
+def is_female(voice_id: str) -> bool:
+    lowered = (voice_id or "").lower()
+    return any(hint in lowered for hint in _FEMALE_HINTS)
+
+
+def voice_for_language(language: str, *, prefer: str = "") -> str:
+    """Voz nativa do idioma alvo, mantendo o gênero da voz preferida.
+
+    `prefer` é a voz base da persona do usuário. Se ela já fala o idioma alvo,
+    é devolvida intacta (a identidade da voz própria é preservada).
+    """
+    lang = (language or "").split("-", 1)[0].lower()
+    if not lang or lang == "auto":
+        return prefer or FALLBACK_VOICES[0]["id"]
+    if prefer and language_of(prefer) == lang:
+        return prefer
+    pair = LANG_VOICES.get(lang)
+    if not pair:
+        return prefer or FALLBACK_VOICES[0]["id"]
+    return pair[1] if (prefer and is_female(prefer)) else pair[0]
+
+
 
 class EdgeTTSError(RuntimeError):
     """Erro do motor gratuito, com mensagem pronta para o operador."""
