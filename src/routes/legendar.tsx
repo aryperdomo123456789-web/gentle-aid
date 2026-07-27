@@ -9,6 +9,7 @@ import {
   Save,
   Search,
   Shield,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Type,
