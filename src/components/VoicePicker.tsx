@@ -65,6 +65,7 @@ export function VoicePicker({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openScript, setOpenScript] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const engines = useMemo(
     () =>
