@@ -39,7 +39,7 @@ export function ToolShell({
         </div>
       </main>
       <footer className="mx-auto max-w-7xl px-4 pb-10 text-xs text-muted-foreground md:px-8">
-        Jobs gravados em <code className="font-mono">/www/wwwroot/viralpro.vr766.com/fabrica_clips/</code>
+        Jobs gravados em <code className="font-mono">fabrica_clips/</code>
       </footer>
     </div>
   );

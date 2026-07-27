@@ -6,7 +6,9 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-APP_ROOT = Path(os.environ.get("VIRAL_ROOT", "/www/wwwroot/viralpro.vr766.com")).resolve()
+# Sem VIRAL_ROOT definido, usa a raiz do repositório (dois níveis acima deste arquivo).
+_DEFAULT_ROOT = Path(__file__).resolve().parents[2]
+APP_ROOT = Path(os.environ.get("VIRAL_ROOT", str(_DEFAULT_ROOT))).resolve()
 
 
 @dataclass
