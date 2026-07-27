@@ -14,11 +14,14 @@ fluxo de conversão cai para a cadeia FFmpeg local de mudança de timbre.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from ..services import ingest, jobs, media, voice_engine
+from ..config import config
+from ..services import edge_tts, ingest, jobs, media, voice_engine, voice_forge
+
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS, normalize_level
 from ..services.validation import (
@@ -28,8 +31,10 @@ from ..services.validation import (
     clean_text,
     output_path,
     parse_json_object,
+    public_url,
     save_upload,
 )
+from ..services.edge_tts import EdgeTTSError
 from ..services.voice_engine import Settings, VoiceEngineError
 
 bp = Blueprint("voice", __name__, url_prefix="/api/voice")
@@ -44,10 +49,15 @@ VOICES = {
 }
 FORMATS = {"wav": ".wav", "mp3": ".mp3", "aac": ".m4a"}
 TIMINGS = ("strict", "natural")
-ENGINES = ("elevenlabs", "local")
+ENGINES = ("elevenlabs", "forge", "local")
 SAMPLE_RATE = 48000
 MEDIA_EXT = AUDIO_EXT | VIDEO_EXT
 MAX_TTS_CHARS = 40000
+PREVIEW_TEXT = (
+    "Essa é a minha voz. Um timbre exclusivo, construído do zero para este canal, "
+    "pronto para narrar qualquer conteúdo."
+)
+
 
 
 def _settings_from_form() -> Settings:
@@ -69,12 +79,16 @@ def _settings_from_form() -> Settings:
 def catalog():
     return jsonify(
         engine_ready=voice_engine.available(),
+        forge_ready=edge_tts.available(),
         engines=list(ENGINES),
         voices=[
             {"id": vid, "semitones": semi, "formant": formant}
             for vid, (semi, formant) in VOICES.items()
         ],
         realistic_voices=voice_engine.list_voices(),
+        base_voices=edge_tts.list_voices(),
+        personas=voice_forge.list_personas(),
+        persona_bounds=voice_forge.BOUNDS,
         formats=list(FORMATS),
         timings=list(TIMINGS),
         levels=list(LEVELS),
@@ -85,6 +99,81 @@ def catalog():
 @bp.get("/voices")
 def voices():
     return jsonify(engine_ready=voice_engine.available(), voices=voice_engine.list_voices())
+
+
+# --------------------------------------------------------------------------- #
+# Voice Forge — vozes próprias (motor gratuito + assinatura acústica)
+# --------------------------------------------------------------------------- #
+@bp.get("/personas")
+def personas_list():
+    return jsonify(
+        forge_ready=edge_tts.available(),
+        personas=voice_forge.list_personas(),
+        base_voices=edge_tts.list_voices(),
+        bounds=voice_forge.BOUNDS,
+    )
+
+
+@bp.post("/personas")
+def personas_save():
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    if not isinstance(payload, dict) or not payload:
+        return jsonify(error="Envie os parâmetros da voz."), 400
+    try:
+        persona = voice_forge.save(payload)
+    except (ValueError, TypeError) as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(persona=persona.dict()), 201
+
+
+@bp.delete("/personas/<persona_id>")
+def personas_delete(persona_id: str):
+    if not voice_forge.delete(persona_id):
+        return jsonify(error="Voz não encontrada."), 404
+    return jsonify(ok=True)
+
+
+@bp.post("/personas/preview")
+def personas_preview():
+    """Gera uma amostra curta (síncrona) da voz própria para escuta imediata."""
+    if not edge_tts.available():
+        return jsonify(
+            error="Motor gratuito indisponível: instale `edge-tts` no servidor e reinicie o viral-api."
+        ), 400
+
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    if not isinstance(payload, dict) or not payload:
+        return jsonify(error="Envie os parâmetros da voz."), 400
+    payload = dict(payload)
+    payload.setdefault("id", "forge_preview")
+    payload.setdefault("name", "Prévia")
+    try:
+        persona = voice_forge._from_dict(payload)
+    except (TypeError, ValueError) as exc:
+        return jsonify(error=f"Parâmetros inválidos: {exc}"), 400
+
+    text = str(payload.get("text") or PREVIEW_TEXT)[:400]
+    job_id = f"preview-{persona.id}-{int(time.time())}"
+    raw = output_path("voice", job_id, ".raw.wav")
+    dst = output_path("voice", job_id, ".mp3")
+    try:
+        edge_tts.synthesize(text, raw, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate)
+        media.run(
+            [
+                config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(raw), "-af", ",".join(voice_forge.filter_chain(persona, preserve_duration=False)),
+                "-c:a", "libmp3lame", "-b:a", "192k", str(dst),
+            ],
+            job_id=None,
+        )
+    except (EdgeTTSError, RuntimeError) as exc:
+        raw.unlink(missing_ok=True)
+        return jsonify(error=str(exc)), 400
+    finally:
+        raw.unlink(missing_ok=True)
+
+    return jsonify(url=public_url(dst), persona=persona.dict())
+
 
 
 def _common_params() -> tuple[str, str, str]:
@@ -112,10 +201,17 @@ def convert():
 
     target = request.form.get("target_voice", "masc_grave")
     realistic_voice = (request.form.get("voice_id") or "").strip()
+    persona_id = (request.form.get("persona_id") or "").strip()
     keep_video = request.form.get("keep_video", "1") not in ("0", "false", "off")
+
+    persona = voice_forge.get(persona_id) if persona_id else None
+    if persona_id and persona is None:
+        return jsonify(error="Voz própria não encontrada. Recarregue a lista de vozes."), 400
 
     if engine == "local" and target not in VOICES:
         return jsonify(error="Timbre alvo inválido."), 400
+    if engine == "forge" and persona is None:
+        return jsonify(error="Escolha (ou crie) uma voz própria no Forge."), 400
     if engine == "elevenlabs":
         if not voice_engine.available():
             return jsonify(
@@ -135,7 +231,8 @@ def convert():
         meta={
             "mode": "convert",
             "engine": engine,
-            "target": realistic_voice or target,
+            "target": (persona.name if persona and engine == "forge" else (realistic_voice or target)),
+            "persona": persona.id if persona else None,
             "format": fmt,
             "timing": preserve,
             "mutation": mutation,
@@ -162,10 +259,12 @@ def convert():
     jobs.submit(
         job["job_id"],
         lambda jid: _work_convert(
-            jid, src, engine, target, realistic_voice, fmt, mutation, preserve, source_url, keep_video, settings
+            jid, src, engine, target, realistic_voice, fmt, mutation, preserve, source_url, keep_video,
+            settings, persona,
         ),
     )
     return jsonify(job), 202
+
 
 
 # --------------------------------------------------------------------------- #
@@ -173,14 +272,28 @@ def convert():
 # --------------------------------------------------------------------------- #
 @bp.post("/tts")
 def tts():
-    if not voice_engine.available():
-        return jsonify(
-            error="Narração por texto exige a chave ElevenLabs. Cadastre em /apis (provedor ElevenLabs)."
-        ), 400
+    engine = (request.form.get("engine") or ("elevenlabs" if voice_engine.available() else "forge")).lower()
+    if engine not in ("elevenlabs", "forge"):
+        return jsonify(error="Motor de narração inválido."), 400
 
     voice_id = (request.form.get("voice_id") or "").strip()
-    if not voice_id:
-        return jsonify(error="Escolha uma voz para a narração."), 400
+    persona_id = (request.form.get("persona_id") or "").strip()
+    persona = voice_forge.get(persona_id) if persona_id else None
+
+    if engine == "elevenlabs":
+        if not voice_engine.available():
+            return jsonify(
+                error="Narração por texto exige a chave ElevenLabs. Cadastre em /apis (provedor ElevenLabs)."
+            ), 400
+        if not voice_id:
+            return jsonify(error="Escolha uma voz para a narração."), 400
+    else:
+        if not edge_tts.available():
+            return jsonify(
+                error="Motor gratuito indisponível: instale `edge-tts` no servidor e reinicie o viral-api."
+            ), 400
+        if persona is None:
+            return jsonify(error="Escolha (ou crie) uma voz própria no Forge."), 400
 
     try:
         text = clean_text(request.form.get("text"), max_length=MAX_TTS_CHARS, field="text")
@@ -199,16 +312,21 @@ def tts():
         "voice",
         meta={
             "mode": "tts",
-            "engine": "elevenlabs",
-            "target": voice_id,
+            "engine": engine,
+            "target": persona.name if (engine == "forge" and persona) else voice_id,
+            "persona": persona.id if persona else None,
             "format": fmt,
             "mutation": mutation,
             "chars": len(text),
         },
     )
     settings = _settings_from_form()
-    jobs.submit(job["job_id"], lambda jid: _work_tts(jid, text, voice_id, fmt, mutation, speed, settings))
+    jobs.submit(
+        job["job_id"],
+        lambda jid: _work_tts(jid, text, engine, voice_id, fmt, mutation, speed, settings, persona),
+    )
     return jsonify(job), 202
+
 
 
 # --------------------------------------------------------------------------- #
@@ -243,6 +361,7 @@ def _work_convert(
     source_url: str,
     keep_video: bool,
     settings: Settings,
+    persona: "voice_forge.Persona | None" = None,
 ) -> None:
     src = ingest.resolve_source(src, source_url, job_id)
     info = media.probe(src)
@@ -250,6 +369,30 @@ def _work_convert(
         raise RuntimeError("O arquivo enviado não tem trilha de áudio para converter.")
 
     jobs.update(job_id, progress=15)
+
+    if engine == "forge" and persona is not None:
+        # Voz própria por DSP: reescreve o timbre do narrador original mantendo
+        # a narrativa, o ritmo e a sincronia com a imagem — custo zero.
+        jobs.log(
+            job_id,
+            f"Voice Forge · persona '{persona.name}' · timing {timing} · {info.duration:.1f}s de áudio",
+        )
+        chain = voice_forge.filter_chain(persona, preserve_duration=(timing == "strict"))
+        if keep_video and info.has_video:
+            dst = output_path("voice", job_id, ".mp4")
+            report = media.sterilize(
+                src, dst, job_id=job_id, level=mutation, extra_audio_filters=chain,
+            )
+            message = f"Narração reescrita com a voz própria '{persona.name}' e vídeo esterilizado."
+        else:
+            dst = output_path("voice", job_id, FORMATS[fmt])
+            report = media.sterilize(
+                src, dst, job_id=job_id, level=mutation, extra_audio_filters=chain, audio_only=True,
+            )
+            message = f"Áudio reescrito com a voz própria '{persona.name}' e sem rastro de origem."
+        src.unlink(missing_ok=True)
+        deliver(job_id, dst, report, message=message)
+        return
 
     if engine == "local":
         jobs.log(
@@ -277,16 +420,22 @@ def _work_convert(
 
     jobs.update(job_id, progress=88)
 
+    # Acabamento opcional: a persona vira uma assinatura própria por cima da voz
+    # realista, o que também descaracteriza o timbre original do provedor.
+    finish = voice_forge.filter_chain(persona, preserve_duration=True) if persona else None
+
     if keep_video and info.has_video:
         muxed = work_dir / f"{job_id}_muxed.mp4"
         voice_engine.swap_video_audio(src, converted, muxed, job_id)
         dst = output_path("voice", job_id, ".mp4")
-        report = media.sterilize(muxed, dst, job_id=job_id, level=mutation)
+        report = media.sterilize(muxed, dst, job_id=job_id, level=mutation, extra_audio_filters=finish)
         muxed.unlink(missing_ok=True)
         message = "Narrador trocado, vídeo remuxado e arquivo esterilizado."
     else:
         dst = output_path("voice", job_id, FORMATS[fmt])
-        report = media.sterilize(converted, dst, job_id=job_id, level=mutation, audio_only=True)
+        report = media.sterilize(
+            converted, dst, job_id=job_id, level=mutation, extra_audio_filters=finish, audio_only=True
+        )
         message = "Narrador trocado com narrativa e timing preservados."
 
     converted.unlink(missing_ok=True)
@@ -294,31 +443,51 @@ def _work_convert(
     deliver(job_id, dst, report, message=message)
 
 
+
 def _work_tts(
     job_id: str,
     text: str,
+    engine: str,
     voice_id: str,
     fmt: str,
     mutation: str,
     speed: float,
     settings: Settings,
+    persona: "voice_forge.Persona | None" = None,
 ) -> None:
     jobs.update(job_id, progress=12)
     work_dir = output_path("voice", job_id, ".tmp").parent
     narrated = work_dir / f"{job_id}_tts.wav"
-    try:
-        voice_engine.text_to_speech(
-            text, narrated, voice_id=voice_id, job_id=job_id, settings=settings, speed=speed
-        )
-    except VoiceEngineError as exc:
-        raise RuntimeError(str(exc)) from exc
+
+    if engine == "forge":
+        if persona is None:
+            raise RuntimeError("Nenhuma voz própria selecionada.")
+        try:
+            edge_tts.synthesize(
+                text, narrated, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate
+            )
+        except EdgeTTSError as exc:
+            raise RuntimeError(str(exc)) from exc
+        source_label = f"voz própria '{persona.name}'"
+    else:
+        try:
+            voice_engine.text_to_speech(
+                text, narrated, voice_id=voice_id, job_id=job_id, settings=settings, speed=speed
+            )
+        except VoiceEngineError as exc:
+            raise RuntimeError(str(exc)) from exc
+        source_label = "voz realista"
 
     jobs.update(job_id, progress=90)
+    chain = voice_forge.filter_chain(persona, preserve_duration=False) if persona else None
     dst = output_path("voice", job_id, FORMATS[fmt])
-    report = media.sterilize(narrated, dst, job_id=job_id, level=mutation, audio_only=True)
+    report = media.sterilize(
+        narrated, dst, job_id=job_id, level=mutation, extra_audio_filters=chain, audio_only=True
+    )
     narrated.unlink(missing_ok=True)
     duration = media.probe_duration(dst)
     deliver(
         job_id, dst, report,
-        message=f"Narração gerada ({duration/60:.1f} min) com voz realista e áudio sem rastro.",
+        message=f"Narração gerada ({duration/60:.1f} min) com {source_label} e áudio sem rastro.",
     )
+
