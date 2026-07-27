@@ -149,15 +149,17 @@ function VoiceStudio() {
             ))}
           </div>
 
-          {!ready ? (
+          {!ready && mode !== "forge" ? (
             <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               Chave ElevenLabs ausente. Cadastre o provedor <strong>ElevenLabs</strong> em <code>/apis</code> para
-              liberar as vozes realistas e a narração por texto. Enquanto isso, o motor local de timbre segue
-              disponível.
+              liberar as vozes realistas. Enquanto isso, use a aba <strong>Criar voz</strong> — o Voice Forge gera
+              uma voz exclusiva sua sem nenhum custo.
             </p>
           ) : null}
 
-          {mode === "media" ? (
+          {mode === "forge" ? (
+            <VoiceForgePanel onChanged={setPersonas} />
+          ) : mode === "media" ? (
             <form ref={mediaForm} onSubmit={submit("/api/voice/convert")} className="space-y-5">
               <Field label="Vídeo ou áudio de origem" hint="MP4, MOV, MKV, WAV, MP3 ou M4A — arquivos longos são fatiados automaticamente.">
                 {(id) => (
@@ -177,10 +179,13 @@ function VoiceStudio() {
                     id={id}
                     name="engine"
                     value={engine}
-                    onChange={(e) => setEngine(e.target.value as "elevenlabs" | "local")}
+                    onChange={(e) => setEngine(e.target.value as Engine)}
                   >
                     <option value="elevenlabs" disabled={!ready}>
                       ElevenLabs — voz realista (speech-to-speech)
+                    </option>
+                    <option value="forge" disabled={!forgeReady}>
+                      Voice Forge — sua voz própria (sem custo)
                     </option>
                     <option value="local">Local FFmpeg — troca de timbre (sem custo)</option>
                   </SelectInput>
@@ -191,6 +196,13 @@ function VoiceStudio() {
                 <Field label="Voz do novo narrador" hint="A narrativa, a entonação e as pausas do original são preservadas.">
                   {voiceSelect}
                 </Field>
+              ) : engine === "forge" ? (
+                <Field
+                  label="Voz própria"
+                  hint="A fala original é reescrita com a assinatura acústica da sua voz — narrativa, ritmo e sincronia intactos."
+                >
+                  {personaSelect}
+                </Field>
               ) : (
                 <Field label="Timbre alvo">
                   {(id) => (
@@ -200,6 +212,7 @@ function VoiceStudio() {
                       <option value="fem_suave">Feminino suave</option>
                       <option value="fem_energetica">Feminino energética</option>
                       <option value="narrador">Narrador documentário</option>
+
                     </SelectInput>
                   )}
                 </Field>
