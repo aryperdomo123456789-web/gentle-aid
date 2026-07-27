@@ -49,6 +49,7 @@ export function CaptionStage({
   onYChange,
   onTick,
   onReady,
+  onDetectAspect,
   hideControls = false,
   className,
 }: {
@@ -60,6 +61,8 @@ export function CaptionStage({
   onYChange: (y: number) => void;
   onTick?: (time: number, duration: number, playing: boolean) => void;
   onReady?: (api: CaptionStageApi) => void;
+  /** Reporta o formato lido do arquivo real (9:16, 16:9 ou 1:1). */
+  onDetectAspect?: (aspect: Exclude<CaptionAspect, "auto">) => void;
   hideControls?: boolean;
   className?: string;
 }) {
@@ -71,6 +74,7 @@ export function CaptionStage({
   const [playing, setPlaying] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [blocks, setBlocks] = useState<PreviewBlock[]>([]);
+  const [natural, setNatural] = useState<Exclude<CaptionAspect, "auto"> | null>(null);
 
   useEffect(() => {
     setBlocks(groupWords(buildWords(transcript, duration), style.wordsPerLine));
