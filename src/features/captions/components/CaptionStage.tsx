@@ -156,13 +156,21 @@ export function CaptionStage({
   const accent = style.accent || view?.accent || "#ffe500";
   const primary = style.primary || view?.color || "#ffffff";
   const boxed = view?.boxed || animation === "boxed";
+  const effectiveAspect: Exclude<CaptionAspect, "auto"> =
+    style.aspect === "auto" ? natural ?? "9:16" : style.aspect;
 
   return (
     <div className={cn("space-y-3", className)}>
       <div
         ref={stageRef}
-        className="relative mx-auto aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden rounded-2xl border border-border bg-black shadow-2xl"
-        style={{ backgroundImage: poster && !src ? `url(${poster})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }}
+        className="relative mx-auto h-full max-h-full w-auto max-w-full overflow-hidden rounded-2xl border border-border bg-black shadow-2xl"
+        style={{
+          aspectRatio: ASPECT_RATIO[effectiveAspect],
+          containerType: "inline-size",
+          backgroundImage: poster && !src ? `url(${poster})` : undefined,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
       >
         {src ? (
           <video
@@ -170,7 +178,13 @@ export function CaptionStage({
             src={src}
             playsInline
             className="absolute inset-0 size-full object-contain"
-            onLoadedMetadata={(e) => setDuration(Math.max(1, e.currentTarget.duration || 12))}
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget;
+              setDuration(Math.max(1, el.duration || 12));
+              const found = detectAspect(el.videoWidth, el.videoHeight);
+              setNatural(found);
+              onDetectAspect?.(found);
+            }}
             onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
