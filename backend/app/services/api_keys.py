@@ -28,6 +28,22 @@ _lock = threading.RLock()
 # auth: "bearer" | "header" | "query" | "none"
 PROVIDERS: list[dict[str, Any]] = [
     {
+        "id": "elevenlabs",
+        "name": "ElevenLabs",
+        "category": "Voz / TTS",
+        "env": "ELEVENLABS_API_KEY",
+        "docs": "https://elevenlabs.io/docs/api-reference",
+        "usage": "Motor principal do Estúdio de Voz: troca de narrador (speech-to-speech) e narração realista por texto.",
+        "prefix": "sk_",
+        "format_hint": "Chave pessoal em elevenlabs.io → Profile → API Key (começa com sk_).",
+        "remediation": "401 = chave revogada (gere outra no perfil); 402 = créditos de voz esgotados (recarregue o plano).",
+        "test": [
+            {"url": "https://api.elevenlabs.io/v1/user", "auth": "header", "header": "xi-api-key"},
+            {"url": "https://api.elevenlabs.io/v1/voices", "auth": "header", "header": "xi-api-key"},
+        ],
+    },
+    {
+
         "id": "deepseek",
         "name": "DeepSeek",
         "category": "LLM",

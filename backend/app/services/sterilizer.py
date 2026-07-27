@@ -413,11 +413,14 @@ def build_command(
     rng: random.Random,
     extra_video_filters: list[str] | None = None,
     extra_audio_filters: list[str] | None = None,
+    audio_only: bool = False,
 ) -> tuple[list[str], SterilizationReport]:
     identity = _fake_identity(rng)
     suffix = dst.suffix.lower()
     mp4_family = suffix in {".mp4", ".mov", ".m4a", ".m4v"}
-    vf = list(extra_video_filters or []) + build_video_filters(level, info, rng)
+    # Saída só de áudio (ferramenta de voz): nenhum filtro/encoder de vídeo.
+    keep_video = info.has_video and not audio_only
+    vf = [] if audio_only else list(extra_video_filters or []) + build_video_filters(level, info, rng)
 
     speed_filter = next((f for f in vf if f.startswith("setpts=PTS/")), "")
     speed = float(speed_filter.split("/")[-1]) if speed_filter else 1.0
@@ -452,10 +455,12 @@ def build_command(
     ]
     if vf:
         cmd += ["-vf", ",".join(vf)]
+    if audio_only:
+        cmd += ["-vn", "-map", "0:a:0?"]
     if af:
         cmd += ["-af", ",".join(af)]
 
-    if info.has_video:
+    if keep_video:
         cmd += [
             "-c:v",
             "libx264",
@@ -517,7 +522,7 @@ def build_command(
         "-metadata",
         "copyright=",
     ]
-    if info.has_video:
+    if keep_video:
         cmd += ["-metadata:s:v:0", f"handler_name={identity['handler_video']}"]
     if info.has_audio:
         cmd += ["-metadata:s:a:0", f"handler_name={identity['handler_audio']}"]
@@ -576,6 +581,7 @@ def sterilize(
     bitrate: str = "auto",
     extra_video_filters: list[str] | None = None,
     extra_audio_filters: list[str] | None = None,
+    audio_only: bool = False,
     max_attempts: int = 3,
     runner=None,
 ) -> SterilizationReport:
@@ -603,6 +609,7 @@ def sterilize(
             rng=rng,
             extra_video_filters=extra_video_filters,
             extra_audio_filters=extra_audio_filters,
+            audio_only=audio_only,
         )
         report.md5_before = before["md5"]
         report.attempts = attempt
