@@ -211,12 +211,108 @@ def delete(persona_id: str) -> bool:
 
 
 # --------------------------------------------------------------------------- #
+# Fábrica de modelos — várias vozes derivadas de uma mesma matéria-prima
+# --------------------------------------------------------------------------- #
+# Cada arquétipo é uma "direção" de mutação: aplicado sobre a voz base, produz um
+# modelo com caráter distinto mas ainda coerente com a matéria-prima escolhida.
+ARCHETYPES: list[dict[str, object]] = [
+    {"key": "grave", "label": "Grave", "pitch": -2.6, "formant": -0.06, "warmth": 3.0,
+     "brightness": -0.5, "breath": 0.05, "body": 1.5, "room": 0.05, "tempo": -0.02, "rate": -4},
+    {"key": "jovem", "label": "Jovem", "pitch": 2.2, "formant": 0.07, "warmth": -1.5,
+     "brightness": 3.0, "breath": 0.05, "body": -1.0, "room": 0.0, "tempo": 0.03, "rate": 6},
+    {"key": "locutor", "label": "Locutor", "pitch": -1.0, "formant": -0.03, "warmth": 2.5,
+     "brightness": 2.0, "breath": 0.0, "body": 1.0, "room": 0.10, "tempo": 0.0, "rate": 0},
+    {"key": "intimo", "label": "Íntimo", "pitch": -1.8, "formant": -0.02, "warmth": 4.0,
+     "brightness": -1.0, "breath": 0.35, "body": 1.0, "room": 0.25, "tempo": -0.03, "rate": -6},
+    {"key": "energetico", "label": "Energético", "pitch": 1.2, "formant": 0.03, "warmth": -0.5,
+     "brightness": 4.0, "breath": -0.05, "body": -0.5, "room": 0.02, "tempo": 0.05, "rate": 10},
+    {"key": "cinema", "label": "Cinematográfico", "pitch": -3.4, "formant": -0.08, "warmth": 5.0,
+     "brightness": 1.0, "breath": 0.20, "body": 2.0, "room": 0.32, "tempo": -0.04, "rate": -8},
+    {"key": "claro", "label": "Claro / Didático", "pitch": 0.4, "formant": 0.02, "warmth": 1.0,
+     "brightness": 2.5, "breath": 0.10, "body": 0.0, "room": 0.06, "tempo": 0.01, "rate": 2},
+    {"key": "rouco", "label": "Rouco", "pitch": -2.0, "formant": -0.05, "warmth": 2.0,
+     "brightness": 0.5, "breath": 0.55, "body": 2.5, "room": 0.12, "tempo": -0.01, "rate": -2},
+]
+
+ARCHETYPE_KEYS = [str(a["key"]) for a in ARCHETYPES]
+MAX_VARIANTS = 24
+
+
+def _noise(seed: str, count: int) -> list[float]:
+    """Ruído determinístico em [-1, 1] com o tamanho pedido."""
+    out: list[float] = []
+    counter = 0
+    while len(out) < count:
+        digest = hashlib.sha256(f"{seed}#{counter}".encode("utf-8")).digest()
+        out.extend((byte / 127.5) - 1.0 for byte in digest)
+        counter += 1
+    return out[:count]
+
+
+def generate_variants(
+    base: Persona,
+    *,
+    count: int = 6,
+    intensity: float = 0.6,
+    seed: str | None = None,
+    base_voices: list[str] | None = None,
+) -> list[Persona]:
+    """Deriva `count` modelos distintos a partir de uma voz base.
+
+    A mutação combina um arquétipo (direção estética) com um jitter determinístico,
+    então o mesmo `seed` sempre devolve exatamente o mesmo conjunto de vozes.
+    """
+    count = max(1, min(MAX_VARIANTS, int(count)))
+    intensity = max(0.05, min(1.5, float(intensity)))
+    seed = seed or f"{base.id}:{base.base_voice}"
+    pool = [v for v in (base_voices or []) if v] or [base.base_voice]
+    noise = _noise(seed, count * 10)
+
+    variants: list[Persona] = []
+    for index in range(count):
+        arch = ARCHETYPES[index % len(ARCHETYPES)]
+        n = noise[index * 10 : index * 10 + 10]
+        cycle = index // len(ARCHETYPES)
+        suffix = f" {cycle + 1}" if cycle else ""
+        label = f"{base.name or 'Voz'} · {arch['label']}{suffix}"
+
+        variant = Persona(
+            id=slugify(label),
+            name=label,
+            base_voice=pool[index % len(pool)],
+            engine=base.engine,
+            pitch=base.pitch + float(arch["pitch"]) * intensity + n[0] * 0.8 * intensity,
+            formant=base.formant + float(arch["formant"]) * intensity + n[1] * 0.02 * intensity,
+            warmth=base.warmth + float(arch["warmth"]) * intensity + n[2] * 1.0 * intensity,
+            brightness=base.brightness + float(arch["brightness"]) * intensity + n[3] * 1.0 * intensity,
+            breath=base.breath + float(arch["breath"]) * intensity + n[4] * 0.06 * intensity,
+            body=base.body + float(arch["body"]) * intensity + n[5] * 0.8 * intensity,
+            room=base.room + float(arch["room"]) * intensity + n[6] * 0.05 * intensity,
+            tempo=base.tempo + float(arch["tempo"]) * intensity + n[7] * 0.015 * intensity,
+            rate=int(round(base.rate + float(arch["rate"]) * intensity + n[8] * 3 * intensity)),
+            notes=f"Modelo {arch['label'].lower()} derivado de “{base.name or base.base_voice}”.",
+        ).normalized()
+        variants.append(variant)
+    return variants
+
+
+def save_many(personas: list[Persona | dict]) -> list[Persona]:
+    saved: list[Persona] = []
+    for item in personas:
+        payload = item.dict() if isinstance(item, Persona) else dict(item)
+        payload.pop("id", None)  # deixa o catálogo resolver colisões de nome
+        saved.append(save(payload))
+    return saved
+
+
+# --------------------------------------------------------------------------- #
 # DNA acústico — micro-ajustes estáveis e exclusivos por persona
 # --------------------------------------------------------------------------- #
 def dna(persona_id: str) -> list[float]:
     """Sequência determinística em [-1, 1] derivada do id da persona."""
     digest = hashlib.sha256(persona_id.encode("utf-8")).digest()
     return [(byte / 127.5) - 1.0 for byte in digest[:8]]
+
 
 
 def filter_chain(persona: Persona, *, preserve_duration: bool = True) -> list[str]:
