@@ -27,6 +27,7 @@ O problema mais provavel na Central de APIs nao parece ser apenas "chave ausente
 - `audit/06-checklist-deploy.md`
 - `audit/07-plano-producao-voz.md`
 - `audit/08-corrigir-dublagem-ia.md`
+- `audit/10-laboratorio-legendas.md` (laboratorio local da ferramenta de legenda: logica, testes e diagnostico)
 - `audit/09-auditoria-apis-completa.md` (auditoria completa: toda chamada externa, contrato e matriz ferramenta -> dependencia)
 
 ## Leitura rapida

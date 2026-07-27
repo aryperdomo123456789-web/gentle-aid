@@ -29,6 +29,8 @@ export const TOOLS: Tool[] = [
   { to: "/historico", label: "Central de Jobs", icon: History },
   { to: "/apis", label: "Central de APIs", icon: KeyRound },
   { to: "/lab", label: "Laboratório de APIs", icon: FlaskConical },
+  { to: "/lab-legenda", label: "Lab de Legendas", icon: Captions },
+
 ];
 
 export function TopNav() {
