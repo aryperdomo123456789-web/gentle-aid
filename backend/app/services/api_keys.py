@@ -314,6 +314,16 @@ PROVIDERS: list[dict[str, Any]] = [
 
 ]
 
+_PROJECT_ACTIVE_IDS = {
+    "deepseek",
+    "groq",
+    "openrouter",
+    "mistral",
+    "siliconflow",
+    "tavily",
+    "exa",
+}
+
 PROVIDER_BY_ID = {p["id"]: p for p in PROVIDERS}
 
 
@@ -437,6 +447,8 @@ def describe(provider_id: str) -> dict[str, Any]:
 
         "configured": bool(key),
         "source": "cofre" if stored_key else ("env" if env_key else "vazio"),
+        "project_active": provider["id"] in _PROJECT_ACTIVE_IDS,
+        "project_label": "Usada no projeto" if provider["id"] in _PROJECT_ACTIVE_IDS else "Só ligada",
         "masked": mask(key),
         "note": stored.get("note", ""),
         "updated_at": stored.get("updated_at"),
@@ -445,7 +457,9 @@ def describe(provider_id: str) -> dict[str, Any]:
 
 
 def list_all() -> list[dict[str, Any]]:
-    return [describe(p["id"]) for p in PROVIDERS]
+    order = {True: 0, False: 1}
+    items = [describe(p["id"]) for p in PROVIDERS]
+    return sorted(items, key=lambda item: (order[item["project_active"]], item["category"], item["name"]))
 
 # --- Teste de conectividade --------------------------------------------------
 _HTTP_MESSAGES = {
@@ -883,7 +897,7 @@ def _parse_legacy_catalog(text: str) -> dict[str, str]:
                     None,
                 )
             continue
-        if not current or current in out:
+        if not current:
             continue
         if line.startswith("=") or line.startswith("#") or "://" in line:
             continue

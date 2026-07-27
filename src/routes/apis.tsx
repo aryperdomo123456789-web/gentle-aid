@@ -63,6 +63,8 @@ type Provider = {
 
   configured: boolean;
   source: "cofre" | "env" | "vazio";
+  project_active: boolean;
+  project_label: string;
   masked: string;
   note: string;
   updated_at?: string | null;
@@ -496,7 +498,18 @@ function ProviderCard({
       <header className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">{provider.name}</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">{provider.category}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className="text-xs text-muted-foreground">{provider.category}</p>
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                provider.project_active
+                  ? "border-success/40 bg-success/10 text-success"
+                  : "border-border bg-surface/60 text-muted-foreground"
+              }`}
+            >
+              {provider.project_label}
+            </span>
+          </div>
         </div>
         <HealthPill provider={provider} />
       </header>

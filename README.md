@@ -119,6 +119,13 @@ ir no `.env`: cadastre pela aba **Central de APIs**, que grava no cofre
 fica desativado por padrão; se quiser reativá-lo, use
 `VIRAL_AUTO_IMPORT_ON_BOOT=1`.
 
+Se você tiver o TXT do legado com as chaves, pode importar tudo para o cofre
+com:
+
+```bash
+python scripts/import_legacy_api_keys.py /caminho/para/TODASAPI.txt
+```
+
 ## Desenvolvimento local
 
 ```bash
