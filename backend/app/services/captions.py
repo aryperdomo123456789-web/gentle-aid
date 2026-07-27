@@ -33,6 +33,7 @@ __all__ = [
     "group_words",
     "lines_from_segments",
     "parse_srt",
+    "spread_words",
     "preset_catalog",
     "resolve_preset",
 ]
@@ -686,3 +687,6 @@ def _active_token(token: str, *, anim: str, accent: str, primary: str) -> str:
         tag = f"{{{color}}}"
     # `reset` volta ao estilo base para as palavras seguintes na mesma linha
     return tag + token + reset
+
+
+spread_words = _spread_words

@@ -138,7 +138,7 @@ def _work(
         else:
             jobs.stage(job_id, "transcrevendo", "Texto simples recebido — sincronizando com a duração.", progress=25)
             duration = max(1.0, info.duration or media.probe_duration(src))
-            words = captions._spread_words(srt_text.strip(), 0.0, duration)
+            words = captions.spread_words(srt_text.strip(), 0.0, duration)
             lines = captions.group_words(words, max_words=max_words)
     else:
         jobs.stage(
