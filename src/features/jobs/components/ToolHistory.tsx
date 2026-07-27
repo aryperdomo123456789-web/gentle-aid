@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Download, Eye, RefreshCw, StopCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { JobMediaPreview } from "./JobMediaPreview";
 import { StatusPill } from "./StatusPanel";
 import { cancelJob, deleteJob, fetchJobList } from "@/features/jobs/api";

@@ -3,7 +3,7 @@ import { RefreshCw, StopCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
-import { StatusPill } from "@/components/StatusPanel";
+import { StatusPill } from "@/features/jobs/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
 import { cancelJob, deleteJob, fetchJobList } from "@/features/jobs/api";
 import {
