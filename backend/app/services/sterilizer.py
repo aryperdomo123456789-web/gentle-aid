@@ -307,17 +307,59 @@ def build_audio_filters(level: str, info: Probe, rng: random.Random, speed: floa
     if level == "off" or not info.has_audio:
         return []
 
-    rate = 48000
-    pitch = 1 + rng.uniform(-0.006, 0.006) * {"leve": 0.4, "media": 1.0, "agressiva": 1.6, "extrema": 2.2}.get(level, 1.0)
-    filters = [
-        f"asetrate={int(rate * pitch)}",
-        f"aresample={rate}",
-        f"atempo={speed / pitch:.6f}",
-        f"volume={1 + rng.uniform(-0.02, 0.02):.4f}",
-    ]
-    if level in {"agressiva", "extrema"}:
-        filters.append(f"highpass=f={rng.randint(18, 32)}")
-        filters.append(f"lowpass=f={rng.randint(17600, 18400)}")
+    # O legado forte de TikTok/Youtube preserva o corpo do grave.
+    # Aqui evitamos `asetrate` para não alterar pitch e mantemos só o
+    # reencaixe temporal com `atempo`, que muda velocidade sem achatar o baixo.
+    filters = [f"atempo={speed:.6f}"]
+
+    if level == "leve":
+        filters.extend(
+            [
+                f"volume={1 + rng.uniform(-0.01, 0.01):.4f}",
+                "acompressor=threshold=0.22:ratio=1.8:attack=18:release=180:makeup=1.0",
+            ]
+        )
+        return filters
+
+    if level == "media":
+        filters.extend(
+            [
+                "equalizer=f=120:t=q:w=1.0:g=2.0",
+                "equalizer=f=4200:t=q:w=1.0:g=-1.2",
+                "acompressor=threshold=0.20:ratio=2.2:attack=18:release=160:makeup=1.0",
+                "alimiter=limit=0.94",
+            ]
+        )
+        return filters
+
+    if level == "agressiva":
+        filters.extend(
+            [
+                "equalizer=f=100:t=q:w=1.0:g=3.0",
+                "equalizer=f=5500:t=q:w=1.0:g=1.8",
+                "acompressor=threshold=0.17:ratio=3.0:attack=12:release=120:makeup=1.2",
+                "alimiter=limit=0.92",
+            ]
+        )
+        return filters
+
+    if level == "extrema":
+        filters.extend(
+            [
+                "equalizer=f=90:t=q:w=1.0:g=3.4",
+                "equalizer=f=6000:t=q:w=1.0:g=2.0",
+                "acompressor=threshold=0.15:ratio=3.4:attack=10:release=110:makeup=1.3",
+                "alimiter=limit=0.90",
+            ]
+        )
+        return filters
+
+    filters.extend(
+        [
+            "acompressor=threshold=0.20:ratio=2.0:attack=18:release=160:makeup=1.0",
+            "alimiter=limit=0.94",
+        ]
+    )
     return filters
 
 
@@ -379,7 +421,9 @@ def build_command(
 
     speed_filter = next((f for f in vf if f.startswith("setpts=PTS/")), "")
     speed = float(speed_filter.split("/")[-1]) if speed_filter else 1.0
-    af = list(extra_audio_filters or []) + build_audio_filters(level, info, rng, speed)
+    af = list(extra_audio_filters or [])
+    if not af:
+        af.extend(build_audio_filters(level, info, rng, speed))
 
     chosen_bitrate = pick_bitrate(bitrate, rng)
     gop = rng.choice((48, 50, 60, 72, 90))
