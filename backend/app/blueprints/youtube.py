@@ -91,7 +91,7 @@ def _work(job_id: str, urls: list[str], intensity: str) -> None:
             }
         )
         last_report, last_dst = report, dst
-        jobs.update(job_id, progress=int(index / total * 100), meta_outputs=outputs)
+        jobs.update(job_id, progress=int(index / total * 100), outputs=outputs)
 
     if last_report and last_dst:
         deliver(
