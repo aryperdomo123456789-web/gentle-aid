@@ -237,6 +237,8 @@ function ApisPage() {
                 <Activity className="size-4" aria-hidden="true" />
               )}
               Diagnóstico
+            </button>
+
 
             <button
               type="button"
