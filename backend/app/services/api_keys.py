@@ -341,7 +341,10 @@ def describe(provider_id: str) -> dict[str, Any]:
         "docs": provider["docs"],
         "usage": provider["usage"],
         "prefix": provider.get("prefix"),
+        "format_hint": provider.get("format_hint"),
+        "format_ok": (not provider.get("prefix")) or key.startswith(provider["prefix"]) if key else None,
         "testable": bool(provider.get("test")),
+
         "configured": bool(key),
         "source": "cofre" if stored_key else ("env" if env_key else "vazio"),
         "masked": mask(key),
