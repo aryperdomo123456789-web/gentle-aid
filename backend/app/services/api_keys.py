@@ -352,26 +352,20 @@ def describe(provider_id: str) -> dict[str, Any]:
 def list_all() -> list[dict[str, Any]]:
     return [describe(p["id"]) for p in PROVIDERS]
 
-
 # --- Teste de conectividade --------------------------------------------------
-def test_provider(provider_id: str) -> dict[str, Any]:
-    provider = PROVIDER_BY_ID[provider_id]
-    spec = provider.get("test")
-    key = get_key(provider_id)
+_HTTP_MESSAGES = {
+    400: "Requisição rejeitada (400) — normalmente formato de credencial errado.",
+    401: "Chave inválida ou revogada (401).",
+    402: "Créditos esgotados / pagamento pendente (402).",
+    403: "Sem permissão para este recurso (403).",
+    404: "Endpoint não encontrado (404).",
+    429: "Limite de requisições atingido (429).",
+}
 
-    if not key:
-        result = {"ok": False, "status": 0, "message": "Nenhuma chave configurada.", "at": _now()}
-        _record_test(provider_id, result)
-        return result
-    if not spec:
-        result = {
-            "ok": None,
-            "status": 0,
-            "message": "Provedor sem endpoint de teste — validação manual.",
-            "at": _now(),
-        }
-        _record_test(provider_id, result)
-        return result
+
+def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
+    """Executa um único endpoint de verificação e devolve status/ok/mensagem."""
+    import base64
 
     url = spec["url"]
     headers = {"Accept": "application/json", "User-Agent": "EcossistemaViral/1.0"}
@@ -385,45 +379,96 @@ def test_provider(provider_id: str) -> dict[str, Any]:
         headers[spec.get("header", "x-api-key")] = key
     elif auth == "query":
         sep = "&" if "?" in url else "?"
-        url = f"{url}{sep}{spec.get('param', 'key')}={key}"
+        url = f"{url}{sep}{spec.get('param', 'key')}={urllib.parse.quote(key)}"
+    elif auth == "basic":
+        user = os.environ.get(spec.get("basic_user_env", ""), "") or spec.get("basic_user", "")
+        if not user:
+            return {
+                "ok": None,
+                "status": 0,
+                "message": f"Defina {spec.get('basic_user_env')} para validar esta chave.",
+            }
+        token = base64.b64encode(f"{user}:{key}".encode()).decode()
+        headers["Authorization"] = f"Basic {token}"
 
     if spec.get("body") is not None:
         body = json.dumps(spec["body"]).encode()
         headers["Content-Type"] = "application/json"
 
-    started = time.perf_counter()
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     ctx = ssl.create_default_context()
     try:
         with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
-            status = resp.status
             resp.read(2048)
-        ok, message = True, "Chave válida e respondendo."
+            return {"ok": True, "status": resp.status, "message": "Chave válida e respondendo."}
     except urllib.error.HTTPError as exc:
         status = exc.code
-        ok = status not in (401, 402, 403, 429)
-        message = {
-            401: "Chave inválida ou revogada (401).",
-            402: "Créditos esgotados / pagamento pendente (402).",
-            403: "Sem permissão para este recurso (403).",
-            429: "Limite de requisições atingido (429).",
-        }.get(status, f"Endpoint respondeu HTTP {status}.")
+        return {
+            "ok": status not in (400, 401, 402, 403, 429),
+            "status": status,
+            "message": _HTTP_MESSAGES.get(status, f"Endpoint respondeu HTTP {status}."),
+        }
     except urllib.error.URLError as exc:
-        status, ok = 0, False
-        message = f"Falha de rede: {exc.reason}"
+        return {"ok": False, "status": 0, "message": f"Falha de rede: {exc.reason}"}
     except Exception as exc:  # noqa: BLE001
-        status, ok = 0, False
-        message = f"Erro inesperado: {exc}"
+        return {"ok": False, "status": 0, "message": f"Erro inesperado: {exc}"}
+
+
+def test_provider(provider_id: str) -> dict[str, Any]:
+    provider = PROVIDER_BY_ID[provider_id]
+    spec = provider.get("test")
+    specs = [s for s in (spec if isinstance(spec, list) else [spec]) if s]
+    key = get_key(provider_id)
+    hint = provider.get("format_hint")
+
+    if not key:
+        result = {"ok": False, "status": 0, "message": "Nenhuma chave configurada.", "at": _now()}
+        _record_test(provider_id, result)
+        return result
+
+    prefix = provider.get("prefix")
+    if prefix and not key.startswith(prefix):
+        result = {
+            "ok": False,
+            "status": 0,
+            "message": f"Formato inesperado: a chave deveria começar com '{prefix}'."
+            + (f" {hint}" if hint else ""),
+            "at": _now(),
+        }
+        _record_test(provider_id, result)
+        return result
+
+    if not specs:
+        result = {
+            "ok": None,
+            "status": 0,
+            "message": "Provedor sem endpoint de teste — validação manual.",
+            "at": _now(),
+        }
+        _record_test(provider_id, result)
+        return result
+
+    started = time.perf_counter()
+    attempt: dict[str, Any] = {}
+    for candidate in specs:
+        attempt = _run_probe(candidate, key)
+        if attempt.get("ok"):
+            break
+
+    message = attempt.get("message", "Falha desconhecida.")
+    if attempt.get("ok") is False and hint:
+        message = f"{message} {hint}"
 
     result = {
-        "ok": ok,
-        "status": status,
+        "ok": attempt.get("ok"),
+        "status": attempt.get("status", 0),
         "message": message,
         "latency_ms": int((time.perf_counter() - started) * 1000),
         "at": _now(),
     }
     _record_test(provider_id, result)
     return result
+
 
 
 # --- Auto-preenchimento (importação de chaves existentes) --------------------
