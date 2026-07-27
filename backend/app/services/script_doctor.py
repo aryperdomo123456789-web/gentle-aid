@@ -321,11 +321,13 @@ def clean_for_speech(text: str) -> str:
     out = re.sub(r"\s*\n\s*", "\n", out)
     out = re.sub(r"\n{3,}", "\n\n", out)
     out = re.sub(r"[ \t]{2,}", " ", out)
-    out = re.sub(r"\s+([,.;:!?])", r"\1", out)
-    out = re.sub(r"([,.;:!?])(?=[^\s\d])", r"\1 ", out)
-    out = re.sub(r"\.{4,}", "…", out)
-    out = out.replace("...", "…")
-    out = re.sub(r"([!?])\1{1,}", r"\1", out)
+    # Pontuação: primeiro colapsa repetição, só depois normaliza espaçamento —
+    # a ordem inversa transformava "!!!" em "! ! !".
+    out = re.sub(r"\.{3,}", "…", out)
+    out = re.sub(r"([!?])\1+", r"\1", out)
+    out = re.sub(r"([,;:.])\1+", r"\1", out)
+    out = re.sub(r"\s+([,.;:!?…])", r"\1", out)
+    out = re.sub(r"([,.;:!?…])(?=[^\s\d,.;:!?…])", r"\1 ", out)
 
     for pattern, replacement in _ABBREV.items():
         out = re.sub(pattern, replacement, out, flags=re.IGNORECASE)
@@ -333,6 +335,9 @@ def clean_for_speech(text: str) -> str:
         out = out.replace(old, new)
     for filler in _FILLERS:
         out = re.sub(rf"\b{re.escape(filler)}\b[,]?\s*", "", out, flags=re.IGNORECASE)
+
+    # Depois de cortar muleta a frase pode começar em minúscula.
+    out = re.sub(r"(^|[.!?…]\s+)([a-zà-ÿ])", lambda m: m.group(1) + m.group(2).upper(), out)
 
     out = re.sub(r"([0-9])%", r"\1 por cento", out)
     out = re.sub(r"\bkm/h\b", "quilômetros por hora", out)
