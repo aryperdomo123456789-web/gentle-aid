@@ -18,7 +18,9 @@ type Props = {
   busy: boolean;
   picker: ReactNode;
   dubReady: boolean;
+  translateReady?: boolean;
   languages: Record<string, string>;
+
 };
 
 /** Aba "Dublagem IA": escuta o vídeo original e refaz a narração sincronizada. */
