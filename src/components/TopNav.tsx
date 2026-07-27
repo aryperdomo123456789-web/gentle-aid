@@ -46,8 +46,8 @@ export function TopNav() {
           </div>
         </div>
 
-        <nav aria-label="Ferramentas" className="-mx-1 overflow-x-auto pb-1">
-          <ul className="flex min-w-max items-center gap-2 px-1">
+        <nav aria-label="Ferramentas" className="-mx-1 pb-1">
+          <ul className="flex flex-wrap items-center gap-2 px-1">
             {TOOLS.map(({ to, label, icon: Icon }) => (
               <li key={to}>
                 <Link

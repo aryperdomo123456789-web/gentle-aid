@@ -976,7 +976,7 @@ def sync_env(data: dict[str, dict[str, Any]] | None = None) -> str | None:
 
 
 
-def autofill(force: bool = False) -> dict[str, Any]:
+def autofill(force: bool = False, repair: bool = False) -> dict[str, Any]:
     """Preenche o cofre com chaves encontradas no ambiente e em arquivos legados."""
     harvested, sources = _collect()
 
@@ -987,7 +987,9 @@ def autofill(force: bool = False) -> dict[str, Any]:
         for provider in PROVIDERS:
             pid = provider["id"]
             existing = (data.get(pid) or {}).get("key")
-            if existing and not force:
+            broken = last_test_ok(pid) is False
+            # "repair" só mexe em quem falhou no último teste; nunca toca em chave saudável.
+            if existing and not force and not (repair and broken):
                 skipped.append(pid)
                 continue
 
@@ -1020,11 +1022,19 @@ def autofill(force: bool = False) -> dict[str, Any]:
             prefer = provider.get("prefer_pattern")
             if prefer:
                 pool.sort(key=lambda item: 0 if re.match(prefer, item[0]) else 1)
-            if len(pool) > 1:
+            probed_ok = False
+            if len(pool) > 1 or (existing and value != existing):
                 for candidate_key, candidate_origin in pool:
                     if _probe_key(provider, candidate_key):
-                        value, origin = candidate_key, candidate_origin
+                        value, origin, probed_ok = candidate_key, candidate_origin, True
                         break
+
+            if existing:
+                # Só substitui uma chave já gravada quando a candidata comprovadamente funciona
+                # e é diferente — evita trocar uma credencial ruim por outra igualmente ruim.
+                if value == existing or not probed_ok:
+                    skipped.append(pid)
+                    continue
 
 
 

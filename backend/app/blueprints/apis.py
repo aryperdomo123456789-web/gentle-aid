@@ -60,7 +60,10 @@ def test_provider(provider_id: str):
 def import_keys():
     """Varre .env, app antigo e configs legadas e preenche o cofre sozinho."""
     payload = request.get_json(silent=True) or {}
-    report = api_keys.autofill(force=bool(payload.get("force")))
+    report = api_keys.autofill(
+        force=bool(payload.get("force")),
+        repair=bool(payload.get("repair")),
+    )
     return jsonify(report=report, providers=api_keys.list_all())
 
 
