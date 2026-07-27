@@ -8,6 +8,7 @@ chaves SEMPRE por `api_keys.get_key("groq")` — nunca com os.environ direto.
 from __future__ import annotations
 
 import json
+import re
 import os
 import ssl
 import threading
@@ -213,6 +214,10 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://developers.cloudflare.com/api/operations/user-api-tokens-verify-token",
         "usage": "Endpoints leves, cache e camada pública de webhooks.",
         "format_hint": "Use um API Token (Meu Perfil → API Tokens). A Global API Key antiga só é aceita junto com CLOUDFLARE_EMAIL.",
+        "shape_warn": {
+            "pattern": r"^[0-9a-fA-F]{32,40}$",
+            "message": "Esta credencial tem cara de Global API Key (32-40 caracteres hexadecimais), não de API Token.",
+        },
         "remediation": "Gere um API Token em dash.cloudflare.com → Meu Perfil → API Tokens (template 'Edit Cloudflare Workers') e cole aqui. Se preferir manter a Global API Key, defina também CLOUDFLARE_EMAIL no .env.",
         "test": [
             {"url": "https://api.cloudflare.com/client/v4/user/tokens/verify", "auth": "bearer"},
@@ -570,6 +575,10 @@ def test_provider(provider_id: str) -> dict[str, Any]:
     message = attempt.get("message", "Falha desconhecida.")
     if attempt.get("ok") is False and hint:
         message = f"{message} {hint}"
+
+    shape = provider.get("shape_warn")
+    if attempt.get("ok") is False and shape and re.match(shape["pattern"], key or ""):
+        message = f"{message} {shape['message']}"
 
     action = None
     remediation = None
