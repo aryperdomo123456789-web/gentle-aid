@@ -20,7 +20,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from ..config import config
-from ..services import edge_tts, ingest, jobs, media, voice_engine, voice_forge
+from ..services import dubbing, edge_tts, ingest, jobs, media, transcribe, voice_engine, voice_forge
 
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS, normalize_level
@@ -35,6 +35,7 @@ from ..services.validation import (
     save_upload,
 )
 from ..services.edge_tts import EdgeTTSError
+from ..services.transcribe import TranscribeError
 from ..services.voice_engine import Settings, VoiceEngineError
 
 bp = Blueprint("voice", __name__, url_prefix="/api/voice")
@@ -113,6 +114,8 @@ def catalog():
         timings=list(TIMINGS),
         levels=list(LEVELS),
         max_tts_chars=MAX_TTS_CHARS,
+        dub_ready=transcribe.available(),
+        dub_languages=dubbing.LANGUAGES,
         test_script=TEST_SCRIPT,
         local_voices=[
             {"id": "masc_grave", "name": "Masculino grave"},
@@ -643,3 +646,157 @@ def _work_tts(
         message=f"Narração gerada ({duration/60:.1f} min) com {source_label} e áudio sem rastro.",
     )
 
+
+
+# --------------------------------------------------------------------------- #
+# Dublagem com IA — link do YouTube/TikTok ou upload
+# --------------------------------------------------------------------------- #
+@bp.post("/dub")
+def dub():
+    """Ouve a narração original e refaz o áudio com a voz escolhida, sincronizado."""
+    engine = (request.form.get("engine") or "forge").lower()
+    if engine not in ("forge", "elevenlabs"):
+        return jsonify(error="Motor de dublagem inválido (use 'forge' ou 'elevenlabs')."), 400
+
+    if not transcribe.available():
+        return jsonify(error=transcribe.missing_key_message()), 400
+
+    persona_id = (request.form.get("persona_id") or "").strip()
+    persona = voice_forge.get(persona_id) if persona_id else None
+    if persona_id and persona is None:
+        return jsonify(error="Voz própria não encontrada. Recarregue a lista de vozes."), 400
+
+    voice_id = (request.form.get("voice_id") or "").strip()
+    if engine == "forge":
+        if persona is None:
+            return jsonify(error="Escolha (ou crie) uma voz própria no Voice Forge."), 400
+        if not edge_tts.available():
+            return jsonify(
+                error="Motor gratuito indisponível: instale `edge-tts` no servidor e reinicie o viral-api."
+            ), 400
+    elif not voice_engine.available() or not voice_id:
+        return jsonify(
+            error="A dublagem realista exige a chave ElevenLabs em /apis e uma voz selecionada."
+        ), 400
+
+    target_lang = (request.form.get("target_lang") or "auto").strip().lower()
+    if target_lang not in dubbing.LANGUAGES:
+        return jsonify(error="Idioma de dublagem não suportado."), 400
+    source_lang = (request.form.get("source_lang") or "").strip().lower() or None
+
+    try:
+        keep_ambience = max(0.0, min(0.6, float(request.form.get("keep_ambience", 0.12))))
+    except (TypeError, ValueError):
+        keep_ambience = 0.12
+
+    try:
+        fmt, mutation, _timing = _common_params()
+        source_card = parse_json_object(request.form.get("source_card"), field="source_card")
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+
+    keep_video = request.form.get("keep_video", "1") not in ("0", "false", "off")
+
+    job = jobs.create_job(
+        "voice",
+        meta={
+            "mode": "dub",
+            "engine": engine,
+            "target": persona.name if persona else voice_id,
+            "persona": persona.id if persona else None,
+            "format": fmt,
+            "mutation": mutation,
+            "target_lang": target_lang,
+            "keep_video": keep_video,
+            **({"source_card": source_card} if source_card else {}),
+        },
+    )
+
+    source_url = (request.form.get("url") or "").strip()
+    upload = request.files.get("media") or request.files.get("audio") or request.files.get("video")
+    src: Path | None = None
+    if upload and upload.filename:
+        try:
+            src = save_upload(upload, job["job_id"], MEDIA_EXT)
+        except ValidationError as exc:
+            jobs.update(job["job_id"], status="error", message=str(exc))
+            return jsonify(error=str(exc)), 400
+    elif not ingest.is_supported_url(source_url):
+        msg = "Cole o link do YouTube/TikTok ou envie um arquivo para dublar."
+        jobs.update(job["job_id"], status="error", message=msg)
+        return jsonify(error=msg), 400
+
+    jobs.submit(
+        job["job_id"],
+        lambda jid: _work_dub(
+            jid, src, source_url, engine, voice_id, persona, fmt, mutation,
+            keep_video, keep_ambience, target_lang, source_lang,
+        ),
+    )
+    return jsonify(job), 202
+
+
+def _work_dub(
+    job_id: str,
+    src: Path | None,
+    source_url: str,
+    engine: str,
+    voice_id: str,
+    persona: "voice_forge.Persona | None",
+    fmt: str,
+    mutation: str,
+    keep_video: bool,
+    keep_ambience: float,
+    target_lang: str,
+    source_lang: str | None,
+) -> None:
+    src = ingest.resolve_source(src, source_url, job_id)
+    info = media.probe(src)
+    if not info.has_audio:
+        raise RuntimeError("Esse conteúdo não tem trilha de áudio para dublar.")
+
+    jobs.update(job_id, progress=10)
+    try:
+        segments, detected = transcribe.transcribe(src, job_id=job_id, language=source_lang)
+    except TranscribeError as exc:
+        raise RuntimeError(str(exc)) from exc
+
+    if target_lang not in ("", "auto") and detected and detected.lower().startswith(target_lang):
+        jobs.log(job_id, "Idioma alvo igual ao original — tradução dispensada.")
+    else:
+        segments = dubbing.translate(segments, target_lang, job_id)
+
+    work_dir = output_path("voice", job_id, ".tmp").parent
+    track = work_dir / f"{job_id}_dubtrack.wav"
+    base_voice = persona.base_voice if (engine == "forge" and persona) else voice_id
+    try:
+        dubbing.build_track(
+            segments, track,
+            engine=engine, voice=base_voice, job_id=job_id, total_duration=info.duration,
+        )
+    except (EdgeTTSError, VoiceEngineError, dubbing.DubbingError) as exc:
+        raise RuntimeError(str(exc)) from exc
+
+    if persona is not None:
+        signed = work_dir / f"{job_id}_dubvoice.wav"
+        track = dubbing.apply_persona(track, signed, persona, job_id)
+
+    jobs.update(job_id, progress=88)
+    voice_label = persona.name if persona else voice_id
+
+    if keep_video and info.has_video:
+        muxed = work_dir / f"{job_id}_dubmux.mp4"
+        dubbing.mix_with_background(src, track, muxed, keep_ambience=keep_ambience, job_id=job_id)
+        dst = output_path("voice", job_id, ".mp4")
+        report = media.sterilize(muxed, dst, job_id=job_id, level=mutation)
+        muxed.unlink(missing_ok=True)
+        message = f"Vídeo dublado com a voz '{voice_label}', sincronizado e esterilizado."
+    else:
+        dst = output_path("voice", job_id, FORMATS[fmt])
+        report = media.sterilize(track, dst, job_id=job_id, level=mutation, audio_only=True)
+        message = f"Narração dublada com a voz '{voice_label}' e áudio sem rastro."
+
+    track.unlink(missing_ok=True)
+    src.unlink(missing_ok=True)
+    jobs.update(job_id, transcript=[s.dict() for s in segments][:400])
+    deliver(job_id, dst, report, message=message)
