@@ -130,8 +130,10 @@ function VoiceStudio() {
               [
                 ["media", "Vídeo / Áudio → nova voz"],
                 ["text", "Texto → narração"],
+                ["forge", "Criar voz"],
               ] as const
             ).map(([value, label]) => (
+
               <button
                 key={value}
                 type="button"
