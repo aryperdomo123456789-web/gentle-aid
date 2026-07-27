@@ -79,6 +79,7 @@ type PanelId =
   | "animacao"
   | "cores"
   | "esterilizar"
+  | "exportar"
   | "jobs"
   | "historico";
 
@@ -90,6 +91,7 @@ const RAIL: { id: PanelId; label: string; icon: typeof Upload }[] = [
   { id: "animacao", label: "Animação", icon: Wand2 },
   { id: "cores", label: "Cores", icon: Palette },
   { id: "esterilizar", label: "Esterilizar", icon: Shield },
+  { id: "exportar", label: "Exportar", icon: ShieldCheck },
   { id: "jobs", label: "Job", icon: ImageIcon },
   { id: "historico", label: "Histórico", icon: Clock3 },
 ];
@@ -204,15 +206,12 @@ function Legendar() {
     return form;
   }
 
+  /** Nada roda direto: a mídia é carregada e a exportação exige confirmação. */
   function processCard(nextCard: DiscoveryCard) {
     setCard(nextCard);
     setFile(null);
-    const form = buildForm(new FormData());
-    form.set("url", nextCard.url);
-    form.set("source_card", JSON.stringify(nextCard));
     saveDraft();
-    setPanel("jobs");
-    run(() => apiPostForm<Job>("/api/legendar/run", form));
+    setPanel("exportar");
   }
 
   function exportVideo() {
