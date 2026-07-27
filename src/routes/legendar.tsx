@@ -621,7 +621,9 @@ function Legendar() {
             onToggle={() => stageApi.current?.toggle()}
           />
         </div>
+        </div>
       </div>
+
     </div>
   );
 }
