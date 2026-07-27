@@ -14,6 +14,7 @@ import { Route as TiktokRouteImport } from './routes/tiktok'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LegendarRouteImport } from './routes/legendar'
+import { Route as LabRouteImport } from './routes/lab'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
@@ -44,6 +45,11 @@ const LoginRoute = LoginRouteImport.update({
 const LegendarRoute = LegendarRouteImport.update({
   id: '/legendar',
   path: '/legendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabRoute = LabRouteImport.update({
+  id: '/lab',
+  path: '/lab',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoricoRoute = HistoricoRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/conta': typeof ContaRoute
   '/historico': typeof HistoricoRouteWithChildren
+  '/lab': typeof LabRoute
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/conta': typeof ContaRoute
   '/historico': typeof HistoricoRouteWithChildren
+  '/lab': typeof LabRoute
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/conta': typeof ContaRoute
   '/historico': typeof HistoricoRouteWithChildren
+  '/lab': typeof LabRoute
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/canva-cleaner'
     | '/conta'
     | '/historico'
+    | '/lab'
     | '/legendar'
     | '/login'
     | '/radar'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/canva-cleaner'
     | '/conta'
     | '/historico'
+    | '/lab'
     | '/legendar'
     | '/login'
     | '/radar'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/canva-cleaner'
     | '/conta'
     | '/historico'
+    | '/lab'
     | '/legendar'
     | '/login'
     | '/radar'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   CanvaCleanerRoute: typeof CanvaCleanerRoute
   ContaRoute: typeof ContaRoute
   HistoricoRoute: typeof HistoricoRouteWithChildren
+  LabRoute: typeof LabRoute
   LegendarRoute: typeof LegendarRoute
   LoginRoute: typeof LoginRoute
   RadarRoute: typeof RadarRoute
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/legendar'
       fullPath: '/legendar'
       preLoaderRoute: typeof LegendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab': {
+      id: '/lab'
+      path: '/lab'
+      fullPath: '/lab'
+      preLoaderRoute: typeof LabRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/historico': {
@@ -272,6 +292,7 @@ const rootRouteChildren: RootRouteChildren = {
   CanvaCleanerRoute: CanvaCleanerRoute,
   ContaRoute: ContaRoute,
   HistoricoRoute: HistoricoRouteWithChildren,
+  LabRoute: LabRoute,
   LegendarRoute: LegendarRoute,
   LoginRoute: LoginRoute,
   RadarRoute: RadarRoute,
