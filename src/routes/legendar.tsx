@@ -35,10 +35,12 @@ import { EditorTimeline } from "@/features/captions/components/EditorTimeline";
 import { PresetGallery } from "@/features/captions/components/PresetGallery";
 import {
   applyStyle,
+  ASPECT_LABEL,
   DEFAULT_STYLE,
   POSITION_LABEL,
   positionFromY,
   yFromPosition,
+  type CaptionAspect,
   type CaptionStyle,
 } from "@/features/captions/style";
 import { useCaptionDraft } from "@/features/captions/use-caption-draft";
