@@ -143,7 +143,61 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
     }
   }
 
+  async function makeVariants() {
+    setBusy("variants");
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await apiPostJson<{ variants: Persona[] }>("/api/voice/personas/variants", {
+        base: { ...draft, id: draft.id || "forge_base", name: draft.name || "Voz base" },
+        count: variantCount,
+        intensity: variantIntensity,
+        seed: `${draft.name || draft.base_voice}:${variantCount}:${variantIntensity}`,
+      });
+      setVariants(res.variants);
+      setVariantAudio({});
+      setNotice(`${res.variants.length} modelos gerados. Ouça e salve os que curtir.`);
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function previewVariant(variant: Persona) {
+    setVariantBusy(variant.id);
+    setError(null);
+    try {
+      const res = await apiPostJson<{ url: string }>("/api/voice/personas/preview", {
+        ...variant,
+        text: previewText.trim() || undefined,
+      });
+      setVariantAudio((prev) => ({ ...prev, [variant.id]: `${downloadUrl(res.url)}?t=${Date.now()}` }));
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setVariantBusy("");
+    }
+  }
+
+  async function saveVariants(list: Persona[]) {
+    setBusy("bulk");
+    setError(null);
+    try {
+      const res = await apiPostJson<{ personas: Persona[] }>("/api/voice/personas/bulk", {
+        personas: list,
+      });
+      setNotice(`${res.personas.length} voz(es) salva(s) no catálogo.`);
+      await load();
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setBusy("");
+    }
+  }
+
   const baseVoices = data?.base_voices ?? [];
+
 
   return (
     <section className="rounded-2xl border border-border bg-card/60 p-5">
