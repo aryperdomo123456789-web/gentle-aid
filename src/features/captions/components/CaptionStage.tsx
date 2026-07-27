@@ -109,6 +109,16 @@ export function CaptionStage({
     if (videoRef.current) videoRef.current.currentTime = value;
   }, []);
 
+  useEffect(() => {
+    onReady?.({ seek, toggle });
+  }, [onReady, seek, toggle]);
+
+  useEffect(() => {
+    onTick?.(time, duration, playing);
+  }, [onTick, time, duration, playing]);
+
+
+
   const applyPointer = useCallback(
     (clientY: number) => {
       const rect = stageRef.current?.getBoundingClientRect();
