@@ -99,6 +99,7 @@ export function CaptionStage({
   useEffect(() => {
     setTime(0);
     setPlaying(false);
+    setNatural(null);
   }, [src]);
 
   const toggle = useCallback(() => {
