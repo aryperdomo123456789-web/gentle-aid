@@ -52,7 +52,7 @@ TIMINGS = ("strict", "natural")
 ENGINES = ("elevenlabs", "forge", "local")
 SAMPLE_RATE = 48000
 MEDIA_EXT = AUDIO_EXT | VIDEO_EXT
-MAX_TTS_CHARS = 40000
+MAX_TTS_CHARS = 500000
 PREVIEW_TEXT = (
     "Essa é a minha voz. Um timbre exclusivo, construído do zero para este canal, "
     "pronto para narrar qualquer conteúdo."

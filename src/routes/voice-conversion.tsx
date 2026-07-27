@@ -302,7 +302,7 @@ function VoiceStudio() {
 
               <MutationSelect defaultValue="auto" label="Esterilização" hint="Áudio final sem rastro de origem." />
 
-              <SubmitButton busy={busy} disabled={!ready}>
+              <SubmitButton busy={busy} disabled={ttsVoice.engine === "elevenlabs" ? !ready : !forgeReady}>
                 {busy ? "Narrando…" : "Gerar narração"}
               </SubmitButton>
             </form>
