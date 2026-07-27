@@ -41,12 +41,23 @@ PROVIDERS: list[dict[str, Any]] = [
         "env": "GEMINI_API_KEY",
         "docs": "https://ai.google.dev/gemini-api/docs",
         "usage": "Geração de roteiros, títulos e análise multimodal de clipes.",
-        "test": {
-            "url": "https://generativelanguage.googleapis.com/v1beta/models",
-            "auth": "query",
-            "param": "key",
-        },
+        "prefix": "AIza",
+        "format_hint": "A chave do Gemini (AI Studio) começa com 'AIza'. Tokens 'AQ.' ou 'ya29.' são credenciais OAuth do Google Cloud e não funcionam aqui.",
+        # Doc oficial: autenticação por header x-goog-api-key.
+        "test": [
+            {
+                "url": "https://generativelanguage.googleapis.com/v1beta/models",
+                "auth": "header",
+                "header": "x-goog-api-key",
+            },
+            {
+                "url": "https://generativelanguage.googleapis.com/v1beta/models",
+                "auth": "query",
+                "param": "key",
+            },
+        ],
     },
+
     {
         "id": "groq",
         "name": "Groq",
