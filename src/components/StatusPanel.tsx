@@ -169,9 +169,37 @@ export function StatusPanel({
         <Download className="size-4" aria-hidden="true" />
         {job?.download_url ? "Baixar arquivo final" : "Download indisponível"}
       </a>
+
+      <ConfirmActionDialog
+        open={Boolean(dialog)}
+        onOpenChange={(open) => {
+          if (!open) setDialog(null);
+        }}
+        title={dialog === "cancel" ? "Cancelar este job?" : "Apagar este job?"}
+        description={
+          dialog === "cancel"
+            ? `O processamento de ${job?.filename ?? job?.job_id} para imediatamente e o job fica marcado como cancelado.`
+            : `Isso remove ${job?.filename ?? job?.job_id}, os arquivos gerados e o rastro do servidor. A trilha de auditoria é preservada.`
+        }
+        confirmLabel={dialog === "cancel" ? "Sim, cancelar" : "Sim, apagar"}
+        destructive={dialog === "delete"}
+        busy={acting}
+        onConfirm={async () => {
+          const current = dialog;
+          setDialog(null);
+          setActing(true);
+          try {
+            if (current === "cancel") await onCancel?.();
+            else await onDelete?.();
+          } finally {
+            setActing(false);
+          }
+        }}
+      />
     </div>
   );
 }
+
 
 function HashRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
