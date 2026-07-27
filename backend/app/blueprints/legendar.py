@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from ..services import jobs, media
+from ..services import ingest, jobs, media
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS
 from ..services.validation import (
@@ -39,18 +39,39 @@ def run_job():
     except ValidationError as exc:
         return jsonify(error=str(exc)), 400
 
-    job = jobs.create_job("legendar", meta={"style": style, "position": position, "mutation": mutation})
-    try:
-        src = save_upload(request.files.get("video"), job["job_id"], VIDEO_EXT)
-    except ValidationError as exc:
-        jobs.update(job["job_id"], status="error", message=str(exc))
-        return jsonify(error=str(exc)), 400
+    source_url = (request.form.get("url") or "").strip()
+    job = jobs.create_job(
+        "legendar",
+        meta={"style": style, "position": position, "mutation": mutation, "url": source_url},
+    )
+    src: Path | None = None
+    if request.files.get("video"):
+        try:
+            src = save_upload(request.files.get("video"), job["job_id"], VIDEO_EXT)
+        except ValidationError as exc:
+            jobs.update(job["job_id"], status="error", message=str(exc))
+            return jsonify(error=str(exc)), 400
+    elif not ingest.is_supported_url(source_url):
+        jobs.update(job["job_id"], status="error", message="Envie um arquivo ou selecione um vídeo na pesquisa.")
+        return jsonify(error="Envie um arquivo ou selecione um vídeo na pesquisa."), 400
 
-    jobs.submit(job["job_id"], lambda jid: _work(jid, src, srt_text, style, position, mutation))
+    jobs.submit(
+        job["job_id"],
+        lambda jid: _work(jid, src, srt_text, style, position, mutation, source_url),
+    )
     return jsonify(job), 202
 
 
-def _work(job_id: str, src: Path, srt_text: str, style: str, position: str, mutation: str) -> None:
+def _work(
+    job_id: str,
+    src: Path | None,
+    srt_text: str,
+    style: str,
+    position: str,
+    mutation: str,
+    source_url: str = "",
+) -> None:
+    src = ingest.resolve_source(src, source_url, job_id)
     jobs.update(job_id, progress=20)
 
     srt_path = output_path("legendar", job_id, ".srt")

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from ..services import jobs, media
+from ..services import ingest, jobs, media
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS
 from ..services.validation import AUDIO_EXT, ValidationError, output_path, save_upload
@@ -54,17 +54,26 @@ def convert():
     job = jobs.create_job(
         "voice", meta={"target": target, "format": fmt, "timing": preserve, "mutation": mutation}
     )
-    try:
-        src = save_upload(request.files.get("audio"), job["job_id"], AUDIO_EXT)
-    except ValidationError as exc:
-        jobs.update(job["job_id"], status="error", message=str(exc))
-        return jsonify(error=str(exc)), 400
+    source_url = (request.form.get("url") or "").strip()
+    src: Path | None = None
+    if request.files.get("audio"):
+        try:
+            src = save_upload(request.files.get("audio"), job["job_id"], AUDIO_EXT)
+        except ValidationError as exc:
+            jobs.update(job["job_id"], status="error", message=str(exc))
+            return jsonify(error=str(exc)), 400
+    elif not ingest.is_supported_url(source_url):
+        jobs.update(job["job_id"], status="error", message="Envie um áudio ou selecione um vídeo na pesquisa.")
+        return jsonify(error="Envie um áudio ou selecione um vídeo na pesquisa."), 400
 
-    jobs.submit(job["job_id"], lambda jid: _work(jid, src, target, fmt, mutation))
+    jobs.submit(job["job_id"], lambda jid: _work(jid, src, target, fmt, mutation, source_url))
     return jsonify(job), 202
 
 
-def _work(job_id: str, src: Path, target: str, fmt: str, mutation: str) -> None:
+def _work(
+    job_id: str, src: Path | None, target: str, fmt: str, mutation: str, source_url: str = ""
+) -> None:
+    src = ingest.resolve_source(src, source_url, job_id)
     semitones, formant = VOICES[target]
     ratio = 2 ** (semitones / 12)
     jobs.update(job_id, progress=25)
