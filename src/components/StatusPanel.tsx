@@ -61,12 +61,16 @@ export function StatusPanel({
         )}
       </div>
 
+      {job?.sterilization ? <SterilizationBadge report={job.sterilization} /> : null}
+
       {job?.md5_before || job?.md5_after ? (
         <dl className="grid gap-2 text-xs">
           <HashRow label="MD5 origem" value={job.md5_before} />
-          <HashRow label="MD5 sanitizado" value={job.md5_after} />
+          <HashRow label="MD5 esterilizado" value={job.md5_after} />
+          <HashRow label="SHA-256 final" value={job.sha256_after} />
         </dl>
       ) : null}
+
 
       <a
         href={job?.download_url ? downloadUrl(job.download_url) : undefined}
