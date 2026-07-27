@@ -85,6 +85,30 @@ export function friendlyError(err: unknown): string {
 /** Status normalizado de um job de processamento. */
 export type JobStatus = "queued" | "running" | "done" | "error";
 
+/** Relatório de esterilização devolvido pelo backend. */
+export type SterilizationReport = {
+  level: string;
+  seed: number;
+  md5_before: string;
+  md5_after: string;
+  sha256_after: string;
+  bitrate: string;
+  attempts: number;
+  video_filters: string[];
+  audio_filters: string[];
+  identity: Record<string, string>;
+  steps: string[];
+  unique: boolean;
+};
+
+export type JobOutput = {
+  url?: string;
+  download_url: string;
+  filename: string;
+  md5_before?: string;
+  md5_after?: string;
+};
+
 export type Job = {
   job_id: string;
   tool: string;
@@ -95,8 +119,13 @@ export type Job = {
   finished_at?: string;
   download_url?: string | null;
   filename?: string | null;
+  size_bytes?: number;
   md5_before?: string | null;
   md5_after?: string | null;
+  sha256_after?: string | null;
+  sterilization?: SterilizationReport | null;
+  outputs?: JobOutput[];
   log?: string[];
   meta?: Record<string, unknown>;
 };
+
