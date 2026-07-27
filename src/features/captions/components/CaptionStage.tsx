@@ -244,6 +244,7 @@ export function CaptionStage({
         </span>
       </div>
 
+      {hideControls ? null : (
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -275,6 +276,7 @@ export function CaptionStage({
           {formatClock(time)} / {formatClock(duration)}
         </span>
       </div>
+      )}
     </div>
   );
 }
