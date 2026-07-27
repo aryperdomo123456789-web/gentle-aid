@@ -39,18 +39,6 @@ export function TopNav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
-      {auth.user ? (
-        <div className="pointer-events-none fixed right-4 top-4 z-50">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-border bg-background/90 px-4 py-2 text-xs font-semibold text-foreground shadow-lg backdrop-blur-xl transition-colors hover:border-destructive/50 hover:text-destructive"
-          >
-            <LogOut className="size-3.5" aria-hidden="true" />
-            Sair
-          </button>
-        </div>
-      ) : null}
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
