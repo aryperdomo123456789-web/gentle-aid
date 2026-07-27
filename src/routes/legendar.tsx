@@ -478,6 +478,21 @@ function Legendar() {
                     </SelectInput>
                   )}
                 </Field>
+                <label className="flex items-start gap-2 rounded-xl border border-border/60 bg-muted/20 p-3 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={style.beatSync}
+                    onChange={(e) => patch({ beatSync: e.target.checked })}
+                    className="mt-0.5 size-4 accent-primary"
+                  />
+                  <span>
+                    Legenda no ritmo da música
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      O servidor analisa a trilha do vídeo, detecta o BPM e encaixa cada palavra na batida.
+                      Combina com a animação “Beat”.
+                    </span>
+                  </span>
+                </label>
                 <Field label="Posição" hint={`Arraste no palco para ajuste fino · atual ${style.yPct}%`}>
                   {(id) => (
                     <SelectInput

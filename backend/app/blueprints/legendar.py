@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from ..services import captions, ingest, jobs, media, transcribe
+from ..services import beatsync, captions, ingest, jobs, media, transcribe
 from ..services.delivery import deliver
 from ..services.sterilizer import normalize_level
 from ..services.validation import (
@@ -77,6 +77,9 @@ def run_job():
         "primary": (request.form.get("primary") or "").strip(),
         "emoji": request.form.get("emoji") in ("1", "true", "on"),
         "language": (request.form.get("language") or "").strip() or None,
+        # Sincroniza a legenda com a batida da música do próprio vídeo
+        "beat_sync": request.form.get("beat_sync") in ("1", "true", "on"),
+        "beat_strength": _float("beat_strength", 0.22, 0.05, 0.5),
     }
 
     source_url = (request.form.get("url") or "").strip()
@@ -92,6 +95,7 @@ def run_job():
             "animation": animation if animation != "auto" else preset["animation"],
             "mutation": mutation,
             "aspect": aspect,
+            "beat_sync": request.form.get("beat_sync") in ("1", "true", "on"),
             "url": source_url,
             **({"source_card": source_card} if source_card else {}),
         },
@@ -156,6 +160,21 @@ def _work(
         )
         jobs.update(job_id, detected_language=detected)
         lines = captions.lines_from_segments(segments, max_words=max_words)
+
+    if opts.get("beat_sync"):
+        jobs.stage(job_id, "ritmo", "Analisando a trilha para achar a batida da música.", progress=42)
+        beat_map = beatsync.detect_beats(src, duration=info.duration or 0.0)
+        if beat_map.ok:
+            lines = beatsync.snap_lines(lines, beat_map.beats, tolerance=opts["beat_strength"])
+            jobs.update(job_id, bpm=beat_map.bpm, beat_confidence=beat_map.confidence)
+            jobs.stage(
+                job_id,
+                "ritmo",
+                f"Batida travada em {beat_map.bpm:.0f} BPM — legenda encaixada no ritmo.",
+                progress=48,
+            )
+        else:
+            jobs.stage(job_id, "ritmo", "Sem batida clara no áudio — mantendo o tempo da fala.", progress=48)
 
     if not lines:
         raise RuntimeError("Não foi possível montar as legendas — nenhum trecho de fala detectado.")

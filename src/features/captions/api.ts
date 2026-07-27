@@ -10,7 +10,17 @@ export type CaptionAnimation =
   | "typewriter"
   | "highlight"
   | "boxed"
-  | "shake";
+  | "shake"
+  | "beat"
+  | "zoom"
+  | "slide"
+  | "blur"
+  | "wave"
+  | "glitch"
+  | "neon"
+  | "rainbow"
+  | "stamp"
+  | "flip";
 
 export type CaptionPreview = {
   bg: string;
@@ -50,6 +60,16 @@ export const ANIMATION_LABELS: Record<CaptionAnimation, string> = {
   typewriter: "Typewriter — revela e mantém",
   fade: "Fade — frase inteira suave",
   none: "Estático — sem animação",
+  beat: "Beat — pulso na batida da música",
+  zoom: "Zoom punch — entra grande e crava",
+  slide: "Slide up — sobe deslizando",
+  blur: "Blur in — desfoque que entra em foco",
+  wave: "Wave — onda subindo e descendo",
+  glitch: "Glitch — split RGB estilo falha",
+  neon: "Neon pulse — brilho pulsante",
+  rainbow: "Rainbow — ciclo de cores por palavra",
+  stamp: "Stamp — carimbo que gira e crava",
+  flip: "Flip 3D — vira no eixo Y",
 };
 
 export function fetchCaptionCatalog(signal?: AbortSignal) {

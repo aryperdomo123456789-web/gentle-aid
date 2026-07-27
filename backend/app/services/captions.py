@@ -323,7 +323,36 @@ PRESETS: list[dict[str, Any]] = [
 PRESET_IDS = tuple(p["id"] for p in PRESETS)
 _PRESET_MAP = {p["id"]: p for p in PRESETS}
 
-ANIMATIONS = ("auto", "none", "pop", "bounce", "fade", "karaoke", "typewriter", "highlight", "boxed", "shake")
+ANIMATIONS = (
+    "auto",
+    "none",
+    "pop",
+    "bounce",
+    "fade",
+    "karaoke",
+    "typewriter",
+    "highlight",
+    "boxed",
+    "shake",
+    # --- pacote viral 2024/2025 (referências: Hormozi, MrBeast, Submagic,
+    # CapCut "Beat Sync", Opus Clip, VEED, Captions.ai) ---
+    "beat",       # pulso forte na batida — feito para usar com beat_sync
+    "zoom",       # zoom punch: entra grande e crava
+    "slide",      # sobe deslizando com fade
+    "blur",       # desfoque que entra em foco
+    "wave",       # onda: palavras sobem e descem alternando
+    "glitch",     # split RGB estilo glitch
+    "neon",       # brilho neon pulsante no contorno
+    "rainbow",    # cada palavra em uma cor do ciclo
+    "stamp",      # carimbo: gira e crava
+    "flip",       # vira no eixo Y
+)
+
+# Animações que precisam saber a posição da palavra na linha
+_INDEXED_ANIMS = {"wave", "rainbow"}
+
+# Ciclo de cores do modo rainbow (BBGGRR, como o ASS espera)
+_RAINBOW = ("&H0000FF&", "&H00A5FF&", "&H00FFFF&", "&H00FF00&", "&HFFFF00&", "&HFF00FF&")
 POSITIONS = {"bottom": 2, "center": 5, "top": 8}
 
 # Compatibilidade com os estilos antigos da ferramenta.
@@ -566,7 +595,9 @@ def build_ass(
     header = [
         "[Script Info]",
         "ScriptType: v4.00+",
-        "WrapStyle: 2",
+        # 0 = quebra inteligente e balanceada. Com 2 (sem quebra) frases longas
+        # saem cortadas nas bordas do vídeo — bug visto em render real 1080x1920.
+        "WrapStyle: 0",
         "ScaledBorderAndShadow: yes",
         "YCbCr Matrix: TV.709",
         f"PlayResX: {width}",
@@ -662,7 +693,14 @@ def _render_line(
         for other_index, other in enumerate(words):
             token = render(other.text)
             if other_index == index:
-                token = _active_token(token, anim=anim, accent=accent, primary=primary)
+                token = _active_token(
+                    token,
+                    anim=anim,
+                    accent=accent,
+                    primary=primary,
+                    index=index,
+                    total=len(words),
+                )
             parts.append(token)
         text = " ".join(parts)
         if emoji and index == len(words) - 1:
@@ -672,7 +710,9 @@ def _render_line(
     return events
 
 
-def _active_token(token: str, *, anim: str, accent: str, primary: str) -> str:
+def _active_token(
+    token: str, *, anim: str, accent: str, primary: str, index: int = 0, total: int = 1
+) -> str:
     color = f"\\c{accent}"
     reset = "{\\r}"  # volta 100% ao estilo base (cor, escala, contorno, rotação)
     if anim == "pop":
@@ -683,6 +723,42 @@ def _active_token(token: str, *, anim: str, accent: str, primary: str) -> str:
         tag = f"{{{color}\\frz-4\\t(0,80,\\frz4)\\t(80,160,\\frz0)\\fscx112\\fscy112\\t(0,140,\\fscx100\\fscy100)}}"
     elif anim == "boxed":
         tag = f"{{\\c&H00FFFFFF&\\3c{accent}\\bord14\\shad0}}"
+    elif anim == "beat":
+        # pulso curto e seco, no tempo da batida (usar junto com beat_sync)
+        tag = (
+            f"{{{color}\\fscx142\\fscy142\\t(0,70,\\fscx96\\fscy96)"
+            "\\t(70,150,\\fscx100\\fscy100)}"
+        )
+    elif anim == "zoom":
+        tag = f"{{{color}\\fscx165\\fscy165\\alpha&H40&\\t(0,120,\\fscx100\\fscy100\\alpha&H00&)}}"
+    elif anim == "slide":
+        tag = f"{{{color}\\fay-0.12\\t(0,130,\\fay0)\\alpha&HB0&\\t(0,130,\\alpha&H00&)}}"
+    elif anim == "blur":
+        tag = f"{{{color}\\blur9\\t(0,160,\\blur0)\\fscx108\\fscy108\\t(0,160,\\fscx100\\fscy100)}}"
+    elif anim == "wave":
+        up = index % 2 == 0
+        shift = "-0.10" if up else "0.10"
+        tag = f"{{{color}\\fay{shift}\\t(0,180,\\fay0)\\fscy118\\t(0,180,\\fscy100)}}"
+    elif anim == "glitch":
+        tag = (
+            f"{{{color}\\3c&H00FFFF&\\bord6\\xshad-5\\yshad0\\4c&HFF0000&"
+            "\\t(0,60,\\xshad5)\\t(60,130,\\xshad0)\\fscx112\\t(0,130,\\fscx100)}"
+        )
+    elif anim == "neon":
+        tag = (
+            f"{{{color}\\3c{accent}\\bord2\\blur6\\t(0,140,\\bord9\\blur14)"
+            "\\t(140,300,\\bord4\\blur7)}"
+        )
+    elif anim == "rainbow":
+        hue = _RAINBOW[index % len(_RAINBOW)]
+        tag = f"{{\\c{hue}\\fscx114\\fscy114\\t(0,140,\\fscx100\\fscy100)}}"
+    elif anim == "stamp":
+        tag = (
+            f"{{{color}\\frz-12\\fscx170\\fscy170\\alpha&H60&"
+            "\\t(0,110,\\frz0\\fscx100\\fscy100\\alpha&H00&)}"
+        )
+    elif anim == "flip":
+        tag = f"{{{color}\\fry88\\t(0,150,\\fry0)\\fscx105\\t(0,150,\\fscx100)}}"
     else:  # highlight
         tag = f"{{{color}}}"
     # `reset` volta ao estilo base para as palavras seguintes na mesma linha
