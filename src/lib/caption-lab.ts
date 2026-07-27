@@ -303,7 +303,24 @@ export function groupWords(
   return lines;
 }
 
+/**
+ * PIPELINE CORRETO DO SRT (igual ao blueprint `legendar.py`):
+ * parse_srt → achata as palavras → group_words(max_words).
+ * Usar as linhas cruas do SRT direto no ASS é o erro clássico: elas vêm com
+ * frases inteiras (>42 caracteres) e ignoram o `words_per_line` do preset.
+ */
+export function linesFromSrt(text: string, maxWords: number): Line[] {
+  const words = parseSrt(text).flatMap((line) => line.words);
+  return groupWords(words, { maxWords: clampWordsPerLine(maxWords) });
+}
+
+/** O backend aceita apenas 1..10 palavras por linha. */
+export function clampWordsPerLine(value: number): number {
+  return Math.max(1, Math.min(10, Math.round(value || 1)));
+}
+
 /** Ordena, corrige sobreposição e agrupa — espelho de `lines_from_segments`. */
+
 export function linesFromWords(words: Word[], maxWords: number): Line[] {
   const list = words.filter((w) => w.text.trim()).sort((a, b) => a.start - b.start);
   for (let i = 0; i < list.length - 1; i += 1) {
