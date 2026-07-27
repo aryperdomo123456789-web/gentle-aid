@@ -234,7 +234,7 @@ export function CaptionStage({
               color: primary,
               fontWeight: view?.weight ?? 800,
               fontStyle: view?.italic ? "italic" : "normal",
-              fontSize: `${1.55 * style.fontScale}rem`,
+              fontSize: `clamp(0.62rem, ${(7 * style.fontScale).toFixed(2)}cqw, ${(2.3 * style.fontScale).toFixed(2)}rem)`,
               textShadow: boxed ? "none" : "0 2px 0 rgba(0,0,0,.9), 0 0 14px rgba(0,0,0,.65)",
             }}
           >
