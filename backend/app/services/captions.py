@@ -674,7 +674,7 @@ def _render_line(
 
 def _active_token(token: str, *, anim: str, accent: str, primary: str) -> str:
     color = f"\\c{accent}"
-    reset = f"{{\\c{primary}\\fscx100\\fscy100\\bord0\\3a&H00&\\frz0}}"
+    reset = "{\\r}"  # volta 100% ao estilo base (cor, escala, contorno, rotação)
     if anim == "pop":
         tag = f"{{{color}\\fscx118\\fscy118\\t(0,110,\\fscx100\\fscy100)}}"
     elif anim == "bounce":
