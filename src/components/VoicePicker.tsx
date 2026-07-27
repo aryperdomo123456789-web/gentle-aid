@@ -156,7 +156,7 @@ export function VoicePicker({
             type="button"
             disabled={!enabled}
             onClick={() => switchEngine(id)}
-            className={`flex-1 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors disabled:opacity-40 ${
+            className={`min-h-10 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-[11px] sm:flex-1 font-semibold transition-colors disabled:opacity-40 ${
               value.engine === id
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
