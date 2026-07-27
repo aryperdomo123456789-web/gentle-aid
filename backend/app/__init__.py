@@ -7,6 +7,7 @@ import os
 from flask import Flask, jsonify, send_from_directory
 
 from .config import Config
+from .blueprints.apis import bp as apis_bp
 from .blueprints.canva_cleaner import bp as canva_bp
 from .blueprints.jobs import bp as jobs_bp
 from .blueprints.legendar import bp as legendar_bp
@@ -28,7 +29,7 @@ def create_app(config: Config | None = None) -> Flask:
 
     cfg.ensure_dirs()
 
-    for bp in (youtube_bp, tiktok_bp, legendar_bp, voice_bp, canva_bp, jobs_bp):
+    for bp in (youtube_bp, tiktok_bp, legendar_bp, voice_bp, canva_bp, jobs_bp, apis_bp):
         app.register_blueprint(bp)
 
     @app.get("/api/health")

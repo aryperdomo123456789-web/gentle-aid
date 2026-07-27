@@ -14,6 +14,7 @@ import { Route as TiktokRouteImport } from './routes/tiktok'
 import { Route as LegendarRouteImport } from './routes/legendar'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
+import { Route as ApisRouteImport } from './routes/apis'
 import { Route as IndexRouteImport } from './routes/index'
 
 const VoiceConversionRoute = VoiceConversionRouteImport.update({
@@ -41,6 +42,11 @@ const CanvaCleanerRoute = CanvaCleanerRouteImport.update({
   path: '/canva-cleaner',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApisRoute = ApisRouteImport.update({
+  id: '/apis',
+  path: '/apis',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,6 +55,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/historico': typeof HistoricoRoute
   '/legendar': typeof LegendarRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/historico': typeof HistoricoRoute
   '/legendar': typeof LegendarRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/historico': typeof HistoricoRoute
   '/legendar': typeof LegendarRoute
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/apis'
     | '/canva-cleaner'
     | '/historico'
     | '/legendar'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/apis'
     | '/canva-cleaner'
     | '/historico'
     | '/legendar'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/apis'
     | '/canva-cleaner'
     | '/historico'
     | '/legendar'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApisRoute: typeof ApisRoute
   CanvaCleanerRoute: typeof CanvaCleanerRoute
   HistoricoRoute: typeof HistoricoRoute
   LegendarRoute: typeof LegendarRoute
@@ -145,6 +158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CanvaCleanerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/apis': {
+      id: '/apis'
+      path: '/apis'
+      fullPath: '/apis'
+      preLoaderRoute: typeof ApisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -157,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApisRoute: ApisRoute,
   CanvaCleanerRoute: CanvaCleanerRoute,
   HistoricoRoute: HistoricoRoute,
   LegendarRoute: LegendarRoute,
@@ -166,13 +187,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
