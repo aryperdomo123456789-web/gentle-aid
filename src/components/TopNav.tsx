@@ -8,6 +8,7 @@ import {
   History,
   Radar,
   KeyRound,
+  UserCog,
   LogOut,
   Shield,
 } from "lucide-react";
@@ -68,6 +69,13 @@ export function TopNav() {
               <span className="hidden rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs font-mono text-muted-foreground md:inline-flex">
                 {auth.user.email}
               </span>
+              <Link
+                to="/conta"
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50"
+              >
+                <UserCog className="size-3.5" aria-hidden="true" />
+                Conta
+              </Link>
               <button
                 type="button"
                 onClick={handleLogout}

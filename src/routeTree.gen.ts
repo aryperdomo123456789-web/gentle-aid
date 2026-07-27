@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApisRouteImport } from './routes/apis'
 import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
+import { Route as ContaRouteImport } from './routes/conta'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as LegendarRouteImport } from './routes/legendar'
 import { Route as LoginRouteImport } from './routes/login'
@@ -33,6 +34,11 @@ const ApisRoute = ApisRouteImport.update({
 const CanvaCleanerRoute = CanvaCleanerRouteImport.update({
   id: '/canva-cleaner',
   path: '/canva-cleaner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContaRoute = ContaRouteImport.update({
+  id: '/conta',
+  path: '/conta',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoricoRoute = HistoricoRouteImport.update({
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
+  '/conta': typeof ContaRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
+  '/conta': typeof ContaRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
+  '/conta': typeof ContaRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/apis'
     | '/canva-cleaner'
+    | '/conta'
     | '/historico'
     | '/legendar'
     | '/login'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/'
     | '/apis'
     | '/canva-cleaner'
+    | '/conta'
     | '/historico'
     | '/legendar'
     | '/login'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/apis'
     | '/canva-cleaner'
+    | '/conta'
     | '/historico'
     | '/legendar'
     | '/login'
@@ -151,6 +163,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApisRoute: typeof ApisRoute
   CanvaCleanerRoute: typeof CanvaCleanerRoute
+  ContaRoute: typeof ContaRoute
   HistoricoRoute: typeof HistoricoRouteWithChildren
   LegendarRoute: typeof LegendarRoute
   LoginRoute: typeof LoginRoute
@@ -180,6 +193,13 @@ declare module '@tanstack/react-router' {
       path: '/canva-cleaner'
       fullPath: '/canva-cleaner'
       preLoaderRoute: typeof CanvaCleanerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conta': {
+      id: '/conta'
+      path: '/conta'
+      fullPath: '/conta'
+      preLoaderRoute: typeof ContaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/historico': {
@@ -250,6 +270,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApisRoute: ApisRoute,
   CanvaCleanerRoute: CanvaCleanerRoute,
+  ContaRoute: ContaRoute,
   HistoricoRoute: HistoricoRouteWithChildren,
   LegendarRoute: LegendarRoute,
   LoginRoute: LoginRoute,
