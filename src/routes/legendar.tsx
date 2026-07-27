@@ -509,18 +509,64 @@ function Legendar() {
                     />
                   )}
                 </Field>
-                <Field label={`Tamanho da fonte · ${style.fontScale.toFixed(2)}x`}>
+                <Field
+                  label={`Tamanho da fonte · ${style.fontScale.toFixed(2)}x`}
+                  hint="Arraste para a esquerda para deixar a legenda menor e mais discreta."
+                >
                   {(id) => (
                     <input
                       id={id}
                       type="range"
-                      min={0.6}
+                      min={0.35}
                       max={1.8}
                       step={0.05}
                       value={style.fontScale}
                       onChange={(e) => patch({ fontScale: Number(e.target.value) })}
                       className="w-full accent-primary"
                     />
+                  )}
+                </Field>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "Pequena", value: 0.6 },
+                    { label: "Média", value: 1 },
+                    { label: "Grande", value: 1.4 },
+                  ].map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => patch({ fontScale: opt.value })}
+                      className={cn(
+                        "rounded-lg border px-3 py-1.5 text-xs transition",
+                        Math.abs(style.fontScale - opt.value) < 0.03
+                          ? "border-primary bg-primary/15 text-foreground"
+                          : "border-border text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <Field
+                  label="Formato do vídeo"
+                  hint={
+                    style.aspect === "auto"
+                      ? `Detectado automaticamente: ${detected ?? "aguardando o vídeo"}`
+                      : "Formato fixado manualmente para a prévia."
+                  }
+                >
+                  {(id) => (
+                    <SelectInput
+                      id={id}
+                      value={style.aspect}
+                      onChange={(e) => patch({ aspect: e.target.value as CaptionAspect })}
+                    >
+                      {(Object.keys(ASPECT_LABEL) as CaptionAspect[]).map((key) => (
+                        <option key={key} value={key}>
+                          {ASPECT_LABEL[key]}
+                        </option>
+                      ))}
+                    </SelectInput>
                   )}
                 </Field>
               </div>
