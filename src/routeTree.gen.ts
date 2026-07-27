@@ -9,8 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VoiceConversionRouteImport } from './routes/voice-conversion'
+import { Route as TiktokRouteImport } from './routes/tiktok'
+import { Route as LegendarRouteImport } from './routes/legendar'
+import { Route as HistoricoRouteImport } from './routes/historico'
+import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
 import { Route as IndexRouteImport } from './routes/index'
 
+const VoiceConversionRoute = VoiceConversionRouteImport.update({
+  id: '/voice-conversion',
+  path: '/voice-conversion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TiktokRoute = TiktokRouteImport.update({
+  id: '/tiktok',
+  path: '/tiktok',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegendarRoute = LegendarRouteImport.update({
+  id: '/legendar',
+  path: '/legendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoricoRoute = HistoricoRouteImport.update({
+  id: '/historico',
+  path: '/historico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CanvaCleanerRoute = CanvaCleanerRouteImport.update({
+  id: '/canva-cleaner',
+  path: '/canva-cleaner',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +49,102 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/canva-cleaner': typeof CanvaCleanerRoute
+  '/historico': typeof HistoricoRoute
+  '/legendar': typeof LegendarRoute
+  '/tiktok': typeof TiktokRoute
+  '/voice-conversion': typeof VoiceConversionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/canva-cleaner': typeof CanvaCleanerRoute
+  '/historico': typeof HistoricoRoute
+  '/legendar': typeof LegendarRoute
+  '/tiktok': typeof TiktokRoute
+  '/voice-conversion': typeof VoiceConversionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/canva-cleaner': typeof CanvaCleanerRoute
+  '/historico': typeof HistoricoRoute
+  '/legendar': typeof LegendarRoute
+  '/tiktok': typeof TiktokRoute
+  '/voice-conversion': typeof VoiceConversionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/canva-cleaner'
+    | '/historico'
+    | '/legendar'
+    | '/tiktok'
+    | '/voice-conversion'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/canva-cleaner'
+    | '/historico'
+    | '/legendar'
+    | '/tiktok'
+    | '/voice-conversion'
+  id:
+    | '__root__'
+    | '/'
+    | '/canva-cleaner'
+    | '/historico'
+    | '/legendar'
+    | '/tiktok'
+    | '/voice-conversion'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CanvaCleanerRoute: typeof CanvaCleanerRoute
+  HistoricoRoute: typeof HistoricoRoute
+  LegendarRoute: typeof LegendarRoute
+  TiktokRoute: typeof TiktokRoute
+  VoiceConversionRoute: typeof VoiceConversionRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/voice-conversion': {
+      id: '/voice-conversion'
+      path: '/voice-conversion'
+      fullPath: '/voice-conversion'
+      preLoaderRoute: typeof VoiceConversionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tiktok': {
+      id: '/tiktok'
+      path: '/tiktok'
+      fullPath: '/tiktok'
+      preLoaderRoute: typeof TiktokRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legendar': {
+      id: '/legendar'
+      path: '/legendar'
+      fullPath: '/legendar'
+      preLoaderRoute: typeof LegendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/historico': {
+      id: '/historico'
+      path: '/historico'
+      fullPath: '/historico'
+      preLoaderRoute: typeof HistoricoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/canva-cleaner': {
+      id: '/canva-cleaner'
+      path: '/canva-cleaner'
+      fullPath: '/canva-cleaner'
+      preLoaderRoute: typeof CanvaCleanerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,6 +157,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CanvaCleanerRoute: CanvaCleanerRoute,
+  HistoricoRoute: HistoricoRoute,
+  LegendarRoute: LegendarRoute,
+  TiktokRoute: TiktokRoute,
+  VoiceConversionRoute: VoiceConversionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
