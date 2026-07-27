@@ -217,9 +217,10 @@ def build_video_filters(level: str, info: Probe, rng: random.Random) -> list[str
     speed = 1 + rng.uniform(0.004, 0.018) * intensity
     filters.append(f"setpts=PTS/{speed:.5f}")
 
-    # 7. Nível extremo: espelhamento imperceptível de bordas via padding zerado.
+    # 7. Nível extremo: micro-blur + realce, embaralha a assinatura de frequência.
     if level == "extrema":
-        filters.append("setdar=dar=iw/ih")
+        filters.append(f"gblur=sigma={rng.uniform(0.12, 0.28):.3f}")
+
 
     return filters
 
