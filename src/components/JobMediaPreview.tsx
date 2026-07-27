@@ -35,9 +35,8 @@ function getOrientation(job: Job): "portrait" | "landscape" | "square" | "unknow
 }
 
 function previewAspectClass(orientation: ReturnType<typeof getOrientation>): string {
-  if (orientation === "portrait") return "aspect-[9/16]";
-  if (orientation === "square") return "aspect-square";
-  return "aspect-video";
+  void orientation;
+  return "aspect-square";
 }
 
 function isVideoAsset(url: string): boolean {
@@ -52,7 +51,11 @@ export function JobMediaPreview({ job }: { job: Job }) {
   return (
     <div className="space-y-4">
       <div
-        className={`overflow-hidden rounded-2xl border border-border bg-black/90 ${previewAspectClass(orientation)}`}
+        className={`mx-auto overflow-hidden rounded-2xl border border-border bg-black/90 ${previewAspectClass(orientation)}`}
+        style={{
+          width: "min(92vw, 32rem)",
+          height: "min(92vw, 32rem)",
+        }}
       >
         {playable ? (
           isVideoAsset(playable) ? (
@@ -63,7 +66,9 @@ export function JobMediaPreview({ job }: { job: Job }) {
               playsInline
             />
           ) : (
-            <audio controls src={playable} className="w-full" />
+            <div className="flex h-full w-full items-center justify-center p-6">
+              <audio controls src={playable} className="w-full" />
+            </div>
           )
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
