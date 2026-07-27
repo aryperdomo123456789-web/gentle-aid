@@ -206,9 +206,10 @@ function TikTokDashboard() {
           />
           <ToolHistory
             tool="tiktok"
-          title="Histórico · TikTok Clone"
-          refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
-        />
+            title="Histórico · TikTok Clone"
+            refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
+          />
+        </div>
       }
     />
   );
