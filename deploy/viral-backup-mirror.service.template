@@ -1,0 +1,10 @@
+[Unit]
+Description=Ecossistema Viral - Backup mirror - __DOMAIN__
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__APP_DIR__
+Environment="VIRAL_ROOT=__APP_DIR__"
+EnvironmentFile=-__APP_DIR__/.env
+ExecStart=/usr/bin/env bash __APP_DIR__/deploy/backup-mirror.sh

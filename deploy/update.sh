@@ -22,4 +22,8 @@ printf '\n\033[1;35m==>\033[0m Reiniciando serviços\n'
 systemctl restart viral-api viral-web
 sleep 3
 curl -s http://127.0.0.1:"${VIRAL_API_PORT:-8010}"/api/health || true
+
+printf '\n\033[1;35m==>\033[0m Espelhando estado atual no backup\n'
+bash "$APP_DIR/deploy/backup-mirror.sh" || true
+
 printf '\n\033[1;32m✔ Atualizado.\033[0m\n'

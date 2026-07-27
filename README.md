@@ -104,6 +104,21 @@ Se quiser desativar temporariamente:
 VIRAL_AUTO_UPDATE=0 systemctl restart viral-auto-update.timer
 ```
 
+### Espelho automático de backup
+
+O projeto também mantém um espelho automático no branch `backup`. Esse branch
+recebe snapshots do estado atual do aaPanel em segundo plano, sem depender de
+ação manual.
+
+O timer faz uma checagem leve: se não houver diferença real no conteúdo, ele
+sai sem criar commit nem travar o servidor.
+
+Para desativar temporariamente:
+
+```bash
+VIRAL_BACKUP_MIRROR=0 systemctl restart viral-backup-mirror.timer
+```
+
 ### Operação
 
 ```bash
