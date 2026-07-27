@@ -1,5 +1,5 @@
 import { LockKeyhole, PencilLine, Search, Shield, Trash2, Users } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 import { Field, SubmitButton, TextInput } from "@/components/form";
 import type { ManagedUser } from "@/lib/auth";
@@ -350,7 +350,7 @@ function SummaryTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Chip({ children }: { children: React.ReactNode }) {
+function Chip({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex items-center rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs text-muted-foreground">
       {children}
