@@ -155,11 +155,11 @@ function TikTokDashboard() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => clone(t.url)}
+                      onClick={() => pick(t.url)}
                       disabled={busy}
                       className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
                     >
-                      Clonar 1:1
+                      Usar este viral
                     </button>
                   </li>
                 ))}
@@ -170,7 +170,7 @@ function TikTokDashboard() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (cloneUrl.trim()) clone(cloneUrl.trim());
+              clone();
             }}
             className="space-y-4 rounded-xl border border-border bg-background/40 p-4"
           >
@@ -221,8 +221,8 @@ function TikTokDashboard() {
         <div className="space-y-6">
           <DiscoveryPanel
             defaultPlatform="tiktok"
-            actionLabel="Codificar 1:1"
-            onAction={(card: DiscoveryCard) => clone(card.url, card)}
+            actionLabel="Usar este vídeo"
+            onAction={(card: DiscoveryCard) => pick(card.url, card)}
             actionBusyUrl={busy ? cloneUrl : null}
           />
           <ToolHistory
