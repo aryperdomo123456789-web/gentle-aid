@@ -11,6 +11,16 @@ _DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = Path(os.environ.get("VIRAL_ROOT", str(_DEFAULT_ROOT))).resolve()
 
 
+def _tool_bin(env_key: str, default_name: str) -> str:
+    value = os.environ.get(env_key)
+    if value:
+        return value
+    candidate = APP_ROOT / ".venv" / "bin" / default_name
+    if candidate.exists():
+        return str(candidate)
+    return default_name
+
+
 def _recommended_worker_count() -> int:
     cpu = os.cpu_count() or 4
     # Mantém margem para o sistema e ainda escala bem em máquinas de 30+ núcleos.
@@ -21,9 +31,9 @@ def _recommended_worker_count() -> int:
 class Config:
     app_root: Path = APP_ROOT
     storage_dir: Path = field(default_factory=lambda: APP_ROOT / "fabrica_clips")
-    ffmpeg_bin: str = os.environ.get("FFMPEG_BIN", "ffmpeg")
-    ffprobe_bin: str = os.environ.get("FFPROBE_BIN", "ffprobe")
-    ytdlp_bin: str = os.environ.get("YTDLP_BIN", "yt-dlp")
+    ffmpeg_bin: str = _tool_bin("FFMPEG_BIN", "ffmpeg")
+    ffprobe_bin: str = _tool_bin("FFPROBE_BIN", "ffprobe")
+    ytdlp_bin: str = _tool_bin("YTDLP_BIN", "yt-dlp")
     max_upload_bytes: int = int(os.environ.get("MAX_UPLOAD_MB", "500")) * 1024 * 1024
     max_workers: int = int(os.environ.get("VIRAL_WORKERS", str(_recommended_worker_count())))
     secret_key: str = os.environ.get("SECRET_KEY", "change-me-in-env")

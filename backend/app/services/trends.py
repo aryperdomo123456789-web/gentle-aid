@@ -157,14 +157,54 @@ def _video_from_entry(entry: dict[str, Any], origin: str) -> dict[str, Any]:
     }
 
 
+def _youtube_search(keyword: str, limit: int, *, origin: str = "youtube-search") -> list[dict[str, Any]]:
+    query = re.sub(r"\s+", " ", (keyword or "")).strip()
+    if not query:
+        return []
+    try:
+        entries = _ytdlp_json(f"ytsearch{max(limit, 1) * 2}:{query}", max(limit, 1) * 2)
+    except Exception:  # noqa: BLE001
+        return []
+    videos = [_video_from_entry(e, origin) for e in entries]
+    return sorted(videos, key=lambda v: v["views"], reverse=True)[:limit]
+
+
 def youtube_trending(region: str = "BR", limit: int = 15) -> list[dict[str, Any]]:
     """Aba oficial de 'Em alta' do YouTube — o que já está viralizando."""
     try:
         entries = _ytdlp_json("https://www.youtube.com/feed/trending", limit)
     except Exception:  # noqa: BLE001
-        return []
+        entries = []
     videos = [_video_from_entry(e, "youtube-trending") for e in entries]
-    return sorted(videos, key=lambda v: v["views"], reverse=True)[:limit]
+    videos = sorted(videos, key=lambda v: v["views"], reverse=True)[:limit]
+    if videos:
+        return videos
+
+    geo = (region or "BR").upper()[:2]
+    fallback_queries = [
+        f"youtube em alta {geo}",
+        f"trending youtube {geo}",
+        f"youtube trending {geo}",
+    ]
+    for trend in google_trends(region, 4):
+        term = (trend.get("term") or "").strip()
+        if term:
+            fallback_queries.append(f"{term} {geo}")
+            fallback_queries.append(term)
+
+    fallback: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for keyword in fallback_queries:
+        for video in _youtube_search(keyword, max(3, limit // 2), origin="youtube-trending-fallback"):
+            key = video["url"] or video["id"]
+            if key in seen:
+                continue
+            seen.add(key)
+            fallback.append(video)
+            if len(fallback) >= limit:
+                return fallback
+
+    return fallback
 
 
 def youtube_niche(nicho: str, limit: int = 15, *, shorts_only: bool = False) -> list[dict[str, Any]]:
