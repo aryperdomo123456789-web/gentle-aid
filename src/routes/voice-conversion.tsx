@@ -333,6 +333,16 @@ function VoiceStudio() {
                 )}
               </Field>
 
+              <LinkInspector
+                url={dubLink}
+                onInspected={setDubCard}
+                actionLabel="Dublar este vídeo"
+                actionBusy={busy}
+                onAction={processCard}
+              />
+
+
+
               <Field label="Ou envie o arquivo" hint="MP4 / MOV / MKV / WAV / MP3 / M4A — de 10 segundos a 3 horas.">
                 {(id) => (
                   <FileDrop
