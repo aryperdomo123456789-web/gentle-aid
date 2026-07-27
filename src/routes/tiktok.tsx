@@ -41,7 +41,7 @@ type Trend = {
 };
 
 function TikTokDashboard() {
-  const { job, error, busy, run } = useJobRunner();
+  const { job, error, busy, run, cancel, remove } = useJobRunner("tiktok");
   const [nicho, setNicho] = useState("Motivacional");
   const [region, setRegion] = useState("BR");
   const [trends, setTrends] = useState<Trend[]>([]);
@@ -201,6 +201,8 @@ function TikTokDashboard() {
           error={error}
           busy={busy}
           emptyHint="Escolha um viral do radar ou cole um link para iniciar a clonagem."
+          onCancel={cancel}
+          onDelete={remove}
         />
       }
       below={

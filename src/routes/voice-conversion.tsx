@@ -56,7 +56,7 @@ export const Route = createFileRoute("/voice-conversion")({
 });
 
 function VoiceStudio() {
-  const { job, error, busy, run } = useJobRunner();
+  const { job, error, busy, run, cancel, remove } = useJobRunner("voice");
   const [mode, setMode] = useState<Mode>("media");
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [hasFile, setHasFile] = useState(false);
@@ -488,6 +488,8 @@ function VoiceStudio() {
           error={error}
           busy={busy}
           emptyHint="Cole o link do YouTube/TikTok, envie um arquivo ou escreva um roteiro para começar."
+          onCancel={cancel}
+          onDelete={remove}
         />
       }
       below={
