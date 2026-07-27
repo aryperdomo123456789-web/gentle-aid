@@ -33,17 +33,34 @@ class TranscribeError(RuntimeError):
 
 
 @dataclass
+class WordStamp:
+    start: float
+    end: float
+    text: str
+
+    def dict(self) -> dict[str, object]:
+        return {"start": round(self.start, 3), "end": round(self.end, 3), "text": self.text}
+
+
+@dataclass
 class Segment:
     start: float
     end: float
     text: str
+    words: list["WordStamp"] = field(default_factory=list)
 
     @property
     def duration(self) -> float:
         return max(0.05, self.end - self.start)
 
     def dict(self) -> dict[str, object]:
-        return {"start": round(self.start, 3), "end": round(self.end, 3), "text": self.text}
+        return {
+            "start": round(self.start, 3),
+            "end": round(self.end, 3),
+            "text": self.text,
+            "words": [w.dict() for w in self.words],
+        }
+
 
 
 # --------------------------------------------------------------------------- #
