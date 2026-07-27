@@ -201,10 +201,17 @@ def convert():
 
     target = request.form.get("target_voice", "masc_grave")
     realistic_voice = (request.form.get("voice_id") or "").strip()
+    persona_id = (request.form.get("persona_id") or "").strip()
     keep_video = request.form.get("keep_video", "1") not in ("0", "false", "off")
+
+    persona = voice_forge.get(persona_id) if persona_id else None
+    if persona_id and persona is None:
+        return jsonify(error="Voz própria não encontrada. Recarregue a lista de vozes."), 400
 
     if engine == "local" and target not in VOICES:
         return jsonify(error="Timbre alvo inválido."), 400
+    if engine == "forge" and persona is None:
+        return jsonify(error="Escolha (ou crie) uma voz própria no Forge."), 400
     if engine == "elevenlabs":
         if not voice_engine.available():
             return jsonify(
@@ -224,7 +231,8 @@ def convert():
         meta={
             "mode": "convert",
             "engine": engine,
-            "target": realistic_voice or target,
+            "target": (persona.name if persona and engine == "forge" else (realistic_voice or target)),
+            "persona": persona.id if persona else None,
             "format": fmt,
             "timing": preserve,
             "mutation": mutation,
@@ -251,10 +259,12 @@ def convert():
     jobs.submit(
         job["job_id"],
         lambda jid: _work_convert(
-            jid, src, engine, target, realistic_voice, fmt, mutation, preserve, source_url, keep_video, settings
+            jid, src, engine, target, realistic_voice, fmt, mutation, preserve, source_url, keep_video,
+            settings, persona,
         ),
     )
     return jsonify(job), 202
+
 
 
 # --------------------------------------------------------------------------- #
