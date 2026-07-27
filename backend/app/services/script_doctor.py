@@ -334,7 +334,6 @@ def clean_for_speech(text: str) -> str:
     for filler in _FILLERS:
         out = re.sub(rf"\b{re.escape(filler)}\b[,]?\s*", "", out, flags=re.IGNORECASE)
 
-    out = re.sub(r"\bR\$\s*", "", out) if False else out
     out = re.sub(r"([0-9])%", r"\1 por cento", out)
     out = re.sub(r"\bkm/h\b", "quilômetros por hora", out)
 
