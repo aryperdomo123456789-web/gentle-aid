@@ -126,6 +126,8 @@ def catalog():
         max_tts_chars=MAX_TTS_CHARS,
         dub_ready=transcribe.available(),
         dub_languages=dubbing.LANGUAGES,
+        dub_translate_ready=dubbing.llm_available(),
+
         test_script=TEST_SCRIPT,
         script_styles=script_doctor.list_styles(),
         script_actions=script_doctor.ACTIONS,
