@@ -447,28 +447,47 @@ def _work_convert(
 def _work_tts(
     job_id: str,
     text: str,
+    engine: str,
     voice_id: str,
     fmt: str,
     mutation: str,
     speed: float,
     settings: Settings,
+    persona: "voice_forge.Persona | None" = None,
 ) -> None:
     jobs.update(job_id, progress=12)
     work_dir = output_path("voice", job_id, ".tmp").parent
     narrated = work_dir / f"{job_id}_tts.wav"
-    try:
-        voice_engine.text_to_speech(
-            text, narrated, voice_id=voice_id, job_id=job_id, settings=settings, speed=speed
-        )
-    except VoiceEngineError as exc:
-        raise RuntimeError(str(exc)) from exc
+
+    if engine == "forge":
+        if persona is None:
+            raise RuntimeError("Nenhuma voz própria selecionada.")
+        try:
+            edge_tts.synthesize(
+                text, narrated, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate
+            )
+        except EdgeTTSError as exc:
+            raise RuntimeError(str(exc)) from exc
+        source_label = f"voz própria '{persona.name}'"
+    else:
+        try:
+            voice_engine.text_to_speech(
+                text, narrated, voice_id=voice_id, job_id=job_id, settings=settings, speed=speed
+            )
+        except VoiceEngineError as exc:
+            raise RuntimeError(str(exc)) from exc
+        source_label = "voz realista"
 
     jobs.update(job_id, progress=90)
+    chain = voice_forge.filter_chain(persona, preserve_duration=False) if persona else None
     dst = output_path("voice", job_id, FORMATS[fmt])
-    report = media.sterilize(narrated, dst, job_id=job_id, level=mutation, audio_only=True)
+    report = media.sterilize(
+        narrated, dst, job_id=job_id, level=mutation, extra_audio_filters=chain, audio_only=True
+    )
     narrated.unlink(missing_ok=True)
     duration = media.probe_duration(dst)
     deliver(
         job_id, dst, report,
-        message=f"Narração gerada ({duration/60:.1f} min) com voz realista e áudio sem rastro.",
+        message=f"Narração gerada ({duration/60:.1f} min) com {source_label} e áudio sem rastro.",
     )
+
