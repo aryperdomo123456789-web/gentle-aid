@@ -128,6 +128,30 @@ function ApisPage() {
     }
   }
 
+  async function importKeys(force: boolean) {
+    setImporting(true);
+    setError(null);
+    setImportReport(null);
+    try {
+      const data = await apiSend<{
+        providers: Provider[];
+        report: { imported: string[]; skipped: string[]; scanned: string[] };
+      }>("/api/apis/import", "POST", { force });
+      setProviders(data.providers ?? []);
+      const n = data.report?.imported?.length ?? 0;
+      setImportReport(
+        n > 0
+          ? `${n} chave(s) importada(s) automaticamente: ${data.report.imported.join(", ")}.`
+          : "Nenhuma chave nova encontrada no servidor (.env, app antigo e configs legadas já foram varridos).",
+      );
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+
   return (
     <div className="min-h-screen">
       <TopNav />
