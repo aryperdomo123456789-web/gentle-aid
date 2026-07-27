@@ -47,6 +47,13 @@ block = f"{BEGIN}\n    include {snippet};\n{END}\n"
 # remove bloco anterior, se existir
 src = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END) + r"\n?", "", src, flags=re.S)
 
+# comenta diretivas que o nosso trecho redefine (evita "directive is duplicate")
+DUPES = re.compile(r'^\s*(client_max_body_size|client_body_timeout|proxy_read_timeout|proxy_send_timeout|send_timeout)\s')
+src = "\n".join(
+    ("    # [viral] " + l.strip()) if DUPES.match(l) else l
+    for l in src.split("\n")
+)
+
 # comenta 'location /' antigos e o root estático para não conflitar
 lines, out, depth, commenting = src.split("\n"), [], 0, False
 for line in lines:
