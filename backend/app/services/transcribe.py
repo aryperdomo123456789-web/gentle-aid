@@ -93,13 +93,15 @@ def missing_key_message() -> str:
 # --------------------------------------------------------------------------- #
 # HTTP multipart
 # --------------------------------------------------------------------------- #
-def _multipart(fields: dict[str, str], file_path: Path) -> tuple[bytes, str]:
+def _multipart(fields: dict[str, object], file_path: Path) -> tuple[bytes, str]:
     boundary = f"----viraldub{uuid.uuid4().hex}"
     parts: list[bytes] = []
-    for name, value in fields.items():
-        parts.append(
-            f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n".encode()
-        )
+    for name, raw in fields.items():
+        values = raw if isinstance(raw, (list, tuple)) else [raw]
+        for value in values:
+            parts.append(
+                f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n".encode()
+            )
     parts.append(
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
         f"filename=\"{file_path.name}\"\r\nContent-Type: audio/mpeg\r\n\r\n".encode()
@@ -109,15 +111,20 @@ def _multipart(fields: dict[str, str], file_path: Path) -> tuple[bytes, str]:
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
 
-def _post(url: str, key: str, file_path: Path, language: str | None) -> dict:
-    fields = {
+def _post(
+    url: str, key: str, file_path: Path, language: str | None, *, words: bool = False
+) -> dict:
+    fields: dict[str, object] = {
         "model": GROQ_MODEL if "groq" in url else "whisper-1",
         "response_format": "verbose_json",
         "temperature": "0",
     }
+    if words:
+        fields["timestamp_granularities[]"] = ["segment", "word"]
     if language:
         fields["language"] = language
     body, content_type = _multipart(fields, file_path)
+
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Authorization", f"Bearer {key}")
     req.add_header("Content-Type", content_type)
