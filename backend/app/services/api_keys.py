@@ -1082,12 +1082,26 @@ def autofill(force: bool = False, repair: bool = False, probe: bool = True) -> d
 
 
 def autofill_once() -> None:
-    """Roda uma vez por processo, no boot da aplicação."""
+    """Dispara a importação uma vez por processo, SEM bloquear o boot.
+
+    Antes isso rodava de forma síncrona no create_app(): a varredura de disco +
+    os testes de rede seguravam o Gunicorn e a Central de APIs ficava em
+    "Carregando integrações…" para sempre. Agora vai para uma thread daemon e
+    sem sondagem de rede (probe=False).
+    """
     global _autofill_done
     if _autofill_done:
         return
     _autofill_done = True
-    try:
-        autofill(force=False)
-    except Exception:  # noqa: BLE001 — nunca derruba o boot
-        pass
+
+    if os.environ.get("VIRAL_DISABLE_AUTOFILL") == "1":
+        return
+
+    def _run() -> None:
+        try:
+            autofill(force=False, probe=False)
+        except Exception:  # noqa: BLE001 — nunca derruba o boot
+            pass
+
+    threading.Thread(target=_run, name="api-keys-autofill", daemon=True).start()
+
