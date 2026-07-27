@@ -138,6 +138,10 @@ class SterilizationReport:
     output_video_codec: str = ""
     audit_summary: str = ""
 
+    @property
+    def unique(self) -> bool:
+        return bool(self.md5_after) and self.md5_after != self.md5_before
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "level": self.level,
@@ -151,7 +155,7 @@ class SterilizationReport:
             "audio_filters": self.audio_filters,
             "identity": self.identity,
             "steps": self.steps,
-            "unique": bool(self.md5_after) and self.md5_after != self.md5_before,
+            "unique": self.unique,
             "source_width": self.source_width,
             "source_height": self.source_height,
             "source_orientation": self.source_orientation,
@@ -604,7 +608,7 @@ def sterilize(
             f"Bitrate randômico {report.bitrate} + GOP variável",
             f"Hash final inédito: MD5 {report.md5_after[:12]}…",
         ]
-        if report.md5_after != report.md5_before:
+        if report.unique:
             return report
         if job_id:
             from . import jobs as jobs_service
