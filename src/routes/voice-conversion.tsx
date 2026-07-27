@@ -46,7 +46,9 @@ function VoiceStudio() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [hasFile, setHasFile] = useState(false);
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
-  const [engine, setEngine] = useState<"elevenlabs" | "local">("elevenlabs");
+  const [engine, setEngine] = useState<Engine>("elevenlabs");
+  const [ttsEngine, setTtsEngine] = useState<Engine>("elevenlabs");
+  const [personas, setPersonas] = useState<Persona[]>([]);
   const mediaForm = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -55,7 +57,12 @@ function VoiceStudio() {
       .then((data) => {
         if (!alive) return;
         setCatalog(data);
-        if (!data.engine_ready) setEngine("local");
+        setPersonas(data.personas ?? []);
+        if (!data.engine_ready) {
+          const fallback: Engine = (data.personas ?? []).length > 0 ? "forge" : "local";
+          setEngine(fallback);
+          setTtsEngine("forge");
+        }
       })
       .catch(() => setCatalog(null));
     return () => {
@@ -65,6 +72,7 @@ function VoiceStudio() {
 
   const voices = catalog?.realistic_voices ?? [];
   const ready = catalog?.engine_ready ?? false;
+  const forgeReady = (catalog?.forge_ready ?? false) && personas.length > 0;
 
   function processCard(card: DiscoveryCard) {
     const form = mediaForm.current ? new FormData(mediaForm.current) : new FormData();
@@ -92,6 +100,18 @@ function VoiceStudio() {
       ))}
     </SelectInput>
   );
+
+  const personaSelect = (id: string) => (
+    <SelectInput id={id} name="persona_id" disabled={personas.length === 0}>
+      {personas.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.name}
+        </option>
+      ))}
+      {personas.length === 0 ? <option value="">Crie uma voz na aba “Criar voz”</option> : null}
+    </SelectInput>
+  );
+
 
   return (
     <ToolShell
