@@ -95,6 +95,42 @@ type ForecastItem = {
 
 type ForecastData = { engine: string; generated_at: string; forecast: ForecastItem[] };
 
+type RadarSnapshot = {
+  nicho: string;
+  region: string;
+  data: RadarData | null;
+  forecast: ForecastData | null;
+};
+
+const RADAR_STORAGE_KEY = "radar:last-snapshot";
+
+function readRadarSnapshot(): RadarSnapshot | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(RADAR_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as RadarSnapshot;
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      nicho: typeof parsed.nicho === "string" ? parsed.nicho : "",
+      region: typeof parsed.region === "string" ? parsed.region : "BR",
+      data: parsed.data ?? null,
+      forecast: parsed.forecast ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveRadarSnapshot(snapshot: RadarSnapshot) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(RADAR_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // ignore storage failures
+  }
+}
+
 function RadarGlobal() {
   const [nicho, setNicho] = useState("");
   const [region, setRegion] = useState("BR");
@@ -124,20 +160,25 @@ function RadarGlobal() {
       setError(null);
       try {
         const qs = new URLSearchParams({ nicho, region, refresh: refresh ? "1" : "0" });
-        setData(await apiGet<RadarData>(`/api/radar/global?${qs}`));
+        const next = await apiGet<RadarData>(`/api/radar/global?${qs}`);
+        setData(next);
+        saveRadarSnapshot({ nicho, region, data: next, forecast });
       } catch (err) {
         setError(friendlyError(err));
-        setData(null);
       } finally {
         setLoading(false);
       }
     },
-    [nicho, region],
+    [nicho, region, forecast],
   );
 
   useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const snapshot = readRadarSnapshot();
+    if (!snapshot) return;
+    setNicho(snapshot.nicho);
+    setRegion(snapshot.region);
+    setData(snapshot.data);
+    setForecast(snapshot.forecast);
   }, []);
 
   async function runForecast() {
@@ -145,10 +186,11 @@ function RadarGlobal() {
     setError(null);
     try {
       const qs = new URLSearchParams({ nicho, region });
-      setForecast(await apiGet<ForecastData>(`/api/radar/forecast?${qs}`));
+      const next = await apiGet<ForecastData>(`/api/radar/forecast?${qs}`);
+      setForecast(next);
+      saveRadarSnapshot({ nicho, region, data, forecast: next });
     } catch (err) {
       setError(friendlyError(err));
-      setForecast(null);
     } finally {
       setForecasting(false);
     }
@@ -165,8 +207,7 @@ function RadarGlobal() {
           </span>
           <h1 className="mt-3 text-3xl font-bold md:text-4xl">Radar Global de Tendências</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Radar congelado na última rodada. Use "Varrer radar" para buscar dados novos e
-            atualizados sob demanda.
+            Radar congelado. Só "Varrer radar" atualiza.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="rounded-full border border-border bg-surface/60 px-3 py-1">
