@@ -18,7 +18,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from ..services import ingest, jobs, media, voice_engine
+from ..services import edge_tts, ingest, jobs, media, voice_engine, voice_forge
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS, normalize_level
 from ..services.validation import (
@@ -28,8 +28,10 @@ from ..services.validation import (
     clean_text,
     output_path,
     parse_json_object,
+    public_url,
     save_upload,
 )
+from ..services.edge_tts import EdgeTTSError
 from ..services.voice_engine import Settings, VoiceEngineError
 
 bp = Blueprint("voice", __name__, url_prefix="/api/voice")
@@ -44,10 +46,15 @@ VOICES = {
 }
 FORMATS = {"wav": ".wav", "mp3": ".mp3", "aac": ".m4a"}
 TIMINGS = ("strict", "natural")
-ENGINES = ("elevenlabs", "local")
+ENGINES = ("elevenlabs", "forge", "local")
 SAMPLE_RATE = 48000
 MEDIA_EXT = AUDIO_EXT | VIDEO_EXT
 MAX_TTS_CHARS = 40000
+PREVIEW_TEXT = (
+    "Essa é a minha voz. Um timbre exclusivo, construído do zero para este canal, "
+    "pronto para narrar qualquer conteúdo."
+)
+
 
 
 def _settings_from_form() -> Settings:
