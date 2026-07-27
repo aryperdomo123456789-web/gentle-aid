@@ -33,3 +33,25 @@ def search():
         return jsonify(error=f"Busca indisponível: {exc}"), 502
 
     return jsonify(data)
+
+
+@bp.post("/inspect")
+def inspect():
+    """Dados completos de um link direto: métricas, legenda e player."""
+    payload = request.get_json(silent=True) or {}
+    url = str(payload.get("url") or "").strip()
+    with_captions = payload.get("captions", True) is not False
+
+    if not url:
+        return jsonify(error="Cole o link do vídeo."), 400
+    if len(url) > 500:
+        return jsonify(error="URL muito longa."), 400
+
+    try:
+        data = discovery.inspect(url, with_captions=with_captions)
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify(error=f"Não foi possível analisar o link: {exc}"), 502
+
+    return jsonify(data)

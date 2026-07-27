@@ -262,3 +262,101 @@ def search(
         "results": results[:limit],
         "sources": sources,
     }
+
+
+# --------------------------------------------------------------------------- #
+# inspeção de link único (métricas + legenda + player)
+# --------------------------------------------------------------------------- #
+_VTT_TS_RE = re.compile(r"^\d{2}:\d{2}:\d{2}[.,]\d{3}\s+-->")
+_VTT_TAG_RE = re.compile(r"<[^>]+>")
+CAPTION_LANGS = "pt.*,pt-BR.*,en.*,es.*"
+
+
+def _parse_vtt(text: str, max_chars: int = 6000) -> str:
+    lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = _VTT_TAG_RE.sub("", raw_line).strip()
+        if not line:
+            continue
+        if line.upper().startswith(("WEBVTT", "KIND:", "LANGUAGE:", "NOTE")):
+            continue
+        if _VTT_TS_RE.match(line) or "-->" in line:
+            continue
+        if line.isdigit():
+            continue
+        if lines and lines[-1] == line:
+            continue
+        lines.append(line)
+    return " ".join(lines)[:max_chars].strip()
+
+
+def captions(url: str) -> dict[str, Any]:
+    """Baixa a legenda (oficial ou automática) do vídeo e devolve o texto."""
+    if not url:
+        return {"text": "", "lang": None, "source": None}
+
+    subs_dir = config.uploads_dir / "_subs"
+    subs_dir.mkdir(parents=True, exist_ok=True)
+    stem = subs_dir / f"cap_{abs(hash(url)) % (10**12)}"
+
+    try:
+        media.run(
+            [
+                config.ytdlp_bin,
+                "--skip-download",
+                "--no-playlist",
+                "--no-warnings",
+                "--write-subs",
+                "--write-auto-subs",
+                "--sub-langs",
+                CAPTION_LANGS,
+                "--convert-subs",
+                "vtt",
+                "-o",
+                str(stem),
+                url,
+            ],
+            timeout=120,
+        )
+    except Exception:  # noqa: BLE001
+        return {"text": "", "lang": None, "source": None}
+
+    found = sorted(subs_dir.glob(f"{stem.name}*.vtt"))
+    text, lang = "", None
+    for path in found:
+        try:
+            parsed = _parse_vtt(path.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:  # noqa: BLE001
+            parsed = ""
+        if parsed and len(parsed) > len(text):
+            text = parsed
+            parts = path.name.split(".")
+            lang = parts[-2] if len(parts) >= 2 else None
+    for path in found:
+        try:
+            path.unlink()
+        except Exception:  # noqa: BLE001
+            pass
+
+    return {"text": text, "lang": lang, "source": "yt-dlp" if text else None}
+
+
+def inspect(url: str, *, with_captions: bool = True) -> dict[str, Any]:
+    """Card completo de um link direto: métricas, descrição, player e legenda."""
+    url = (url or "").strip()
+    if not url.startswith(("http://", "https://")):
+        raise ValueError("Informe uma URL válida do YouTube ou TikTok.")
+
+    entries = _single_url(url)
+    card = None
+    for entry in entries:
+        card = _normalize(entry, _platform_of(url, "youtube"))
+        if card:
+            break
+    if not card:
+        raise ValueError("Não foi possível ler os dados desse link.")
+
+    caption = captions(url) if with_captions else {"text": "", "lang": None, "source": None}
+    card["caption"] = caption.get("text") or ""
+    card["caption_lang"] = caption.get("lang")
+    return {"card": card}

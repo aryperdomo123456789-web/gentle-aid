@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
 import { Field, FileDrop, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { LinkInspector, type InspectedCard } from "@/components/LinkInspector";
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
 import { ToolHistory } from "@/components/ToolHistory";
@@ -81,9 +82,12 @@ function VoiceStudio() {
   const [dubLink, setDubLink] = useState("");
   const [dubFile, setDubFile] = useState(false);
   const [mediaLink, setMediaLink] = useState("");
+  const [mediaCard, setMediaCard] = useState<InspectedCard | null>(null);
+  const [dubCard, setDubCard] = useState<InspectedCard | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const mediaForm = useRef<HTMLFormElement>(null);
   const dubForm = useRef<HTMLFormElement>(null);
+
 
   useEffect(() => {
     let alive = true;
@@ -139,9 +143,14 @@ function VoiceStudio() {
   function submit(path: string) {
     return (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      run(() => apiPostForm<Job>(path, new FormData(e.currentTarget)));
+      const form = new FormData(e.currentTarget);
+      const card = path.endsWith("/dub") ? dubCard : mediaCard;
+      const url = String(form.get("url") || "").trim();
+      if (card && card.url === url) form.set("source_card", JSON.stringify(card));
+      run(() => apiPostForm<Job>(path, form));
     };
   }
+
 
   const mediaPicker = (
     <VoicePicker
@@ -257,6 +266,16 @@ function VoiceStudio() {
                 )}
               </Field>
 
+              <LinkInspector
+                url={mediaLink}
+                onInspected={setMediaCard}
+                actionLabel="Trocar a voz deste vídeo"
+                actionBusy={busy}
+                onAction={processCard}
+              />
+
+
+
               {mediaPicker}
 
 
@@ -323,6 +342,16 @@ function VoiceStudio() {
                   />
                 )}
               </Field>
+
+              <LinkInspector
+                url={dubLink}
+                onInspected={setDubCard}
+                actionLabel="Dublar este vídeo"
+                actionBusy={busy}
+                onAction={processCard}
+              />
+
+
 
               <Field label="Ou envie o arquivo" hint="MP4 / MOV / MKV / WAV / MP3 / M4A — de 10 segundos a 3 horas.">
                 {(id) => (
