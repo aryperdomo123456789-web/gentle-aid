@@ -174,34 +174,55 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://langfuse.com/docs/api-and-data-platform/features/public-api",
         "usage": "Rastreio de job_id, custo, latência, modelo e resultado final.",
         "prefix": "sk-lf-",
-        "test": None,
+        "format_hint": "Requer também LANGFUSE_PUBLIC_KEY (pk-lf-...) — o teste usa Basic auth (public:secret).",
+        # Basic auth pk:sk contra /api/public/projects.
+        "test": [
+            {
+                "url": os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com").rstrip("/")
+                + "/api/public/projects",
+                "auth": "basic",
+                "basic_user_env": "LANGFUSE_PUBLIC_KEY",
+            }
+        ],
     },
     {
         "id": "cloudflare",
         "name": "Cloudflare Workers",
         "category": "Infra",
         "env": "CLOUDFLARE_API_TOKEN",
-        "docs": "https://developers.cloudflare.com/workers/",
+        "docs": "https://developers.cloudflare.com/api/operations/user-api-tokens-verify-token",
         "usage": "Endpoints leves, cache e camada pública de webhooks.",
-        "test": {"url": "https://api.cloudflare.com/client/v4/user/tokens/verify", "auth": "bearer"},
+        "format_hint": "Use um API Token (Meu Perfil → API Tokens). A Global API Key antiga responde 400 nesse endpoint.",
+        "test": [
+            {"url": "https://api.cloudflare.com/client/v4/user/tokens/verify", "auth": "bearer"},
+            {"url": "https://api.cloudflare.com/client/v4/accounts", "auth": "bearer"},
+        ],
     },
     {
         "id": "whisper",
         "name": "Whisper API",
         "category": "Transcrição",
         "env": "WHISPER_API_KEY",
-        "docs": "https://whisper-api.com/docs/",
+        "docs": "https://platform.openai.com/docs/api-reference/audio",
         "usage": "Fallback de transcrição quando a Groq falha ou estoura limite.",
-        "test": None,
+        "format_hint": "Aceita chave OpenAI (sk-...) ou endpoint compatível definido em WHISPER_API_BASE.",
+        "test": [
+            {
+                "url": os.environ.get("WHISPER_API_BASE", "https://api.openai.com/v1").rstrip("/") + "/models",
+                "auth": "bearer",
+            }
+        ],
     },
     {
         "id": "tikapi",
         "name": "TikAPI",
         "category": "TikTok",
         "env": "TIKAPI_KEY",
-        "docs": "https://tikapi.io/",
+        "docs": "https://tikapi.io/documentation/",
         "usage": "Radar de tendências e metadados de vídeos do TikTok.",
-        "test": None,
+        "test": [
+            {"url": "https://api.tikapi.io/public/check", "auth": "header", "header": "X-API-KEY"},
+        ],
     },
     {
         "id": "lamatok",
@@ -210,8 +231,15 @@ PROVIDERS: list[dict[str, Any]] = [
         "env": "LAMATOK_API_KEY",
         "docs": "https://api.lamatok.com/docs",
         "usage": "Download direto de mídia do TikTok por URL.",
-        "test": None,
+        "test": [
+            {
+                "url": "https://api.lamatok.com/v1/user/by/username?username=tiktok",
+                "auth": "query",
+                "param": "access_key",
+            }
+        ],
     },
+
 ]
 
 PROVIDER_BY_ID = {p["id"]: p for p in PROVIDERS}
