@@ -52,10 +52,12 @@ function YoutubeBypass() {
   const [keyword, setKeyword] = useState("");
   const [intensity, setIntensity] = useState("auto");
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
+  const [pickedCard, setPickedCard] = useState<DiscoveryCard | null>(null);
 
   /** Nada roda direto: o vídeo escolhido só entra na lista para conferência. */
   function processCard(card: DiscoveryCard) {
     setPickedUrl(card.url);
+    setPickedCard(card);
     setLinks(card.url);
     if (!keyword.trim()) setKeyword(card.title.slice(0, 60));
   }
@@ -74,6 +76,7 @@ function YoutubeBypass() {
         nicho,
         keyword: keyword.trim(),
         intensity,
+        ...(pickedCard && urls.includes(pickedCard.url) ? { source_card: pickedCard } : {}),
       }),
     );
   }
