@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
 
-import { Field, SelectInput, SubmitButton, TextArea } from "@/components/form";
+import { Field, SelectInput, TextArea } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
+
 import { MutationSelect } from "@/components/MutationSelect";
 import { AudioFormatField } from "./AudioFormatField";
 import { ScriptDoctorChat } from "./ScriptDoctorChat";
@@ -80,9 +82,13 @@ export function TextToSpeechForm({ onSubmit, maxChars, busy, disabled, picker }:
         hint="Áudio final sem rastro de origem."
       />
 
-      <SubmitButton busy={busy} disabled={disabled || text.trim().length < 2}>
-        {busy ? "Narrando…" : "Gerar narração"}
-      </SubmitButton>
+      <JobSettingsGuard
+        busy={busy}
+        disabled={disabled || text.trim().length < 2}
+        label="Gerar narração"
+        busyLabel="Narrando…"
+      />
+
     </form>
   );
 }

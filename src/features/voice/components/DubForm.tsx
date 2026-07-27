@@ -1,7 +1,9 @@
 import type { ReactNode, RefObject } from "react";
 
 import type { DiscoveryCard } from "@/components/DiscoveryPanel";
-import { Field, FileDrop, SelectInput, SubmitButton, TextInput } from "@/components/form";
+import { Field, FileDrop, SelectInput, TextInput } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
+
 import { LinkInspector, type InspectedCard } from "@/components/LinkInspector";
 import { MutationSelect } from "@/components/MutationSelect";
 import { AudioFormatField, MEDIA_ACCEPT, MEDIA_HINT } from "./AudioFormatField";
@@ -135,9 +137,13 @@ export function DubForm({
         hint="O vídeo dublado sai virgem: sem metadados herdados e com hash inédito."
       />
 
-      <SubmitButton busy={busy} disabled={!hasFile && link.trim().length < 8}>
-        {busy ? "Dublando com IA…" : "Dublar com a minha voz"}
-      </SubmitButton>
+      <JobSettingsGuard
+        busy={busy}
+        disabled={(!hasFile && link.trim().length < 8) || !dubReady}
+        label="Dublar com a minha voz"
+        busyLabel="Dublando com IA…"
+      />
+
     </form>
   );
 }

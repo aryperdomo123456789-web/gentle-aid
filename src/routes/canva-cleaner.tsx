@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
 import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
-import { Field, FileDrop, SelectInput, SubmitButton } from "@/components/form";
+import { Field, FileDrop, SelectInput } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
+
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
@@ -91,10 +93,13 @@ function CanvaCleaner() {
             A remoção total de metadados (ISO, encoder, Canva, GPS, XMP) é sempre aplicada e não
             pode ser desligada — o arquivo final recebe identidade forjada e hash inédito.
           </p>
+          <JobSettingsGuard
+            busy={busy}
+            disabled={!hasFile}
+            label="Executar limpeza"
+            busyLabel="Limpando e recodificando…"
+          />
 
-          <SubmitButton busy={busy} disabled={!hasFile}>
-            {busy ? "Limpando e recodificando…" : "Executar limpeza"}
-          </SubmitButton>
         </form>
       }
       right={

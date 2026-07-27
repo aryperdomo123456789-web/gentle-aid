@@ -1,7 +1,9 @@
 import type { ReactNode, RefObject } from "react";
 
 import type { DiscoveryCard } from "@/components/DiscoveryPanel";
-import { Field, FileDrop, SelectInput, SubmitButton, TextInput } from "@/components/form";
+import { Field, FileDrop, SelectInput, TextInput } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
+
 import { LinkInspector, type InspectedCard } from "@/components/LinkInspector";
 import { MutationSelect } from "@/components/MutationSelect";
 import { AudioFormatField, MEDIA_ACCEPT, MEDIA_HINT } from "./AudioFormatField";
@@ -104,9 +106,13 @@ export function MediaConvertForm({
         hint="Remove metadados/ID3 herdados e entrega um arquivo de hash inédito."
       />
 
-      <SubmitButton busy={busy} disabled={!hasFile && link.trim().length < 8}>
-        {busy ? "Trocando o narrador…" : "Trocar a voz do narrador"}
-      </SubmitButton>
+      <JobSettingsGuard
+        busy={busy}
+        disabled={!hasFile && link.trim().length < 8}
+        label="Trocar a voz do narrador"
+        busyLabel="Trocando o narrador…"
+      />
+
     </form>
   );
 }

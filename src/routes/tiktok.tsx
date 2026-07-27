@@ -3,6 +3,8 @@ import { useState } from "react";
 
 import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
 import { Field, SelectInput, SubmitButton, TextInput } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
+
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
@@ -191,7 +193,7 @@ function TikTokDashboard() {
                 </SelectInput>
               )}
             </Field>
-            <SubmitButton busy={busy}>{busy ? "Clonando…" : "Clonar viral"}</SubmitButton>
+            <JobSettingsGuard busy={busy} label="Clonar viral" busyLabel="Clonando…" />
           </form>
         </div>
       }

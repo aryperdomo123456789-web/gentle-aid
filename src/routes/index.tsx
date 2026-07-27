@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
-import { Field, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { Field, SelectInput, TextArea, TextInput } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
+
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
@@ -145,9 +147,12 @@ function YoutubeBypass() {
             )}
           </Field>
 
-          <SubmitButton busy={busy}>
-            {busy ? "Processando lote…" : "Disparar bypass em lote"}
-          </SubmitButton>
+          <JobSettingsGuard
+            busy={busy}
+            label="Disparar bypass em lote"
+            busyLabel="Processando lote…"
+          />
+
         </form>
       }
       right={
