@@ -231,6 +231,32 @@ function Legendar() {
     run(() => apiPostForm<Job>("/api/legendar/run", form));
   }
 
+  /** Resumo legível do que vai para o servidor — usado pela trava de segurança. */
+  const exportEntries = useMemo(() => {
+    const source = file
+      ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`
+      : card
+        ? card.title
+        : "nenhuma mídia";
+    const words = transcript.trim() ? `${transcript.trim().split(/\s+/).length} palavras` : "vazio";
+    return [
+      { name: "source", label: "Mídia de origem", value: source },
+      { name: "preset", label: "Preset de legenda", value: preset?.label ?? style.preset },
+      { name: "aspect", label: "Formato", value: ASPECT_LABEL[style.aspect] ?? style.aspect },
+      { name: "position", label: "Posição", value: `${POSITION_LABEL[position]} · ${style.yPct}%` },
+      { name: "fontScale", label: "Tamanho da fonte", value: `${style.fontScale.toFixed(2)}x` },
+      { name: "wordsPerLine", label: "Palavras por linha", value: String(style.wordsPerLine) },
+      { name: "transcript", label: "Roteiro/legenda", value: words },
+      { name: "mutation", label: "Esterilização", value: mutation },
+    ];
+  }, [file, card, preset, style, position, transcript, mutation]);
+
+  const exportSignature = useMemo(
+    () => JSON.stringify([exportEntries]),
+    [exportEntries],
+  );
+
+
   const draftStamp = useMemo(
     () => (draft ? new Date(draft.savedAt).toLocaleString("pt-BR") : null),
     [draft],
