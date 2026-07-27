@@ -113,7 +113,6 @@ PROVIDERS: list[dict[str, Any]] = [
         "remediation": "Gere um novo token em huggingface.co/settings/tokens com tipo 'Read' e cole aqui — o token atual foi revogado.",
         "test": [
             {"url": "https://huggingface.co/api/whoami-v2", "auth": "bearer"},
-            {"url": "https://huggingface.co/api/models?limit=1", "auth": "bearer"},
         ],
     },
     {
@@ -134,7 +133,14 @@ PROVIDERS: list[dict[str, Any]] = [
                 "expect_json": {"valid": True},
                 "invalid_message": "A Cohere respondeu que esta chave não é válida (valid=false) — ela foi revogada ou pertence a outra conta.",
             },
-            {"url": "https://api.cohere.ai/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
+            {
+                "url": "https://api.cohere.ai/v1/check-api-key",
+                "auth": "bearer",
+                "method": "POST",
+                "body": {},
+                "expect_json": {"valid": True},
+                "invalid_message": "A Cohere respondeu que esta chave não é válida (valid=false).",
+            },
             {
                 "url": "https://api.cohere.com/v1/tokenize",
                 "auth": "bearer",
