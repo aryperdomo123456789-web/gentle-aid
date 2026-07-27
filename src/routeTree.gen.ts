@@ -17,6 +17,7 @@ import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
 import { Route as ApisRouteImport } from './routes/apis'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as HistoricoJobIdRouteImport } from './routes/historico.$jobId'
 
 const VoiceConversionRoute = VoiceConversionRouteImport.update({
   id: '/voice-conversion',
@@ -58,37 +59,45 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HistoricoJobIdRoute = HistoricoJobIdRouteImport.update({
+  id: '/$jobId',
+  path: '/$jobId',
+  getParentRoute: () => HistoricoRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
-  '/historico': typeof HistoricoRoute
+  '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
   '/radar': typeof RadarRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
+  '/historico/$jobId': typeof HistoricoJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
-  '/historico': typeof HistoricoRoute
+  '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
   '/radar': typeof RadarRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
+  '/historico/$jobId': typeof HistoricoJobIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
-  '/historico': typeof HistoricoRoute
+  '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
   '/radar': typeof RadarRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
+  '/historico/$jobId': typeof HistoricoJobIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/tiktok'
     | '/voice-conversion'
+    | '/historico/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/tiktok'
     | '/voice-conversion'
+    | '/historico/$jobId'
   id:
     | '__root__'
     | '/'
@@ -121,13 +132,14 @@ export interface FileRouteTypes {
     | '/radar'
     | '/tiktok'
     | '/voice-conversion'
+    | '/historico/$jobId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApisRoute: typeof ApisRoute
   CanvaCleanerRoute: typeof CanvaCleanerRoute
-  HistoricoRoute: typeof HistoricoRoute
+  HistoricoRoute: typeof HistoricoRouteWithChildren
   LegendarRoute: typeof LegendarRoute
   RadarRoute: typeof RadarRoute
   TiktokRoute: typeof TiktokRoute
@@ -192,14 +204,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/historico/$jobId': {
+      id: '/historico/$jobId'
+      path: '/$jobId'
+      fullPath: '/historico/$jobId'
+      preLoaderRoute: typeof HistoricoJobIdRouteImport
+      parentRoute: typeof HistoricoRoute
+    }
   }
 }
+
+interface HistoricoRouteChildren {
+  HistoricoJobIdRoute: typeof HistoricoJobIdRoute
+}
+
+const HistoricoRouteChildren: HistoricoRouteChildren = {
+  HistoricoJobIdRoute: HistoricoJobIdRoute,
+}
+
+const HistoricoRouteWithChildren = HistoricoRoute._addFileChildren(
+  HistoricoRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApisRoute: ApisRoute,
   CanvaCleanerRoute: CanvaCleanerRoute,
-  HistoricoRoute: HistoricoRoute,
+  HistoricoRoute: HistoricoRouteWithChildren,
   LegendarRoute: LegendarRoute,
   RadarRoute: RadarRoute,
   TiktokRoute: TiktokRoute,

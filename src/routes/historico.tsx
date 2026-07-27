@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -126,6 +126,13 @@ function Historico() {
                 </div>
                 <div className="flex items-center gap-3">
                   <StatusPill status={job.status} />
+                  <Link
+                    to="/historico/$jobId"
+                    params={{ jobId: job.job_id }}
+                    className="rounded-full border border-border bg-surface/60 px-4 py-1.5 text-xs font-semibold hover:border-primary/50"
+                  >
+                    Detalhes
+                  </Link>
                   {job.download_url ? (
                     <a
                       href={downloadUrl(job.download_url)}
