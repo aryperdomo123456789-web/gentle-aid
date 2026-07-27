@@ -258,13 +258,11 @@ def register_artifact(job_id: str, path: Path, kind: str) -> None:
             return
         artifacts = list(job.get("artifacts") or [])
         entry = {"path": str(path), "kind": kind}
-        if entry in artifacts:
-            artifacts = artifacts
-            duplicated = True
-        else:
+        duplicated = entry in artifacts
+        if not duplicated:
             artifacts.append(entry)
-            duplicated = False
         job["artifacts"] = artifacts
+
         job["updated_at"] = _now()
     persist(job_id)
     if not duplicated:
