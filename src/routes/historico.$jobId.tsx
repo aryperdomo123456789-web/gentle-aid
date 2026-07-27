@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { JobMediaPreview } from "@/components/JobMediaPreview";
+import { JobTrace } from "@/components/JobTrace";
 import { StatusPanel } from "@/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
+import { formatDurationMs, stageLabel, toolLabel } from "@/features/jobs/job-utils";
 import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError, type Job } from "@/lib/api";
 
 export const Route = createFileRoute("/historico/$jobId")({
@@ -97,8 +99,14 @@ function JobDetail() {
 
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-xl font-bold leading-tight sm:text-2xl md:text-3xl">{job?.tool ?? "Job"}</h1>
+            <h1 className="text-xl font-bold leading-tight sm:text-2xl md:text-3xl">
+              {job ? toolLabel(job.tool) : "Job"}
+            </h1>
             <p className="break-all font-mono text-xs text-muted-foreground">{jobId}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Etapa atual: {stageLabel(job?.stage) ?? "—"} · Duração:{" "}
+              {formatDurationMs(job?.duration_ms)}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {job?.status === "queued" || job?.status === "running" ? (
@@ -179,11 +187,25 @@ function JobDetail() {
           </section>
         ) : null}
 
+        <section className="panel mt-6 min-w-0 p-4 sm:p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Rastro completo do job</h2>
+            <span className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-muted-foreground">
+              eventos + auditoria imutável
+            </span>
+          </div>
+          <JobTrace jobId={jobId} live={job?.terminal === false} />
+        </section>
+
         <div className="mt-6 grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <section className="panel min-w-0 p-4 sm:p-5">
             <h2 className="mb-3 text-lg font-semibold">Dados do processamento</h2>
             <dl className="grid gap-2 text-xs">
               <Row label="Status" value={job?.status} />
+              <Row label="Etapa" value={stageLabel(job?.stage) ?? undefined} />
+              <Row label="Ferramenta" value={job ? toolLabel(job.tool) : undefined} />
+              <Row label="Duração" value={job ? formatDurationMs(job.duration_ms) : undefined} />
+              <Row label="Atualizado em" value={job?.updated_at} />
               <Row label="Arquivo" value={job?.filename} />
               <Row label="Origem" value={sourceSummary} />
               <Row label="Caminho origem" value={job?.source_path} />
