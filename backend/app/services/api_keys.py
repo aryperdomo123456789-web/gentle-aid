@@ -86,7 +86,19 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://console.groq.com/docs/overview",
         "usage": "Transcrição Whisper-large em alta velocidade e LLM de baixa latência.",
         "prefix": "gsk_",
-        "test": {"url": "https://api.groq.com/openai/v1/models", "auth": "bearer"},
+        "format_hint": "Chave em console.groq.com → API Keys (começa com gsk_). É ela que a Dublagem IA usa para ouvir o vídeo.",
+        "remediation": "401 = chave revogada, gere outra em console.groq.com/keys. 403 = a chave existe mas não tem acesso ao Whisper (plano/organização) — crie a chave em outra org ou use a Whisper como fallback.",
+        "test": [
+            # Teste real do que a dublagem usa: envia um áudio mínimo para o Whisper.
+            {
+                "url": "https://api.groq.com/openai/v1/audio/transcriptions",
+                "auth": "bearer",
+                "method": "POST",
+                "audio_probe": {"model": "whisper-large-v3"},
+                "invalid_message": "A chave não tem acesso à transcrição Whisper na Groq.",
+            },
+            {"url": "https://api.groq.com/openai/v1/models", "auth": "bearer"},
+        ],
     },
     {
         "id": "openrouter",
