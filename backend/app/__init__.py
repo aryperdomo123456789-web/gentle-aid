@@ -9,6 +9,7 @@ from flask import Flask, jsonify, send_from_directory
 from .config import Config
 from .blueprints.apis import bp as apis_bp
 from .blueprints.canva_cleaner import bp as canva_bp
+from .blueprints.discover import bp as discover_bp
 from .blueprints.jobs import bp as jobs_bp
 from .blueprints.legendar import bp as legendar_bp
 from .blueprints.radar import bp as radar_bp
@@ -37,7 +38,7 @@ def create_app(config: Config | None = None) -> Flask:
 
     api_keys.autofill_once()
 
-    for bp in (youtube_bp, tiktok_bp, legendar_bp, voice_bp, canva_bp, jobs_bp, apis_bp, radar_bp):
+    for bp in (youtube_bp, tiktok_bp, legendar_bp, voice_bp, canva_bp, jobs_bp, apis_bp, radar_bp, discover_bp):
         app.register_blueprint(bp)
 
     @app.get("/api/health")
