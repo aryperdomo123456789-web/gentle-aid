@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
 import { Field, FileDrop, SelectInput, SubmitButton, TextArea } from "@/components/form";
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
@@ -33,6 +34,17 @@ export const Route = createFileRoute("/legendar")({
 function Legendar() {
   const { job, error, busy, run } = useJobRunner();
   const [hasFile, setHasFile] = useState(false);
+  const [pickedUrl, setPickedUrl] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function processCard(card: DiscoveryCard) {
+    const form = formRef.current ? new FormData(formRef.current) : new FormData();
+    form.delete("video");
+    form.delete("audio");
+    form.set("url", card.url);
+    setPickedUrl(card.url);
+    run(() => apiPostForm<Job>("/api/legendar/run", form));
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -46,7 +58,7 @@ function Legendar() {
       title="Legendar Vídeos"
       subtitle="Aplique legendas dinâmicas e estilizadas nos vídeos gerados pelo ecossistema. As legendas são queimadas no stream de vídeo via filtro subtitles do FFmpeg."
       left={
-        <form onSubmit={onSubmit} className="space-y-5">
+        <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
           <Field label="Vídeo de entrada" hint="MP4, MOV ou MKV — até 500 MB.">
             {(id) => (
               <FileDrop
@@ -110,11 +122,19 @@ function Legendar() {
         />
       }
       below={
-        <ToolHistory
-          tool="legendar"
-          title="Histórico · Legendas"
-          refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
-        />
+        <div className="space-y-6">
+          <DiscoveryPanel
+            defaultPlatform="auto"
+            actionLabel="Legendar este vídeo"
+            onAction={processCard}
+            actionBusyUrl={busy ? pickedUrl : null}
+          />
+          <ToolHistory
+            tool="legendar"
+            title="Histórico · Legendas"
+            refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
+          />
+        </div>
       }
     />
   );

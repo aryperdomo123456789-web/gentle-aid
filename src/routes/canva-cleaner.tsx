@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
 import { Field, FileDrop, SelectInput, SubmitButton } from "@/components/form";
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
@@ -34,6 +35,17 @@ export const Route = createFileRoute("/canva-cleaner")({
 function CanvaCleaner() {
   const { job, error, busy, run } = useJobRunner();
   const [hasFile, setHasFile] = useState(false);
+  const [pickedUrl, setPickedUrl] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function processCard(card: DiscoveryCard) {
+    const form = formRef.current ? new FormData(formRef.current) : new FormData();
+    form.delete("video");
+    form.delete("audio");
+    form.set("url", card.url);
+    setPickedUrl(card.url);
+    run(() => apiPostForm<Job>("/api/canva-cleaner/run", form));
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -47,7 +59,7 @@ function CanvaCleaner() {
       title="Recodificação e Limpeza Pós-Canva"
       subtitle="Envie o vídeo exportado do Canva ou de outro editor: o pipeline remove os metadados ISO/Canva, recodifica em H.264/AAC, altera bitrate e aplica micro-mutações temporais gerando um hash MD5 inédito."
       left={
-        <form onSubmit={onSubmit} className="space-y-5">
+        <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
           <Field label="Vídeo exportado" hint="MP4, MOV ou WEBM — até 500 MB.">
             {(id) => (
               <FileDrop
@@ -93,11 +105,19 @@ function CanvaCleaner() {
         />
       }
       below={
-        <ToolHistory
-          tool="canva"
-          title="Histórico · Canva Cleaner"
-          refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
-        />
+        <div className="space-y-6">
+          <DiscoveryPanel
+            defaultPlatform="auto"
+            actionLabel="Esterilizar este vídeo"
+            onAction={processCard}
+            actionBusyUrl={busy ? pickedUrl : null}
+          />
+          <ToolHistory
+            tool="canva"
+            title="Histórico · Canva Cleaner"
+            refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
+          />
+        </div>
       }
     />
   );
