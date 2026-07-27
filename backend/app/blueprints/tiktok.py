@@ -12,6 +12,7 @@ from ..services.validation import (
     TIKTOK_RE,
     ValidationError,
     clean_text,
+    parse_json_object,
     output_path,
 )
 
@@ -50,7 +51,18 @@ def clone():
     if level not in LEVELS:
         return jsonify(error="Intensidade inválida."), 400
 
-    job = jobs.create_job("tiktok", meta={"url": url, "intensity": level})
+    source_card = payload.get("source_card")
+    if source_card is not None and not isinstance(source_card, dict):
+        return jsonify(error="Campo 'source_card' deve ser um objeto JSON."), 400
+
+    job = jobs.create_job(
+        "tiktok",
+        meta={
+            "url": url,
+            "intensity": level,
+            **({"source_card": source_card} if source_card else {}),
+        },
+    )
     jobs.submit(job["job_id"], lambda jid: _work(jid, url, level))
     return jsonify(job), 202
 

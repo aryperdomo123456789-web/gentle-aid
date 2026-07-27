@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Download, RefreshCw, Trash2 } from "lucide-react";
+import { Download, Eye, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { JobMediaPreview } from "./JobMediaPreview";
 import { StatusPill } from "./StatusPanel";
 import { apiDelete, apiGet, downloadUrl, friendlyError, type Job } from "@/lib/api";
 
@@ -42,6 +43,7 @@ export function ToolHistory({
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [preview, setPreview] = useState<Job | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,52 +117,99 @@ export function ToolHistory({
         {jobs.map((job) => (
           <li
             key={job.job_id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background/40 px-4 py-3"
+            className="rounded-xl border border-border bg-background/40 px-4 py-3"
           >
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{job.filename ?? job.job_id}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {formatDate(job.created_at)} · {formatBytes(job.size_bytes)}
-                {job.md5_after ? (
-                  <>
-                    {" · "}
-                    <span className="font-mono">md5 {job.md5_after.slice(0, 10)}</span>
-                  </>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{job.filename ?? job.job_id}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {formatDate(job.created_at)} · {formatBytes(job.size_bytes)}
+                  {job.md5_after ? (
+                    <>
+                      {" · "}
+                      <span className="font-mono">md5 {job.md5_after.slice(0, 10)}</span>
+                    </>
+                  ) : null}
+                  {job.outputs && job.outputs.length > 1 ? ` · ${job.outputs.length} arquivos` : ""}
+                </p>
+                {typeof job.meta?.source_card === "object" && job.meta.source_card ? (
+                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+                    {(job.meta.source_card as { title?: string; desc?: string }).title ??
+                      "Vídeo de origem"}{" "}
+                    - {(job.meta.source_card as { desc?: string }).desc ?? "Sem descrição."}
+                  </p>
                 ) : null}
-                {job.outputs && job.outputs.length > 1 ? ` · ${job.outputs.length} arquivos` : ""}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusPill status={job.status} />
-              <Link
-                to="/historico/$jobId"
-                params={{ jobId: job.job_id }}
-                className="rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50"
-              >
-                Detalhes
-              </Link>
-              {job.download_url ? (
-                <a
-                  href={downloadUrl(job.download_url)}
-                  download={job.filename ?? undefined}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-success px-3 py-1.5 text-xs font-semibold text-success-foreground"
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusPill status={job.status} />
+                <button
+                  type="button"
+                  onClick={() => setPreview(job)}
+                  disabled={!job.download_url && !(job.outputs?.length ?? 0)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50 disabled:opacity-50"
                 >
-                  <Download className="size-3.5" aria-hidden="true" />
-                  Baixar
-                </a>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => void remove(job.job_id)}
-                aria-label={`Excluir job ${job.job_id}`}
-                className="rounded-full border border-border bg-surface/60 p-1.5 text-muted-foreground hover:border-destructive/50 hover:text-foreground"
-              >
-                <Trash2 className="size-3.5" aria-hidden="true" />
-              </button>
+                  <Eye className="size-3.5" aria-hidden="true" />
+                  Assistir
+                </button>
+                <Link
+                  to="/historico/$jobId"
+                  params={{ jobId: job.job_id }}
+                  className="rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50"
+                >
+                  Detalhes
+                </Link>
+                {job.download_url ? (
+                  <a
+                    href={downloadUrl(job.download_url)}
+                    download={job.filename ?? undefined}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-success px-3 py-1.5 text-xs font-semibold text-success-foreground"
+                  >
+                    <Download className="size-3.5" aria-hidden="true" />
+                    Baixar
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void remove(job.job_id)}
+                  aria-label={`Excluir job ${job.job_id}`}
+                  className="rounded-full border border-border bg-surface/60 p-1.5 text-muted-foreground hover:border-destructive/50 hover:text-foreground"
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                </button>
+              </div>
             </div>
           </li>
         ))}
       </ul>
+
+      {preview ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Prévia do job ${preview.job_id}`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-4 backdrop-blur-sm"
+          onClick={() => setPreview(null)}
+        >
+          <div className="panel w-full max-w-4xl p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold">{preview.filename ?? preview.job_id}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {preview.tool} · {formatDate(preview.created_at)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreview(null)}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold"
+              >
+                Fechar
+              </button>
+            </div>
+            <JobMediaPreview job={preview} />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

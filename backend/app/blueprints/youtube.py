@@ -37,6 +37,9 @@ def bypass():
     try:
         nicho = clean_text(payload.get("nicho"), max_length=60, field="nicho")
         keyword = clean_text(payload.get("keyword"), max_length=80, field="keyword")
+        source_card = payload.get("source_card")
+        if source_card is not None and not isinstance(source_card, dict):
+            raise ValidationError("Campo 'source_card' deve ser um objeto JSON.")
     except ValidationError as exc:
         return jsonify(error=str(exc)), 400
 
@@ -46,7 +49,13 @@ def bypass():
 
     job = jobs.create_job(
         "youtube",
-        meta={"urls": urls, "nicho": nicho, "keyword": keyword, "intensity": intensity},
+        meta={
+            "urls": urls,
+            "nicho": nicho,
+            "keyword": keyword,
+            "intensity": intensity,
+            **({"source_card": source_card} if source_card else {}),
+        },
     )
     jobs.submit(job["job_id"], lambda jid: _work(jid, urls, intensity))
     return jsonify(job), 202

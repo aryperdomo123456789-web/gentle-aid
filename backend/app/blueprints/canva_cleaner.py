@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request
 from ..services import ingest, jobs, media
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS
-from ..services.validation import VIDEO_EXT, ValidationError, output_path, save_upload
+from ..services.validation import VIDEO_EXT, ValidationError, output_path, parse_json_object, save_upload
 
 bp = Blueprint("canva_cleaner", __name__, url_prefix="/api/canva-cleaner")
 
@@ -24,9 +24,20 @@ def run_job():
     if bitrate != "auto" and not bitrate.endswith("k"):
         return jsonify(error="Perfil de bitrate inválido."), 400
 
+    try:
+        source_card = parse_json_object(request.form.get("source_card"), field="source_card")
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+
     source_url = (request.form.get("url") or "").strip()
     job = jobs.create_job(
-        "canva", meta={"mutation": mutation, "bitrate": bitrate, "url": source_url}
+        "canva",
+        meta={
+            "mutation": mutation,
+            "bitrate": bitrate,
+            "url": source_url,
+            **({"source_card": source_card} if source_card else {}),
+        },
     )
     src: Path | None = None
     if request.files.get("video"):

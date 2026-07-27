@@ -43,6 +43,7 @@ function CanvaCleaner() {
     form.delete("video");
     form.delete("audio");
     form.set("url", card.url);
+    form.set("source_card", JSON.stringify(card));
     setPickedUrl(card.url);
     run(() => apiPostForm<Job>("/api/canva-cleaner/run", form));
   }

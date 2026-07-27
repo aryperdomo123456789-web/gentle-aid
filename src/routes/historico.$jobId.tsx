@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Download, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { JobMediaPreview } from "@/components/JobMediaPreview";
 import { StatusPanel } from "@/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
 import { API_BASE, apiGet, downloadUrl, friendlyError, type Job } from "@/lib/api";
@@ -13,12 +14,12 @@ export const Route = createFileRoute("/historico/$jobId")({
       {
         name: "description",
         content:
-          "Timeline completa do job: etapas de FFmpeg, relatório de esterilização, hashes e download do arquivo final.",
+          "Timeline completa do job: vídeo final assistível, ficha da origem, relatório de esterilização, hashes e download.",
       },
       { property: "og:title", content: "Detalhe do Job — Jobs Center" },
       {
         property: "og:description",
-        content: "Timeline, hashes e relatório de esterilização do job.",
+        content: "Prévia do vídeo, metadados da origem e relatório de esterilização do job.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -60,6 +61,7 @@ function JobDetail() {
   }
 
   const meta = Object.entries(job?.meta ?? {});
+  const sourceCard = getSourceCard(job);
 
   return (
     <div className="min-h-screen">
@@ -97,7 +99,41 @@ function JobDetail() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.1fr]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <section className="panel p-5">
+            <h2 className="mb-3 text-lg font-semibold">Prévia do vídeo</h2>
+            {job ? <JobMediaPreview job={job} /> : null}
+
+            {sourceCard ? (
+              <div className="mt-6 rounded-2xl border border-border bg-background/50 p-4">
+                <h3 className="text-sm font-semibold">Informações completas da origem</h3>
+                <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                  <Row label="Título" value={sourceCard.title} />
+                  <Row label="Descrição" value={sourceCard.desc} />
+                  <Row label="Plataforma" value={sourceCard.platform} />
+                  <Row label="Autor" value={sourceCard.author ?? sourceCard.nickname} />
+                  <Row label="Views" value={sourceCard.views_label} />
+                  <Row label="Curtidas" value={sourceCard.likes_label} />
+                  <Row label="Comentários" value={sourceCard.comments_label} />
+                  <Row label="Compartilhamentos" value={sourceCard.shares_label} />
+                  <Row label="Duração" value={sourceCard.duration_label} />
+                  <Row label="Data" value={sourceCard.published_label} />
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="panel p-5">
+            <StatusPanel
+              job={job}
+              error={error}
+              busy={job?.status === "running" || job?.status === "queued"}
+              emptyHint="Sem logs registrados para este job."
+            />
+          </section>
+        </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
           <section className="panel p-5">
             <h2 className="mb-3 text-lg font-semibold">Dados do job</h2>
             <dl className="grid gap-2 text-xs">
@@ -112,20 +148,28 @@ function JobDetail() {
                 }
               />
               {meta.map(([k, v]) => (
-                <Row key={k} label={k} value={typeof v === "string" ? v : JSON.stringify(v)} />
+                <Row key={k} label={k} value={formatMetaValue(v)} />
               ))}
             </dl>
+          </section>
 
+          <section className="panel p-5">
+            <h2 className="mb-3 text-lg font-semibold">Saídas</h2>
             {job?.outputs?.length ? (
-              <>
-                <h3 className="mt-5 text-sm font-semibold">Saídas em lote</h3>
-                <ul className="mt-2 space-y-2">
-                  {job.outputs.map((o) => (
-                    <li
-                      key={o.download_url}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2 text-xs"
-                    >
-                      <span className="truncate">{o.filename}</span>
+              <ul className="space-y-2">
+                {job.outputs.map((o) => (
+                  <li
+                    key={o.download_url}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2 text-xs"
+                  >
+                    <span className="truncate">{o.filename}</span>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={downloadUrl(o.download_url)}
+                        className="rounded-full border border-border px-3 py-1 font-semibold"
+                      >
+                        Assistir
+                      </a>
                       <a
                         href={downloadUrl(o.download_url)}
                         download={o.filename}
@@ -133,25 +177,43 @@ function JobDetail() {
                       >
                         Baixar
                       </a>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : null}
-          </section>
-
-          <section className="panel p-5">
-            <StatusPanel
-              job={job}
-              error={error}
-              busy={job?.status === "running" || job?.status === "queued"}
-              emptyHint="Sem logs registrados para este job."
-            />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nenhuma saída registrada.</p>
+            )}
           </section>
         </div>
       </main>
     </div>
   );
+}
+
+function getSourceCard(job: Job | null) {
+  const raw = job?.meta?.source_card;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  return raw as {
+    title?: string;
+    desc?: string;
+    platform?: string;
+    author?: string;
+    nickname?: string;
+    views_label?: string;
+    likes_label?: string;
+    comments_label?: string;
+    shares_label?: string;
+    duration_label?: string;
+    published_label?: string;
+  };
+}
+
+function formatMetaValue(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
 }
 
 function Row({ label, value }: { label: string; value?: string | null }) {

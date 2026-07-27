@@ -59,6 +59,7 @@ function YoutubeBypass() {
         nicho,
         keyword: keyword.trim() || card.title.slice(0, 60),
         intensity,
+        source_card: card,
       }),
     );
   }

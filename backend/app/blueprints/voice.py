@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request
 from ..services import ingest, jobs, media
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS
-from ..services.validation import AUDIO_EXT, ValidationError, output_path, save_upload
+from ..services.validation import AUDIO_EXT, ValidationError, output_path, parse_json_object, save_upload
 
 bp = Blueprint("voice", __name__, url_prefix="/api/voice")
 
@@ -51,8 +51,20 @@ def convert():
     if mutation not in LEVELS:
         return jsonify(error="Nível de mutação inválido."), 400
 
+    try:
+        source_card = parse_json_object(request.form.get("source_card"), field="source_card")
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+
     job = jobs.create_job(
-        "voice", meta={"target": target, "format": fmt, "timing": preserve, "mutation": mutation}
+        "voice",
+        meta={
+            "target": target,
+            "format": fmt,
+            "timing": preserve,
+            "mutation": mutation,
+            **({"source_card": source_card} if source_card else {}),
+        },
     )
     source_url = (request.form.get("url") or "").strip()
     src: Path | None = None

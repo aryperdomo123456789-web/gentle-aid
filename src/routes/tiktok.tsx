@@ -67,9 +67,16 @@ function TikTokDashboard() {
     }
   }
 
-  function clone(url: string) {
+  function clone(url: string, sourceCard?: DiscoveryCard) {
     setCloneUrl(url);
-    run(() => apiPostJson<Job>("/api/tiktok/clone", { url, nicho, intensity }));
+    run(() =>
+      apiPostJson<Job>("/api/tiktok/clone", {
+        url,
+        nicho,
+        intensity,
+        ...(sourceCard ? { source_card: sourceCard } : {}),
+      }),
+    );
   }
 
   return (
@@ -201,7 +208,7 @@ function TikTokDashboard() {
           <DiscoveryPanel
             defaultPlatform="tiktok"
             actionLabel="Codificar 1:1"
-            onAction={(card: DiscoveryCard) => clone(card.url)}
+            onAction={(card: DiscoveryCard) => clone(card.url, card)}
             actionBusyUrl={busy ? cloneUrl : null}
           />
           <ToolHistory

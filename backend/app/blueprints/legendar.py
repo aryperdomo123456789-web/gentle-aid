@@ -13,6 +13,7 @@ from ..services.validation import (
     VIDEO_EXT,
     ValidationError,
     clean_text,
+    parse_json_object,
     output_path,
     save_upload,
 )
@@ -36,13 +37,20 @@ def run_job():
 
     try:
         srt_text = clean_text(request.form.get("srt"), max_length=20000, field="srt")
+        source_card = parse_json_object(request.form.get("source_card"), field="source_card")
     except ValidationError as exc:
         return jsonify(error=str(exc)), 400
 
     source_url = (request.form.get("url") or "").strip()
     job = jobs.create_job(
         "legendar",
-        meta={"style": style, "position": position, "mutation": mutation, "url": source_url},
+        meta={
+            "style": style,
+            "position": position,
+            "mutation": mutation,
+            "url": source_url,
+            **({"source_card": source_card} if source_card else {}),
+        },
     )
     src: Path | None = None
     if request.files.get("video"):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -55,6 +56,19 @@ def clean_text(value: str | None, *, max_length: int, field: str) -> str:
     if len(text) > max_length:
         raise ValidationError(f"Campo '{field}' excede {max_length} caracteres.")
     return text
+
+
+def parse_json_object(value: str | None, *, field: str) -> dict[str, object] | None:
+    text = (value or "").strip()
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValidationError(f"Campo '{field}' não é um JSON válido.") from exc
+    if not isinstance(data, dict):
+        raise ValidationError(f"Campo '{field}' deve ser um objeto JSON.")
+    return data  # type: ignore[return-value]
 
 
 YOUTUBE_RE = re.compile(r"^https?://(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)/", re.I)
