@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+from pathlib import Path
 
 from flask import Flask, jsonify, send_from_directory
 
@@ -16,6 +18,25 @@ from .blueprints.radar import bp as radar_bp
 from .blueprints.tiktok import bp as tiktok_bp
 from .blueprints.voice import bp as voice_bp
 from .blueprints.youtube import bp as youtube_bp
+
+
+def _git_revision(root: Path) -> str:
+    env_version = os.environ.get("VIRAL_BUILD_VERSION") or os.environ.get("GIT_COMMIT")
+    if env_version:
+        return env_version.strip()
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        return result.stdout.strip() or "unknown"
+    except Exception:
+        return "unknown"
 
 
 def create_app(config: Config | None = None) -> Flask:
@@ -47,6 +68,14 @@ def create_app(config: Config | None = None) -> Flask:
             status="ok",
             ffmpeg=cfg.ffmpeg_bin,
             storage=str(cfg.storage_dir),
+        )
+
+    @app.get("/api/version")
+    def version():
+        return jsonify(
+            status="ok",
+            version=_git_revision(cfg.app_root),
+            root=str(cfg.app_root),
         )
 
     @app.get("/downloads/<path:filename>")

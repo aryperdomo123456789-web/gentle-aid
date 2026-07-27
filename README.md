@@ -83,12 +83,25 @@ curl -s https://viral.vr766.com/api/health
 O instalador é idempotente e faz sozinho: instala ffmpeg/python/git, gera `.env`
 com `SECRET_KEY` aleatória, cria a venv, valida a importação do Flask, cria a
 árvore `fabrica_clips/`, builda o frontend, registra e sobe `viral-api` e
-`viral-web` no systemd, renderiza o Nginx para o seu domínio e roda health check.
+`viral-web` no systemd, ativa o timer de auto-update, renderiza o Nginx para o
+seu domínio e roda health check.
 
 ### Atualizar depois de um push no GitHub
 
 ```bash
 cd /www/wwwroot/viral.vr766.com && bash deploy/update.sh
+```
+
+### Autoatualização
+
+Depois do `deploy/install.sh`, o servidor passa a checar o GitHub em segundo
+plano e aplica novos commits sozinho. Quando isso acontece, a aba aberta do
+projeto detecta a nova versão e recarrega automaticamente.
+
+Se quiser desativar temporariamente:
+
+```bash
+VIRAL_AUTO_UPDATE=0 systemctl restart viral-auto-update.timer
 ```
 
 ### Operação
@@ -97,6 +110,7 @@ cd /www/wwwroot/viral.vr766.com && bash deploy/update.sh
 systemctl status viral-api viral-web
 journalctl -u viral-api -f     # logs da API/FFmpeg
 journalctl -u viral-web -f     # logs do frontend
+systemctl status viral-auto-update.timer viral-auto-update.service
 systemctl restart viral-api viral-web
 ```
 

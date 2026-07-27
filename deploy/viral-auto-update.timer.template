@@ -1,0 +1,13 @@
+[Unit]
+Description=Ecossistema Viral - Auto update timer - __DOMAIN__
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=30s
+Persistent=true
+Unit=viral-auto-update.service
+
+[Install]
+WantedBy=timers.target
+
