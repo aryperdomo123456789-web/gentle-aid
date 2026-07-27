@@ -1,24 +1,140 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+import { Field, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { StatusPanel } from "@/components/StatusPanel";
+import { ToolShell } from "@/components/ToolShell";
+import { useJobRunner } from "@/hooks/use-job-runner";
+import { apiPostJson, type Job } from "@/lib/api";
+
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "Ecossistema Viral — Download e Bypass de YouTube" },
+      {
+        name: "description",
+        content:
+          "Baixe Shorts e vídeos longos do YouTube em lote, esterilize metadados e aplique mutação estrutural com FFmpeg para bypass de algoritmo.",
+      },
+      { property: "og:title", content: "Ecossistema Viral — Download e Bypass de YouTube" },
+      {
+        property: "og:description",
+        content: "Download em lote, limpeza de metadados e mutação FFmpeg para TikTok, Reels e Shorts.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: YoutubeBypass,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+const NICHOS = [
+  "Motivacional",
+  "Humor",
+  "Finanças",
+  "Fitness",
+  "Curiosidades",
+  "Gaming",
+  "Notícias",
+  "Outro",
+];
+
+function YoutubeBypass() {
+  const { job, error, busy, run } = useJobRunner();
+  const [links, setLinks] = useState("");
+  const [nicho, setNicho] = useState(NICHOS[0]);
+  const [keyword, setKeyword] = useState("");
+  const [intensity, setIntensity] = useState("media");
+
+  const urls = links
+    .split(/\s|,|;/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (urls.length === 0) return;
+    run(() =>
+      apiPostJson<Job>("/api/youtube/bypass", {
+        urls,
+        nicho,
+        keyword: keyword.trim(),
+        intensity,
+      }),
+    );
+  }
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <ToolShell
+      badge="Ferramenta 1 · /api/youtube/bypass"
+      title="Download e Bypass Universal de YouTube"
+      subtitle="Cole links de Shorts ou vídeos longos, escolha o nicho e dispare o bypass em lote: download, re-encode H.264/AAC, remoção de metadados e micro-mutações temporais."
+      left={
+        <form onSubmit={onSubmit} className="space-y-5">
+          <Field
+            label="Links do YouTube"
+            hint={`${urls.length} link(s) detectado(s). Um por linha, ou separados por vírgula.`}
+          >
+            {(id) => (
+              <TextArea
+                id={id}
+                value={links}
+                onChange={(e) => setLinks(e.target.value)}
+                placeholder={"https://youtube.com/shorts/xxxx\nhttps://youtu.be/yyyy"}
+                required
+              />
+            )}
+          </Field>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Nicho">
+              {(id) => (
+                <SelectInput id={id} value={nicho} onChange={(e) => setNicho(e.target.value)}>
+                  {NICHOS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </SelectInput>
+              )}
+            </Field>
+
+            <Field label="Palavra-chave">
+              {(id) => (
+                <TextInput
+                  id={id}
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="ex.: renda extra"
+                  maxLength={80}
+                />
+              )}
+            </Field>
+          </div>
+
+          <Field label="Intensidade da mutação" hint="Afeta bitrate, crop, speed e ruído temporal aplicados pelo FFmpeg.">
+            {(id) => (
+              <SelectInput id={id} value={intensity} onChange={(e) => setIntensity(e.target.value)}>
+                <option value="leve">Leve — só metadados e re-encode</option>
+                <option value="media">Média — bitrate + micro-crop + speed 1.01x</option>
+                <option value="agressiva">Agressiva — mutação estrutural completa</option>
+              </SelectInput>
+            )}
+          </Field>
+
+          <SubmitButton busy={busy}>
+            {busy ? "Processando lote…" : "Disparar bypass em lote"}
+          </SubmitButton>
+        </form>
+      }
+      right={
+        <StatusPanel
+          job={job}
+          error={error}
+          busy={busy}
+          emptyHint="Nenhum job em execução. Envie um lote para acompanhar o log do FFmpeg em tempo real."
+        />
+      }
+    />
   );
 }
