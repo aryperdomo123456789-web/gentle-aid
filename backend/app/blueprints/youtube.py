@@ -1,0 +1,96 @@
+"""Ferramenta 1 — Download e bypass universal de YouTube."""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+from flask import Blueprint, jsonify, request
+
+from ..config import config
+from ..services import jobs, media
+from ..services.validation import (
+    YOUTUBE_RE,
+    ValidationError,
+    clean_text,
+    output_path,
+    public_url,
+)
+
+bp = Blueprint("youtube", __name__, url_prefix="/api/youtube")
+
+
+@bp.post("/bypass")
+def bypass():
+    payload = request.get_json(silent=True) or {}
+    urls = [str(u).strip() for u in payload.get("urls", []) if str(u).strip()]
+
+    if not urls:
+        return jsonify(error="Informe pelo menos um link do YouTube."), 400
+    if len(urls) > 20:
+        return jsonify(error="Máximo de 20 links por lote."), 400
+    for url in urls:
+        if not YOUTUBE_RE.match(url):
+            return jsonify(error=f"Link inválido: {url}"), 400
+
+    try:
+        nicho = clean_text(payload.get("nicho"), max_length=60, field="nicho")
+        keyword = clean_text(payload.get("keyword"), max_length=80, field="keyword")
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+
+    intensity = payload.get("intensity", "media")
+    if intensity not in {"leve", "media", "agressiva"}:
+        return jsonify(error="Intensidade inválida."), 400
+
+    job = jobs.create_job(
+        "youtube",
+        meta={"urls": urls, "nicho": nicho, "keyword": keyword, "intensity": intensity},
+    )
+    jobs.submit(job["job_id"], lambda jid: _work(jid, urls, intensity))
+    return jsonify(job), 202
+
+
+def _work(job_id: str, urls: list[str], intensity: str) -> None:
+    outputs: list[str] = []
+    total = len(urls)
+
+    for index, url in enumerate(urls, start=1):
+        jobs.log(job_id, f"[{index}/{total}] Baixando {url}")
+        raw = config.uploads_dir / f"{job_id}_{index}.mp4"
+        media.run(
+            [
+                config.ytdlp_bin,
+                "-f",
+                "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
+                "--merge-output-format",
+                "mp4",
+                "--no-playlist",
+                "-o",
+                str(raw),
+                url,
+            ],
+            job_id=job_id,
+        )
+
+        jobs.update(job_id, md5_before=media.md5(raw))
+        dst = output_path("youtube", job_id, f"_{index}_bypass.mp4")
+        jobs.log(job_id, f"[{index}/{total}] Aplicando mutação '{intensity}'")
+        media.sanitize_video(raw, dst, job_id=job_id, mutation=intensity)
+        raw.unlink(missing_ok=True)
+
+        outputs.append(public_url(dst))
+        jobs.update(
+            job_id,
+            progress=int(index / total * 100),
+            download_url=outputs[-1],
+            filename=dst.name,
+            md5_after=media.md5(dst),
+        )
+
+    jobs.update(
+        job_id,
+        status="done",
+        message=f"{total} vídeo(s) processado(s) com bypass '{intensity}'.",
+        meta={"outputs": outputs},
+    )
