@@ -42,12 +42,27 @@ async function parse<T>(res: Response): Promise<T> {
 }
 
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    signal,
-  });
-  return parse<T>(res);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25_000);
+  if (signal) signal.addEventListener("abort", () => ctrl.abort(), { once: true });
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: ctrl.signal,
+    });
+    return await parse<T>(res);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ViralApiError(
+        504,
+        "O backend não respondeu em 25s. Verifique se o serviço viral-api está ativo e se o Nginx faz proxy de /api para a porta do Gunicorn.",
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function apiPostJson<T>(path: string, body: unknown): Promise<T> {
