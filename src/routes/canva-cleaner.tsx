@@ -38,16 +38,13 @@ function CanvaCleaner() {
   const { job, error, busy, run, cancel, remove } = useJobRunner("canva");
   const [hasFile, setHasFile] = useState(false);
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
+  const [card, setCard] = useState<DiscoveryCard | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  function processCard(card: DiscoveryCard) {
-    const form = formRef.current ? new FormData(formRef.current) : new FormData();
-    form.delete("video");
-    form.delete("audio");
-    form.set("url", card.url);
-    form.set("source_card", JSON.stringify(card));
-    setPickedUrl(card.url);
-    run(() => apiPostForm<Job>("/api/canva-cleaner/run", form));
+  /** Nada roda direto: o vídeo da pesquisa entra no formulário para conferência. */
+  function processCard(next: DiscoveryCard) {
+    setCard(next);
+    setPickedUrl(next.url);
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -63,6 +60,25 @@ function CanvaCleaner() {
       subtitle="Envie o vídeo exportado do Canva ou de outro editor: o pipeline remove os metadados ISO/Canva, recodifica em H.264/AAC, altera bitrate e aplica micro-mutações temporais gerando um hash MD5 inédito."
       left={
         <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
+          {card ? (
+            <div className="rounded-xl border border-primary/40 bg-primary/5 p-3 text-xs">
+              <p className="font-medium text-foreground">Vídeo da pesquisa selecionado</p>
+              <p className="mt-1 truncate text-muted-foreground">{card.title}</p>
+              <input type="hidden" name="url" value={card.url} />
+              <input type="hidden" name="source_card" value={JSON.stringify(card)} />
+              <button
+                type="button"
+                onClick={() => {
+                  setCard(null);
+                  setPickedUrl(null);
+                }}
+                className="mt-2 rounded-lg border border-border px-3 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+              >
+                Remover seleção
+              </button>
+            </div>
+          ) : null}
+
           <Field label="Vídeo exportado" hint="MP4, MOV ou WEBM — até 500 MB.">
             {(id) => (
               <FileDrop
@@ -95,7 +111,7 @@ function CanvaCleaner() {
           </p>
           <JobSettingsGuard
             busy={busy}
-            disabled={!hasFile}
+            disabled={!hasFile && !card}
             label="Executar limpeza"
             busyLabel="Limpando e recodificando…"
           />
@@ -116,7 +132,7 @@ function CanvaCleaner() {
         <div className="space-y-6">
           <DiscoveryPanel
             defaultPlatform="auto"
-            actionLabel="Esterilizar este vídeo"
+            actionLabel="Usar este vídeo"
             onAction={processCard}
             actionBusyUrl={busy ? pickedUrl : null}
           />
