@@ -86,7 +86,19 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://console.groq.com/docs/overview",
         "usage": "Transcrição Whisper-large em alta velocidade e LLM de baixa latência.",
         "prefix": "gsk_",
-        "test": {"url": "https://api.groq.com/openai/v1/models", "auth": "bearer"},
+        "format_hint": "Chave em console.groq.com → API Keys (começa com gsk_). É ela que a Dublagem IA usa para ouvir o vídeo.",
+        "remediation": "401 = chave revogada, gere outra em console.groq.com/keys. 403 = a chave existe mas não tem acesso ao Whisper (plano/organização) — crie a chave em outra org ou use a Whisper como fallback.",
+        "test": [
+            # Teste real do que a dublagem usa: envia um áudio mínimo para o Whisper.
+            {
+                "url": "https://api.groq.com/openai/v1/audio/transcriptions",
+                "auth": "bearer",
+                "method": "POST",
+                "audio_probe": {"model": "whisper-large-v3"},
+                "invalid_message": "A chave não tem acesso à transcrição Whisper na Groq.",
+            },
+            {"url": "https://api.groq.com/openai/v1/models", "auth": "bearer"},
+        ],
     },
     {
         "id": "openrouter",
@@ -272,7 +284,15 @@ PROVIDERS: list[dict[str, Any]] = [
                 "auth": "header",
                 "header": "X-API-Key",
             },
-            # Endpoint compatível com OpenAI, quando configurado.
+            # Endpoint compatível com OpenAI, quando configurado: testa a transcrição de verdade.
+            {
+                "url": os.environ.get("WHISPER_API_BASE", "https://api.openai.com/v1").rstrip("/")
+                + "/audio/transcriptions",
+                "auth": "bearer",
+                "method": "POST",
+                "audio_probe": {"model": "whisper-1"},
+                "invalid_message": "A chave foi recusada pelo endpoint de transcrição compatível com a OpenAI.",
+            },
             {
                 "url": os.environ.get("WHISPER_API_BASE", "https://api.openai.com/v1").rstrip("/") + "/models",
                 "auth": "bearer",
@@ -508,6 +528,38 @@ _DEFAULT_REMEDIATION = {
 }
 
 
+def _tiny_wav() -> bytes:
+    """WAV mono 8 kHz com ~0,3 s de silêncio — só para validar credencial de STT."""
+    import struct
+
+    sample_rate, samples = 8000, 2400
+    data = b"\x00\x00" * samples
+    header = b"RIFF" + struct.pack("<I", 36 + len(data)) + b"WAVEfmt "
+    header += struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16)
+    header += b"data" + struct.pack("<I", len(data))
+    return header + data
+
+
+def _audio_multipart(fields: dict[str, str]) -> tuple[bytes, str]:
+    """Monta o multipart/form-data com o áudio mínimo do probe de transcrição."""
+    import uuid
+
+    boundary = f"----viralprobe{uuid.uuid4().hex}"
+    parts: list[bytes] = []
+    for name, value in fields.items():
+        parts.append(
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n".encode()
+        )
+    parts.append(
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
+        f"filename=\"probe.wav\"\r\nContent-Type: audio/wav\r\n\r\n".encode()
+    )
+    parts.append(_tiny_wav())
+    parts.append(f"\r\n--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
+
 def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
     """Executa um único endpoint de verificação e devolve status/ok/mensagem."""
     import base64
@@ -549,7 +601,11 @@ def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
         token = base64.b64encode(f"{user}:{key}".encode()).decode()
         headers["Authorization"] = f"Basic {token}"
 
-    if spec.get("body") is not None:
+    if spec.get("audio_probe"):
+        fields = {"response_format": "json", **dict(spec["audio_probe"])}
+        body, content_type = _audio_multipart({k: str(v) for k, v in fields.items()})
+        headers["Content-Type"] = content_type
+    elif spec.get("body") is not None:
         body = json.dumps(spec["body"]).encode()
         headers["Content-Type"] = "application/json"
 
@@ -578,10 +634,16 @@ def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
             return {"ok": True, "status": resp.status, "message": "Chave válida e respondendo."}
     except urllib.error.HTTPError as exc:
         status = exc.code
+        # No probe de áudio, 400 significa "credencial aceita, áudio de teste recusado".
+        if spec.get("audio_probe") and status == 400:
+            return {"ok": True, "status": status, "message": "Chave válida — transcrição autorizada."}
+        message = _HTTP_MESSAGES.get(status, f"Endpoint respondeu HTTP {status}.")
+        if spec.get("audio_probe") and status in (401, 402, 403) and spec.get("invalid_message"):
+            message = f"{spec['invalid_message']} {message}"
         return {
             "ok": status not in (400, 401, 402, 403, 429),
             "status": status,
-            "message": _HTTP_MESSAGES.get(status, f"Endpoint respondeu HTTP {status}."),
+            "message": message,
         }
     except urllib.error.URLError as exc:
         return {"ok": False, "status": 0, "message": f"Falha de rede: {exc.reason}"}
@@ -595,8 +657,11 @@ def _probe_key(provider: dict[str, Any], key: str) -> bool:
     specs = [s for s in (spec if isinstance(spec, list) else [spec]) if s]
     for candidate in specs:
         try:
-            if _run_probe(candidate, key).get("ok"):
+            result = _run_probe(candidate, key)
+            if result.get("ok"):
                 return True
+            if candidate.get("audio_probe") and result.get("status") in (401, 402, 403):
+                return False
         except Exception:  # noqa: BLE001
             continue
     return False
@@ -644,6 +709,10 @@ def test_provider(provider_id: str) -> dict[str, Any]:
         attempt = _run_probe(candidate, key)
         attempts.append(attempt)
         if attempt.get("ok"):
+            break
+        # Probe de áudio é decisivo: se a transcrição recusou a chave, não adianta
+        # o /models responder 200 — a dublagem vai falhar do mesmo jeito.
+        if candidate.get("audio_probe") and attempt.get("status") in (401, 402, 403):
             break
 
     if not attempt.get("ok"):
