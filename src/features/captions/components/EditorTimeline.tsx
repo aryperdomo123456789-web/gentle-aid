@@ -56,7 +56,7 @@ export function EditorTimeline({
       aria-label="Linha do tempo"
       className="flex flex-col gap-2 border-t border-border bg-card/60 px-3 py-2 sm:px-4"
     >
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onToggle}
