@@ -30,3 +30,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Deploy gerado
+deploy/generated/
+.env
+fabrica_clips/
+frontend_dist/

@@ -1,53 +1,62 @@
-# Ecossistema Viral — configuração Nginx (aaPanel)
-# Cole no painel: Site > viralpro.vr766.com > Config File
+# Ecossistema Viral — Nginx (aaPanel)
+# Gerado por deploy/install.sh -> deploy/generated/nginx-__DOMAIN__.conf
+# Cole no painel: Site > __DOMAIN__ > Arquivo de configuração
 # (mantenha as linhas de SSL que o aaPanel gerar)
 
 server {
     listen 80;
-    server_name viralpro.vr766.com;
+    server_name __DOMAIN__ www.__DOMAIN__;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name viralpro.vr766.com;
+    server_name __DOMAIN__ www.__DOMAIN__;
 
     # ssl_certificate / ssl_certificate_key: gerados pelo aaPanel (Let's Encrypt)
 
-    client_max_body_size 600M;
+    client_max_body_size 1024M;
     client_body_timeout 600s;
     proxy_read_timeout 3600s;
     proxy_send_timeout 3600s;
+    send_timeout 3600s;
 
-    access_log /www/wwwlogs/viralpro.vr766.com.log;
-    error_log  /www/wwwlogs/viralpro.vr766.com.error.log;
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
 
-    # ---- API Flask (Gunicorn :8000) --------------------------------------
+    access_log /www/wwwlogs/__DOMAIN__.log;
+    error_log  /www/wwwlogs/__DOMAIN__.error.log;
+
+    # ---- API Flask (Gunicorn :__API_PORT__) ------------------------------
     location /api/ {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:__API_PORT__;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_request_buffering off;
         proxy_buffering off;
     }
 
     # ---- Arquivos finais servidos direto pelo disco ----------------------
     location /downloads/ {
-        alias /www/wwwroot/viralpro.vr766.com/fabrica_clips/;
+        alias __STORAGE__/;
         add_header Content-Disposition "attachment";
         add_header Cache-Control "private, max-age=3600";
+        add_header X-Content-Type-Options "nosniff";
         try_files $uri =404;
     }
 
-    # ---- Frontend (Node :3000) -------------------------------------------
+    # ---- Frontend (Node :__WEB_PORT__) -----------------------------------
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:__WEB_PORT__;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }

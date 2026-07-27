@@ -1,0 +1,22 @@
+[Unit]
+Description=Ecossistema Viral - API Flask (Gunicorn) - __DOMAIN__
+After=network.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__APP_DIR__/backend
+Environment="VIRAL_ROOT=__APP_DIR__"
+Environment="VIRAL_STORAGE=__STORAGE__"
+Environment="PATH=__APP_DIR__/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=-__APP_DIR__/.env
+ExecStart=__APP_DIR__/.venv/bin/gunicorn -c gunicorn.conf.py wsgi:app
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

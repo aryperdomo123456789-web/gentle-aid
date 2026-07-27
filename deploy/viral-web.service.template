@@ -1,0 +1,20 @@
+[Unit]
+Description=Ecossistema Viral - Frontend (TanStack Start / Node) - __DOMAIN__
+After=network.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__APP_DIR__
+Environment="NODE_ENV=production"
+Environment="PORT=__WEB_PORT__"
+Environment="HOST=127.0.0.1"
+EnvironmentFile=-__APP_DIR__/.env
+ExecStart=/usr/bin/env node __WEB_ENTRY__
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
