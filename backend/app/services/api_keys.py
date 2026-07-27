@@ -22,7 +22,7 @@ from typing import Any
 
 from ..config import config
 
-_lock = threading.Lock()
+_lock = threading.RLock()
 
 # --- Catálogo declarativo ----------------------------------------------------
 # auth: "bearer" | "header" | "query" | "none"
