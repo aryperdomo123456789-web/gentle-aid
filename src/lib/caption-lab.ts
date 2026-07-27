@@ -533,7 +533,7 @@ export function buildAss(lines: Line[], options: BuildOptions): BuildResult {
   const header = [
     "[Script Info]",
     "ScriptType: v4.00+",
-    "WrapStyle: 2",
+    "WrapStyle: 0",
     "ScaledBorderAndShadow: yes",
     "YCbCr Matrix: TV.709",
     `PlayResX: ${width}`,

@@ -595,7 +595,9 @@ def build_ass(
     header = [
         "[Script Info]",
         "ScriptType: v4.00+",
-        "WrapStyle: 2",
+        # 0 = quebra inteligente e balanceada. Com 2 (sem quebra) frases longas
+        # saem cortadas nas bordas do vídeo — bug visto em render real 1080x1920.
+        "WrapStyle: 0",
         "ScaledBorderAndShadow: yes",
         "YCbCr Matrix: TV.709",
         f"PlayResX: {width}",
