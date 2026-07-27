@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Field, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { Field, SelectInput, TextArea, TextInput } from "@/components/form";
 import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError } from "@/lib/api";
 
 export type Persona = {
