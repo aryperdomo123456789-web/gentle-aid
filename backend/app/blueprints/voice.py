@@ -20,7 +20,17 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from ..config import config
-from ..services import dubbing, edge_tts, ingest, jobs, media, transcribe, voice_engine, voice_forge
+from ..services import (
+    dubbing,
+    edge_tts,
+    ingest,
+    jobs,
+    media,
+    script_doctor,
+    transcribe,
+    voice_engine,
+    voice_forge,
+)
 
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS, normalize_level
@@ -117,6 +127,9 @@ def catalog():
         dub_ready=transcribe.available(),
         dub_languages=dubbing.LANGUAGES,
         test_script=TEST_SCRIPT,
+        script_styles=script_doctor.list_styles(),
+        script_actions=script_doctor.ACTIONS,
+        script_ai_ready=script_doctor.llm_available(),
         local_voices=[
             {"id": "masc_grave", "name": "Masculino grave"},
             {"id": "masc_jovem", "name": "Masculino jovem"},
@@ -200,6 +213,68 @@ def preview():
 
 
 
+
+
+# --------------------------------------------------------------------------- #
+# Doutor de Roteiro — corrige/reescreve o texto antes de virar áudio
+# --------------------------------------------------------------------------- #
+@bp.get("/script/styles")
+def script_styles():
+    """Catálogo de estilos narrativos + ações do chat."""
+    return jsonify(
+        styles=script_doctor.list_styles(),
+        actions=script_doctor.ACTIONS,
+        ai_ready=script_doctor.llm_available(),
+        words_per_second=script_doctor.WORDS_PER_SECOND,
+    )
+
+
+@bp.post("/script/analyze")
+def script_analyze():
+    """Diagnóstico local do roteiro (roda sem nenhuma chave de API)."""
+    payload = parse_json_object(request)
+    try:
+        text = clean_text(payload.get("text"), max_length=MAX_TTS_CHARS, field="text")
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(analysis=script_doctor.analyze(text))
+
+
+@bp.post("/script/fix")
+def script_fix():
+    """Correção/reescrita do roteiro no estilo escolhido."""
+    payload = parse_json_object(request)
+    try:
+        text = clean_text(payload.get("text"), max_length=MAX_TTS_CHARS, field="text")
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+    if len(text) < 10:
+        return jsonify(error="Escreva pelo menos uma frase para a IA trabalhar."), 400
+
+    style_id = str(payload.get("style") or "neutro")
+    if style_id not in script_doctor.STYLE_IDS:
+        return jsonify(error="Estilo narrativo inválido."), 400
+    action = str(payload.get("action") or "corrigir")
+    if action not in script_doctor.ACTION_IDS:
+        return jsonify(error="Ação inválida."), 400
+
+    seconds_raw = payload.get("seconds")
+    try:
+        seconds = max(5, min(900, int(seconds_raw))) if seconds_raw else None
+    except (TypeError, ValueError):
+        seconds = None
+
+    started = time.time()
+    result = script_doctor.rewrite(
+        text,
+        style_id=style_id,
+        action=action,
+        instruction=str(payload.get("instruction") or "")[:600],
+        seconds=seconds,
+    )
+    result["elapsed"] = round(time.time() - started, 2)
+    result["before"] = script_doctor.analyze(text)
+    return jsonify(result)
 
 
 @bp.get("/voices")
