@@ -1039,7 +1039,8 @@ def autofill(force: bool = False, repair: bool = False, probe: bool = True) -> d
             if prefer:
                 pool.sort(key=lambda item: 0 if re.match(prefer, item[0]) else 1)
             probed_ok = False
-            if len(pool) > 1 or (existing and value != existing):
+            if probe and (len(pool) > 1 or (existing and value != existing)):
+
                 for candidate_key, candidate_origin in pool:
                     if _probe_key(provider, candidate_key):
                         value, origin, probed_ok = candidate_key, candidate_origin, True
