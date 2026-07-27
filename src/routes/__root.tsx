@@ -145,6 +145,9 @@ function RootComponent() {
   );
 }
 
+// Rotas que rodam 100% no cliente (laboratórios locais) não dependem do backend.
+const PUBLIC_PATHS = new Set(["/login", "/lab-legenda"]);
+
 function AuthGate() {
   const auth = useAuth();
   const location = useLocation();
@@ -152,10 +155,11 @@ function AuthGate() {
 
   useEffect(() => {
     if (!auth.ready) return;
-    if (!auth.user && location.pathname !== "/login") {
+    if (!auth.user && !PUBLIC_PATHS.has(location.pathname)) {
       void navigate({ to: "/login", replace: true });
       return;
     }
+
     if (auth.user && location.pathname === "/login") {
       void navigate({ to: "/", replace: true });
     }
