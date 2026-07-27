@@ -1,0 +1,41 @@
+# Ecossistema Viral — trecho de proxy incluído no site do aaPanel
+# Gerado por deploy/apply-nginx.sh — NÃO editar à mão.
+
+client_max_body_size 1024M;
+client_body_timeout 600s;
+proxy_read_timeout 3600s;
+proxy_send_timeout 3600s;
+send_timeout 3600s;
+
+# ---- API Flask (Gunicorn :__API_PORT__) ----
+location /api/ {
+    proxy_pass http://127.0.0.1:__API_PORT__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_request_buffering off;
+    proxy_buffering off;
+}
+
+# ---- Arquivos finais servidos direto do disco ----
+location /downloads/ {
+    alias __STORAGE__/;
+    add_header Content-Disposition "attachment";
+    add_header Cache-Control "private, max-age=3600";
+    add_header X-Content-Type-Options "nosniff";
+    try_files $uri =404;
+}
+
+# ---- Frontend (Node :__WEB_PORT__) ----
+location / {
+    proxy_pass http://127.0.0.1:__WEB_PORT__;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
