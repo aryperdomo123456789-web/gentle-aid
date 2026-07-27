@@ -11,6 +11,7 @@ import {
   UserCog,
   LogOut,
   Shield,
+  FlaskConical,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
