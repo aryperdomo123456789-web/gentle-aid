@@ -129,6 +129,15 @@ type Props = {
   /** Texto enquanto o job roda. */
   busyLabel: string;
   variant?: "primary" | "electric";
+  /**
+   * Modo manual (telas sem <form>, como o editor de legendas): a lista do que
+   * será enviado é montada pela própria tela.
+   */
+  entries?: Entry[];
+  /** Muda sempre que qualquer configuração muda — invalida a revisão salva. */
+  signature?: string;
+  /** Obrigatório no modo manual: dispara o job. */
+  onStart?: () => void;
 };
 
 export function JobSettingsGuard({
@@ -137,7 +146,11 @@ export function JobSettingsGuard({
   label,
   busyLabel,
   variant = "primary",
+  entries,
+  signature,
+  onStart,
 }: Props) {
+  const manual = Boolean(entries);
   const anchor = useRef<HTMLDivElement>(null);
   const [saved, setSaved] = useState<Entry[] | null>(null);
   const [stale, setStale] = useState(false);
@@ -145,14 +158,20 @@ export function JobSettingsGuard({
   const form = () => anchor.current?.closest("form") ?? null;
 
   const save = useCallback(() => {
+    if (manual) {
+      setSaved(entries ?? []);
+      setStale(false);
+      return;
+    }
     const el = form();
     if (!el) return;
     setSaved(readForm(el));
     setStale(false);
-  }, []);
+  }, [manual, entries]);
 
   // Qualquer mudança depois de salvar invalida a revisão.
   useEffect(() => {
+    if (manual) return;
     const el = anchor.current?.closest("form");
     if (!el) return;
     const invalidate = () => setStale(true);
@@ -162,7 +181,18 @@ export function JobSettingsGuard({
       el.removeEventListener("input", invalidate);
       el.removeEventListener("change", invalidate);
     };
-  }, []);
+  }, [manual]);
+
+  // Modo manual: a assinatura das configurações invalida a revisão.
+  const firstSignature = useRef(true);
+  useEffect(() => {
+    if (!manual) return;
+    if (firstSignature.current) {
+      firstSignature.current = false;
+      return;
+    }
+    setStale(true);
+  }, [manual, signature]);
 
   // Ao terminar um job, exige revisar de novo antes do próximo.
   useEffect(() => {
@@ -170,6 +200,7 @@ export function JobSettingsGuard({
   }, [busy]);
 
   const locked = !saved || stale;
+
 
   return (
     <div ref={anchor} className="space-y-3">
