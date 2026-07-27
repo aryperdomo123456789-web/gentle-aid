@@ -149,7 +149,7 @@ export function VoicePicker({
         </p>
       </header>
 
-      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-background/50 p-1">
+      <div className="scroll-x flex gap-2 overflow-x-auto rounded-xl border border-border bg-background/50 p-1 sm:flex-wrap sm:overflow-visible">
         {engines.map(([id, label, enabled]) => (
           <button
             key={id}

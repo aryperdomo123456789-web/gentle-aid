@@ -217,9 +217,9 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
         </p>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Nome da voz">
               {(id) => (
                 <TextInput
@@ -248,7 +248,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
             </Field>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {SLIDERS.map((slider) => (
               <label key={String(slider.key)} className="block text-xs">
                 <span className="flex items-center justify-between text-muted-foreground">
@@ -328,7 +328,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
               acima. Ouça cada um e salve só os que servirem para o canal.
             </p>
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block text-xs">
                 <span className="flex items-center justify-between text-muted-foreground">
                   <span>Quantidade de modelos</span>
@@ -383,7 +383,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
             </div>
 
             {variants.length ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {variants.map((variant) => (
                   <div key={variant.id} className="rounded-xl border border-border bg-card/50 p-3">
                     <p className="text-xs font-semibold text-foreground">{variant.name}</p>
