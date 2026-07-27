@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Field, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";

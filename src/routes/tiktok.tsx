@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Field, SelectInput, SubmitButton, TextInput } from "@/components/form";
+import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";
@@ -45,6 +46,7 @@ function TikTokDashboard() {
   const [radarBusy, setRadarBusy] = useState(false);
   const [radarError, setRadarError] = useState<string | null>(null);
   const [cloneUrl, setCloneUrl] = useState("");
+  const [intensity, setIntensity] = useState("media");
 
   async function loadRadar(e: React.FormEvent) {
     e.preventDefault();
