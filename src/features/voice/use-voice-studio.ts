@@ -122,7 +122,9 @@ export function useVoiceStudio() {
     testScript: catalog?.test_script || TEST_SCRIPT,
     maxChars: catalog?.max_tts_chars ?? 40000,
     dubReady: catalog ? catalog.dub_ready !== false : true,
+    dubTranslateReady: catalog ? catalog.dub_translate_ready !== false : true,
     dubLanguages: catalog?.dub_languages ?? { auto: "mesmo idioma do vídeo" },
+
     hasFile,
     setHasFile,
     dubFile,
