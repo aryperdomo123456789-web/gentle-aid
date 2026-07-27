@@ -230,13 +230,13 @@ function RadarGlobal() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+      <main className="mx-auto max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <header className="mb-6">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-muted-foreground">
             <RadarIcon className="size-3.5 text-primary" aria-hidden="true" /> Radar Global ·
             /api/radar
           </span>
-          <h1 className="mt-3 text-3xl font-bold md:text-4xl">Radar Global de Tendências</h1>
+          <h1 className="mt-3 text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Radar Global de Tendências</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
             Radar congelado. Só "Varrer radar" atualiza.
           </p>
@@ -257,7 +257,7 @@ function RadarGlobal() {
             e.preventDefault();
             void load(true);
           }}
-          className="panel mb-6 grid gap-4 p-5 sm:grid-cols-[1fr_180px_auto_auto]"
+          className="panel mb-6 grid gap-4 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_180px_auto_auto] md:items-end"
         >
           <Field label="Nicho (opcional)">
             {(id) => (

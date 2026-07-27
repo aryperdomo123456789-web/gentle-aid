@@ -102,10 +102,10 @@ function Historico() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+      <main className="mx-auto max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold md:text-4xl">Central de Histórico</h1>
+            <h1 className="text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Central de Histórico</h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               Todos os jobs executados no servidor, com status de hash, metadados sanitizados e
               links de download servidos pelo Nginx.

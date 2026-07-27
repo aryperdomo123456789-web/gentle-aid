@@ -197,14 +197,14 @@ function ApisPage() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto w-full max-w-[1600px] px-4 py-8 md:px-8">
+      <main className="mx-auto w-full max-w-[1600px] px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-foreground">
               <KeyRound className="size-3.5" aria-hidden="true" />
               Cofre · /api/apis
             </span>
-            <h1 className="mt-3 text-3xl font-bold md:text-4xl">Central de APIs</h1>
+            <h1 className="mt-3 text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Central de APIs</h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               Todas as integrações do pipeline em um só lugar. Substitua uma chave que estourou o
               limite, remova a que não usa mais e teste a conectividade sem sair do painel — as
@@ -398,7 +398,7 @@ function ApisPage() {
           </div>
         )}
       </main>
-      <footer className="mx-auto w-full max-w-[1600px] px-4 pb-10 text-xs text-muted-foreground md:px-8">
+      <footer className="mx-auto w-full max-w-[1600px] px-3 pb-10 text-xs sm:px-4 text-muted-foreground md:px-8">
         Chaves gravadas em <code className="font-mono">fabrica_clips/_config/api_keys.json</code>{" "}
         (permissão 600, fora do Git). Variáveis de ambiente continuam valendo como fallback.
       </footer>

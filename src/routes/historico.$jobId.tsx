@@ -87,7 +87,7 @@ function JobDetail() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+      <main className="mx-auto max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <Link
           to="/historico"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -97,7 +97,7 @@ function JobDetail() {
 
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold md:text-3xl">{job?.tool ?? "Job"}</h1>
+            <h1 className="text-xl font-bold leading-tight sm:text-2xl md:text-3xl">{job?.tool ?? "Job"}</h1>
             <p className="font-mono text-xs text-muted-foreground">{jobId}</p>
           </div>
           <div className="flex items-center gap-2">

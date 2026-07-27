@@ -25,7 +25,7 @@ export function Field({
 }
 
 const control =
-  "w-full rounded-xl border border-input bg-background/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40";
+  "w-full min-h-11 max-w-full rounded-xl border border-input bg-background/60 px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40";
 
 export function TextInput({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(control, className)} />;
@@ -79,10 +79,10 @@ export function FileDrop({
       <button
         type="button"
         onClick={() => ref.current?.click()}
-        className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-background/40 px-4 py-8 text-center transition-colors hover:border-primary/60"
+        className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-background/40 px-3 py-6 text-center transition-colors hover:border-primary/60 sm:px-4 sm:py-8"
       >
         <UploadCloud className="size-6 text-primary" aria-hidden="true" />
-        <span className="text-sm font-medium text-foreground">
+        <span className="w-full break-words text-sm font-medium text-foreground">
           {fileName ?? "Selecionar arquivo do computador"}
         </span>
         <span className="text-xs text-muted-foreground">{hint}</span>
@@ -106,7 +106,7 @@ export function SubmitButton({
     <button
       type="submit"
       disabled={busy || disabled}
-      className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60 ${
         variant === "electric"
           ? "bg-electric text-electric-foreground hover:opacity-90"
           : "text-primary-foreground hover:opacity-90"
