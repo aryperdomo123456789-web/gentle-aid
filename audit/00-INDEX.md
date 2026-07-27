@@ -25,6 +25,7 @@ O problema mais provavel na Central de APIs nao parece ser apenas "chave ausente
 - `audit/04-plano-correcao.md`
 - `audit/05-seguranca-env.md`
 - `audit/06-checklist-deploy.md`
+- `audit/07-plano-producao-voz.md`
 
 ## Leitura rapida
 
@@ -35,4 +36,3 @@ Se voce quiser atacar primeiro a causa mais provavel:
 3. Confirme se `VIRAL_ROOT` e `VIRAL_STORAGE` apontam para `/www/wwwroot/gentle-aid`.
 4. Confirme se o cofre existe em `/www/wwwroot/gentle-aid/fabrica_clips/_config/api_keys.json` com permissao `600`.
 5. Depois disso, valide o `scan_report` da Central de APIs.
-
