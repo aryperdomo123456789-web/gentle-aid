@@ -254,6 +254,7 @@ def set_key(provider_id: str, key: str, note: str = "") -> dict[str, Any]:
         entry.pop("last_test", None)
         data[provider_id] = entry
         _save(data)
+        sync_env(data)
     return describe(provider_id)
 
 
@@ -262,6 +263,8 @@ def delete_key(provider_id: str) -> dict[str, Any]:
         data = _load()
         data.pop(provider_id, None)
         _save(data)
+        sync_env(data)
+
     return describe(provider_id)
 
 
@@ -544,6 +547,76 @@ def scan_report() -> dict[str, Any]:
     }
 
 
+# Catálogo legado (TODASAPI.txt): blocos "N - NOME" seguidos das chaves soltas.
+_LEGACY_TITLES = {
+    "deepseek": "deepseek",
+    "gemini": "gemini",
+    "google gemini": "gemini",
+    "groq": "groq",
+    "cohere api": "cohere",
+    "cohere": "cohere",
+    "tavily": "tavily",
+    "jina": "jina",
+    "openrouter": "openrouter",
+    "open router": "openrouter",
+    "mistral": "mistral",
+    "huggingface": "huggingface",
+    "hugging face": "huggingface",
+    "cloudflare api workers": "cloudflare",
+    "cloudflare": "cloudflare",
+    "firecrawl": "firecrawl",
+    "exa": "exa",
+    "langfuse": "langfuse",
+    "siliconflow": "siliconflow",
+    "whisper": "whisper",
+    "lamatok": "lamatok",
+    "tikapi": "tikapi",
+}
+
+_LEGACY_NOISE = {
+    "chave", "teste", "producao", "produção", "documentacao", "documentação",
+    "id", "api", "key", "token", "http", "https", "none", "null",
+}
+
+
+def _parse_legacy_catalog(text: str) -> dict[str, str]:
+    """Lê o formato do TODASAPI.txt do projeto legado (sem NOME=valor)."""
+    import re
+
+    if "======" not in text or not re.search(r"^\s*\d+\s*-", text, re.M):
+        return {}
+
+    out: dict[str, str] = {}
+    current: str | None = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        header = re.match(r"^\d+\s*-\s*(.+)$", line)
+        if header:
+            title = re.sub(r"\s+", " ", header.group(1)).strip().lower()
+            current = _LEGACY_TITLES.get(title)
+            if current is None:
+                current = next(
+                    (pid for name, pid in _LEGACY_TITLES.items() if name in title),
+                    None,
+                )
+            continue
+        if not current or current in out:
+            continue
+        if line.startswith("=") or line.startswith("#") or "://" in line:
+            continue
+        candidate = line.split()[-1].strip("\"',;")
+        if candidate.upper().startswith(("ID", "CHAVE")):
+            continue
+        if len(candidate) < 16 or candidate.lower() in _LEGACY_NOISE:
+            continue
+        if not re.fullmatch(r"[A-Za-z0-9_\-\.:]{16,300}", candidate):
+            continue
+        out[current] = candidate
+    return out
+
+
 def _collect() -> tuple[dict[str, str], dict[str, str]]:
     harvested: dict[str, str] = {}
     sources: dict[str, str] = {}
@@ -562,6 +635,11 @@ def _collect() -> tuple[dict[str, str], dict[str, str]]:
             if name not in harvested:
                 harvested[name] = value
                 sources[name] = str(path)
+        for pid, value in _parse_legacy_catalog(text).items():
+            marker = f"__SIG__{pid}"
+            if marker not in harvested:
+                harvested[marker] = value
+                sources[marker] = f"{path} (catálogo legado)"
         for pid, value in _harvest_signatures(text).items():
             marker = f"__SIG__{pid}"
             if marker not in harvested:
@@ -569,6 +647,46 @@ def _collect() -> tuple[dict[str, str], dict[str, str]]:
                 sources[marker] = str(path)
 
     return harvested, sources
+
+
+def sync_env(data: dict[str, dict[str, Any]] | None = None) -> str | None:
+    """Espelha o cofre no .env da aplicação (0600), preservando as demais variáveis."""
+    entries = data if data is not None else _load()
+    env_path = config.app_root / ".env"
+    managed = {p["env"]: (entries.get(p["id"]) or {}).get("key") for p in PROVIDERS}
+    managed = {name: key for name, key in managed.items() if key}
+
+    lines: list[str] = []
+    try:
+        if env_path.exists():
+            lines = env_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        lines = []
+
+    out: list[str] = []
+    written: set[str] = set()
+    for line in lines:
+        name = line.split("=", 1)[0].strip() if "=" in line and not line.lstrip().startswith("#") else ""
+        if name in managed:
+            out.append(f"{name}={managed[name]}")
+            written.add(name)
+        else:
+            out.append(line)
+
+    pending = [f"{n}={v}" for n, v in managed.items() if n not in written]
+    if pending:
+        if out and out[-1].strip():
+            out.append("")
+        out.append("# --- Central de APIs (gerado automaticamente) ---")
+        out.extend(pending)
+
+    try:
+        env_path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+        os.chmod(env_path, 0o600)
+    except OSError:
+        return None
+    return str(env_path)
+
 
 
 def autofill(force: bool = False) -> dict[str, Any]:
@@ -590,15 +708,17 @@ def autofill(force: bool = False) -> dict[str, Any]:
             value = next((harvested[c.upper()] for c in candidates if harvested.get(c.upper())), None)
             origin = next((sources[c.upper()] for c in candidates if harvested.get(c.upper())), "")
 
+            from_catalog = False
             if not value:
                 marker = f"__SIG__{pid}"
                 if harvested.get(marker):
                     value, origin = harvested[marker], sources.get(marker, "")
+                    from_catalog = True
 
             if not value:
                 continue
             prefix = provider.get("prefix")
-            if prefix and not value.startswith(prefix):
+            if prefix and not from_catalog and not value.startswith(prefix):
                 continue
 
             entry = data.get(pid, {})
@@ -613,14 +733,17 @@ def autofill(force: bool = False) -> dict[str, Any]:
 
         if imported:
             _save(data)
+        env_file = sync_env(data)
 
     return {
         "imported": imported,
         "skipped": skipped,
         "scanned": len(_scan_paths()),
         "roots": [str(r) for r in _scan_roots()],
+        "env_file": env_file,
         "total_configured": sum(1 for p in list_all() if p["configured"]),
     }
+
 
 
 def autofill_once() -> None:

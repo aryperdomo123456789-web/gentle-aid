@@ -152,15 +152,23 @@ function ApisPage() {
     try {
       const data = await apiSend<{
         providers: Provider[];
-        report: { imported: string[]; skipped: string[]; scanned: number; roots?: string[] };
+        report: {
+          imported: string[];
+          skipped: string[];
+          scanned: number;
+          roots?: string[];
+          env_file?: string | null;
+        };
       }>("/api/apis/import", "POST", { force });
       setProviders(data.providers ?? []);
       const n = data.report?.imported?.length ?? 0;
+      const envInfo = data.report?.env_file ? ` Espelhadas com permissão 600 em ${data.report.env_file}.` : "";
       setImportReport(
         n > 0
-          ? `${n} chave(s) importada(s) automaticamente: ${data.report.imported.join(", ")}.`
+          ? `${n} chave(s) importada(s) automaticamente: ${data.report.imported.join(", ")}.${envInfo}`
           : `Nenhuma chave encontrada. Foram lidos ${data.report?.scanned ?? 0} arquivo(s) em: ${(data.report?.roots ?? []).join(", ")}. Use "Diagnóstico" para ver os detalhes.`,
       );
+
     } catch (err) {
       setError(friendlyError(err));
     } finally {
