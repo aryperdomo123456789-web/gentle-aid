@@ -35,6 +35,8 @@ const ANIM_CLASS: Record<string, string> = {
  * enviado ao servidor enquanto você testa — o render final no aaPanel usa
  * exatamente os mesmos parâmetros mostrados aqui.
  */
+export type CaptionStageApi = { seek: (time: number) => void; toggle: () => void };
+
 export function CaptionStage({
   src,
   poster,
@@ -42,6 +44,10 @@ export function CaptionStage({
   preset,
   transcript,
   onYChange,
+  onTick,
+  onReady,
+  hideControls = false,
+  className,
 }: {
   src: string | null;
   poster: string | null;
@@ -49,6 +55,10 @@ export function CaptionStage({
   preset: CaptionPreset | null;
   transcript: string;
   onYChange: (y: number) => void;
+  onTick?: (time: number, duration: number, playing: boolean) => void;
+  onReady?: (api: CaptionStageApi) => void;
+  hideControls?: boolean;
+  className?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
