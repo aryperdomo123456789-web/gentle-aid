@@ -69,4 +69,34 @@ fi
 log "Aplicando dependências, build e reinício dos serviços"
 bash "$APP_DIR/deploy/update.sh"
 
-printf '\n\033[1;32m✔ Atualização segura concluída.\033[0].\033[0m\n'
+# --- 6. Pós-deploy: vozes de fábrica + estúdio de legendas ------------------
+API="http://127.0.0.1:${VIRAL_API_PORT:-8010}"
+
+log "Sincronizando vozes de fábrica (inclui Chiclete Persuasivo)"
+VOICES="$(curl -s -m 60 -X POST "$API/api/voice/personas/reset" || true)"
+if printf '%s' "$VOICES" | grep -qi 'chiclete'; then
+  ok "Vozes Chiclete Persuasivo disponíveis no seletor"
+else
+  warn "Não confirmei as vozes Chiclete via API. Rode manualmente:"
+  warn "  curl -X POST $API/api/voice/personas/reset"
+fi
+
+log "Validando presets do Estúdio de Legendas"
+PRESETS="$(curl -s -m 30 "$API/api/legendar/presets" || true)"
+PRESET_COUNT="$(printf '%s' "$PRESETS" | grep -o '"id"' | wc -l | tr -d ' ')"
+if [ "${PRESET_COUNT:-0}" -gt 0 ]; then
+  ok "$PRESET_COUNT preset(s) de legenda carregados"
+else
+  warn "Não consegui listar os presets de legenda — confira: journalctl -u viral-api -n 80"
+fi
+
+if printf '%s' "$PRESETS" | grep -qE '"transcription": ?true'; then
+  ok "Transcrição automática (Whisper) ativa"
+else
+  warn "Transcrição automática indisponível — confira a chave Groq/OpenAI em /apis"
+fi
+
+printf '\n\033[1;32m✔ Atualização segura concluída.\033[0m\n'
+printf '   Legendas: https://viral.vr766.com/legendar\n'
+printf '   Vozes:    https://viral.vr766.com/voice-conversion\n'
+
