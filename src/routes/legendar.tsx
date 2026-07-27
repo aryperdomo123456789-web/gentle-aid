@@ -112,6 +112,7 @@ function Legendar() {
   const [saved, setSaved] = useState(false);
   const [clock, setClock] = useState({ time: 0, duration: 12, playing: false });
   const [zoom, setZoom] = useState(1);
+  const [detected, setDetected] = useState<Exclude<CaptionAspect, "auto"> | null>(null);
   const stageApi = useRef<CaptionStageApi | null>(null);
 
   const preset = presets.find((p) => p.id === style.preset) ?? presets[0] ?? null;
