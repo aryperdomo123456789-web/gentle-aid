@@ -5,7 +5,18 @@ import { useCallback, useEffect, useState } from "react";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { StatusPill } from "@/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
-import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError, type Job } from "@/lib/api";
+import { cancelJob, deleteJob, fetchJobList } from "@/features/jobs/api";
+import {
+  formatDurationMs,
+  isCancellable,
+  sourceLabel,
+  stageLabel,
+  TOOL_LABEL,
+  toolLabel,
+} from "@/features/jobs/job-utils";
+import { formatBytes, formatDateTime } from "@/lib/format";
+import { downloadUrl, friendlyError } from "@/lib/api";
+import type { Job, JobStats } from "@/types/job";
 
 export const Route = createFileRoute("/historico")({
   head: () => ({
@@ -28,12 +39,21 @@ export const Route = createFileRoute("/historico")({
   component: Historico,
 });
 
-const TOOL_LABEL: Record<string, string> = {
-  youtube: "Desvio YouTube",
-  tiktok: "Clone TikTok",
-  legendar: "Legendas",
-  voice: "Voz V2V",
-  canva: "Limpeza Canva",
+const STATUS_FILTERS: { key: string; label: string }[] = [
+  { key: "todos", label: "Todos" },
+  { key: "running", label: "Em andamento" },
+  { key: "done", label: "Concluídos" },
+  { key: "error", label: "Com erro" },
+  { key: "cancelled", label: "Cancelados" },
+];
+
+const EMPTY_STATS: JobStats = {
+  total: 0,
+  done: 0,
+  error: 0,
+  cancelled: 0,
+  running: 0,
+  bytes: 0,
 };
 
 function Historico() {
@@ -41,6 +61,9 @@ function Historico() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("todos");
+  const [statusFilter, setStatusFilter] = useState("todos");
+  const [search, setSearch] = useState("");
+  const [stats, setStats] = useState<JobStats>(EMPTY_STATS);
   const [dialog, setDialog] = useState<{ job: Job; kind: "cancel" | "delete" } | null>(null);
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
 
@@ -48,15 +71,21 @@ function Historico() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<{ jobs: Job[] }>("/api/jobs");
-      setJobs(data.jobs ?? []);
+      const data = await fetchJobList({
+        tool: filter === "todos" ? undefined : filter,
+        status: statusFilter === "todos" ? undefined : statusFilter,
+        q: search.trim() || undefined,
+      });
+      setJobs(data.jobs);
+      setStats(data.stats);
     } catch (err) {
       setError(friendlyError(err));
       setJobs([]);
+      setStats(EMPTY_STATS);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filter, statusFilter, search]);
 
   useEffect(() => {
     void load();
@@ -73,7 +102,7 @@ function Historico() {
     setBusyJobId(jobId);
     setError(null);
     try {
-      await apiPostJson(`/api/jobs/${jobId}/cancel`, {});
+      await cancelJob(jobId);
       await load();
     } catch (err) {
       setError(friendlyError(err));
@@ -87,7 +116,7 @@ function Historico() {
     setBusyJobId(jobId);
     setError(null);
     try {
-      await apiDelete(`/api/jobs/${jobId}`);
+      await deleteJob(jobId);
       await load();
     } catch (err) {
       setError(friendlyError(err));
@@ -97,7 +126,7 @@ function Historico() {
     }
   }
 
-  const visible = filter === "todos" ? jobs : jobs.filter((j) => j.tool === filter);
+  const visible = jobs;
 
   return (
     <div className="min-h-screen">
