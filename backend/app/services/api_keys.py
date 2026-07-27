@@ -811,8 +811,11 @@ def autofill(force: bool = False) -> dict[str, Any]:
             if not value:
                 continue
             prefix = provider.get("prefix")
-            if prefix and not from_catalog and not value.startswith(prefix):
+            if prefix and not value.startswith(prefix):
+                # nunca importa credencial com formato incompatível (ex.: token OAuth
+                # "AQ." caindo no slot do Gemini, que exige "AIza")
                 continue
+
 
             entry = data.get(pid, {})
             entry.update({
