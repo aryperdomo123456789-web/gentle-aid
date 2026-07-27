@@ -199,6 +199,8 @@ def submit(job_id: str, work: Callable[[str], None]) -> None:
             job = get(job_id) or {}
             if job.get("status") not in {"error", "done", "cancelled"}:
                 update(job_id, status="done", message="Concluído.", progress=100, finished_at=_now())
+            elif job.get("status") == "done" and not job.get("finished_at"):
+                update(job_id, finished_at=_now())
         except JobCancelled:
             update(job_id, status="cancelled", message="Job cancelado pelo operador.", finished_at=_now())
         except Exception as exc:  # noqa: BLE001 - toda falha vira status de job
