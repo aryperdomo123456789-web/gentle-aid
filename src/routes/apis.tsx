@@ -172,7 +172,7 @@ function ApisPage() {
               chaves ficam no servidor, nunca no navegador.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => void load()}
@@ -180,6 +180,20 @@ function ApisPage() {
             >
               <RefreshCw className="size-4" aria-hidden="true" />
               Recarregar
+            </button>
+            <button
+              type="button"
+              onClick={() => void importKeys(false)}
+              disabled={importing}
+              title="Varre .env, o app antigo e configs legadas do servidor e preenche as chaves sozinho"
+              className="inline-flex items-center gap-2 rounded-xl border border-accent/50 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-accent disabled:opacity-60"
+            >
+              {importing ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <DownloadCloud className="size-4" aria-hidden="true" />
+              )}
+              Preencher automaticamente
             </button>
             <button
               type="button"
@@ -196,6 +210,13 @@ function ApisPage() {
             </button>
           </div>
         </div>
+
+        {importReport ? (
+          <p className="mb-4 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-foreground">
+            {importReport}
+          </p>
+        ) : null}
+
 
         <dl className="mb-6 grid gap-3 sm:grid-cols-3">
           <Stat label="Integrações mapeadas" value={String(providers.length)} />
