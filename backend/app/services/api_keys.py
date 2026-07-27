@@ -992,7 +992,7 @@ def sync_env(data: dict[str, dict[str, Any]] | None = None) -> str | None:
 
 
 
-def autofill(force: bool = False, repair: bool = False) -> dict[str, Any]:
+def autofill(force: bool = False, repair: bool = False, probe: bool = True) -> dict[str, Any]:
     """Preenche o cofre com chaves encontradas no ambiente e em arquivos legados."""
     harvested, sources = _collect()
 
