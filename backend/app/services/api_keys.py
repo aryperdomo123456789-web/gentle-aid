@@ -284,7 +284,15 @@ PROVIDERS: list[dict[str, Any]] = [
                 "auth": "header",
                 "header": "X-API-Key",
             },
-            # Endpoint compatível com OpenAI, quando configurado.
+            # Endpoint compatível com OpenAI, quando configurado: testa a transcrição de verdade.
+            {
+                "url": os.environ.get("WHISPER_API_BASE", "https://api.openai.com/v1").rstrip("/")
+                + "/audio/transcriptions",
+                "auth": "bearer",
+                "method": "POST",
+                "audio_probe": {"model": "whisper-1"},
+                "invalid_message": "A chave foi recusada pelo endpoint de transcrição compatível com a OpenAI.",
+            },
             {
                 "url": os.environ.get("WHISPER_API_BASE", "https://api.openai.com/v1").rstrip("/") + "/models",
                 "auth": "bearer",
