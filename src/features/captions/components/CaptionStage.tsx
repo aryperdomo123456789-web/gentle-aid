@@ -262,7 +262,8 @@ export function CaptionStage({
         </div>
 
         <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
-          {POSITION_LABEL[positionFromY(style.yPct)]} · {style.yPct}%
+          {effectiveAspect} · {POSITION_LABEL[positionFromY(style.yPct)]} · {style.yPct}%
+          {style.aspect === "auto" ? " · auto" : ""}
         </span>
       </div>
 
