@@ -102,7 +102,7 @@ function Historico() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
+      <main className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Central de Histórico</h1>
@@ -122,13 +122,13 @@ function Historico() {
           </button>
         </div>
 
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="scroll-x -mx-3 mb-6 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           {["todos", ...Object.keys(TOOL_LABEL)].map((key) => (
             <button
               key={key}
               type="button"
               onClick={() => setFilter(key)}
-              className={`rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
+              className={`min-h-10 shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
                 filter === key
                   ? "border-transparent bg-primary text-primary-foreground"
                   : "border-border bg-surface/60 text-muted-foreground hover:text-foreground"
@@ -153,16 +153,16 @@ function Historico() {
 
         <div className="space-y-3">
           {visible.map((job) => (
-            <article key={job.job_id} className="panel p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <article key={job.job_id} className="panel min-w-0 p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <p className="font-display text-sm font-semibold">
+                  <p className="font-display text-sm font-semibold break-words">
                     {TOOL_LABEL[job.tool] ?? job.tool}
-                    <span className="ml-2 font-mono text-xs text-muted-foreground">
+                    <span className="ml-2 break-all font-mono text-xs text-muted-foreground">
                       {job.job_id}
                     </span>
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="break-words text-xs text-muted-foreground">
                     {job.filename ?? "—"} · {job.created_at ?? "sem data"}
                   </p>
                   {job.source_kind || job.meta?.source_card ? (
@@ -175,7 +175,7 @@ function Historico() {
                     </p>
                   ) : null}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <StatusPill status={job.status} />
                   {job.status === "queued" || job.status === "running" ? (
                     <button
@@ -221,13 +221,13 @@ function Historico() {
                   {job.md5_before ? (
                     <div className="rounded-lg border border-border bg-background/50 px-3 py-2">
                       <dt className="text-muted-foreground">MD5 origem</dt>
-                      <dd className="truncate font-mono">{job.md5_before}</dd>
+                      <dd className="break-all font-mono">{job.md5_before}</dd>
                     </div>
                   ) : null}
                   {job.md5_after ? (
                     <div className="rounded-lg border border-border bg-background/50 px-3 py-2">
                       <dt className="text-muted-foreground">MD5 sanitizado</dt>
-                      <dd className="truncate font-mono">{job.md5_after}</dd>
+                      <dd className="break-all font-mono">{job.md5_after}</dd>
                     </div>
                   ) : null}
                 </dl>

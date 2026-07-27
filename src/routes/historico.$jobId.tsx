@@ -87,7 +87,7 @@ function JobDetail() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
+      <main className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <Link
           to="/historico"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -95,12 +95,12 @@ function JobDetail() {
           <ArrowLeft className="size-4" aria-hidden="true" /> Voltar à Central de Jobs
         </Link>
 
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-          <div>
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-xl font-bold leading-tight sm:text-2xl md:text-3xl">{job?.tool ?? "Job"}</h1>
-            <p className="font-mono text-xs text-muted-foreground">{jobId}</p>
+            <p className="break-all font-mono text-xs text-muted-foreground">{jobId}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {job?.status === "queued" || job?.status === "running" ? (
               <button
                 type="button"
@@ -131,8 +131,8 @@ function JobDetail() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="panel p-5">
+        <div className="mt-6 grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <section className="panel min-w-0 p-4 sm:p-5">
             <h2 className="mb-3 text-lg font-semibold">Prévia do vídeo</h2>
             {job ? <JobMediaPreview job={job} /> : null}
 
@@ -155,7 +155,7 @@ function JobDetail() {
             ) : null}
           </section>
 
-          <section className="panel p-5">
+          <section className="panel min-w-0 p-4 sm:p-5">
             <StatusPanel
               job={job}
               error={error}
@@ -166,8 +166,8 @@ function JobDetail() {
         </div>
 
         {auditSummary ? (
-          <section className="panel mt-6 p-5">
-            <div className="mb-3 flex items-center justify-between gap-3">
+          <section className="panel mt-6 min-w-0 p-4 sm:p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Auditoria estrutural entregue</h2>
               <span className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs font-medium text-muted-foreground">
                 relatório persistido
@@ -179,8 +179,8 @@ function JobDetail() {
           </section>
         ) : null}
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
-          <section className="panel p-5">
+        <div className="mt-6 grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <section className="panel min-w-0 p-4 sm:p-5">
             <h2 className="mb-3 text-lg font-semibold">Dados do processamento</h2>
             <dl className="grid gap-2 text-xs">
               <Row label="Status" value={job?.status} />
@@ -202,7 +202,7 @@ function JobDetail() {
             </dl>
           </section>
 
-          <section className="panel p-5">
+          <section className="panel min-w-0 p-4 sm:p-5">
             <h2 className="mb-3 text-lg font-semibold">Saídas</h2>
             {job?.outputs?.length ? (
               <ul className="space-y-2">
@@ -311,7 +311,7 @@ function formatMetaValue(value: unknown): string {
 function Row({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2">
+    <div className="flex flex-col gap-1 rounded-lg border border-border bg-background/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="truncate font-mono">{value}</dd>
     </div>
