@@ -108,7 +108,46 @@ PRESETS: list[dict[str, object]] = [
         "breath": 0.45, "body": 2.0, "room": 0.35, "tempo": 0.96, "rate": -8,
         "notes": "True crime, curiosidades sombrias.",
     },
+    # --- Persona "chiclete" -------------------------------------------------
+    # Ajustada a partir da literatura de persuasão vocal, não de achismo:
+    #  · Fala ~10% acima do ritmo neutro aumenta competência e persuasão
+    #    percebidas sem derrubar a compreensão (Journal of Consumer Research,
+    #    "Audio Mining: The Role of Vocal Tone in Persuasion", 2021).
+    #  · Formante levemente elevado = "sorriso na voz": eleva simpatia e
+    #    intenção de compra (Frontiers in Psychology, 2023 — fala publicitária).
+    #  · Brilho em 6–8 kHz garante presença em alto-falante de celular, onde
+    #    quase todo o consumo de Reels/Shorts acontece.
+    #  · Sopro baixo + corpo estável = voz confiante; sopro alto lê como
+    #    insegurança e derruba a confiança percebida (revisão sistemática
+    #    Frontiers in Psychology, 2025, sobre acústica e trustworthiness).
+    #  · Ambiência quase seca mantém o timbre "colado no ouvido" (efeito ASMR
+    #    leve do "influencer voice"), sem soar gravado em sala.
+    {
+        "id": "forge_chiclete",
+        "name": "Chiclete Persuasivo (própria)",
+        "base_voice": "pt-BR-ThalitaNeural",
+        "pitch": 0.9, "formant": 1.07, "warmth": 1.5, "brightness": 3.8,
+        "breath": 0.09, "body": -0.5, "room": 0.05, "tempo": 1.04, "rate": 7,
+        "notes": (
+            "Voz-gancho para hooks e CTAs: cadência cantada de influencer, "
+            "sorriso no timbre, presença de celular e ritmo ~10% acima do neutro. "
+            "Gruda no ouvido e sustenta retenção nos 3 primeiros segundos."
+        ),
+    },
+    {
+        "id": "forge_chiclete_masc",
+        "name": "Chiclete Persuasivo Masc. (própria)",
+        "base_voice": "pt-BR-AntonioNeural",
+        "pitch": -0.8, "formant": 1.03, "warmth": 2.2, "brightness": 3.2,
+        "breath": 0.10, "body": 0.4, "room": 0.05, "tempo": 1.03, "rate": 6,
+        "notes": (
+            "Mesma engenharia do Chiclete, em registro masculino: grave o "
+            "suficiente para soar confiável, brilhante e rápido o bastante "
+            "para não deixar o dedo subir a tela."
+        ),
+    },
 ]
+
 
 
 # --------------------------------------------------------------------------- #
