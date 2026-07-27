@@ -43,9 +43,31 @@ function labelFor(form: HTMLFormElement, el: HTMLElement, name: string): string 
   return FRIENDLY[name] ?? name;
 }
 
+const ENGINE_LABEL: Record<string, string> = {
+  forge: "Voz própria (Voice Forge)",
+  elevenlabs: "Voz realista (ElevenLabs)",
+  local: "Motor local (DSP)",
+};
+
+/** Só um dos campos de voz importa — depende do motor escolhido. */
+const VOICE_FIELD_OF_ENGINE: Record<string, string> = {
+  forge: "persona_id",
+  elevenlabs: "voice_id",
+  local: "target_voice",
+};
+
+function humanize(value: string): string {
+  return value
+    .replace(/^forge_/, "")
+    .replace(/_/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
 function readForm(form: HTMLFormElement): Entry[] {
   const out: Entry[] = [];
   const seen = new Set<string>();
+
+
 
   for (const el of Array.from(form.elements)) {
     const field = el as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
