@@ -6,7 +6,7 @@ Reels e Shorts.
 
 - **Frontend:** React 19 + TanStack Start + Tailwind v4 (dark mode nativo).
 - **Backend:** Flask em blueprints modulares + FFmpeg + yt-dlp.
-- **Servidor:** aaPanel (Nginx reverse proxy → Gunicorn :8000 e Node :3000).
+- **Servidor:** aaPanel (Nginx reverse proxy → Gunicorn :8010 e Node :3010).
 
 ## Ferramentas
 
@@ -124,7 +124,7 @@ VIRAL_STORAGE=/www/wwwroot/viral.vr766.com/fabrica_clips
 SECRET_KEY=<aleatória>
 MAX_UPLOAD_MB=1024
 VIRAL_WORKERS=2
-GUNICORN_BIND=127.0.0.1:8000
+GUNICORN_BIND=127.0.0.1:8010
 ```
 
 Chaves de provedores (OpenAI, DeepSeek, Groq, Tavily, ElevenLabs…) não precisam

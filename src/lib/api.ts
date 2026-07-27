@@ -100,7 +100,7 @@ export function downloadUrl(path: string): string {
 export function friendlyError(err: unknown): string {
   if (err instanceof ViralApiError) return err.message;
   if (err instanceof TypeError)
-    return "Não foi possível falar com o servidor. Confirme que o serviço Flask está ativo (porta 8000) atrás do Nginx.";
+    return "Não foi possível falar com o servidor. Confirme que o serviço Flask está ativo atrás do Nginx.";
   if (err instanceof Error) return err.message;
   return "Erro inesperado.";
 }
