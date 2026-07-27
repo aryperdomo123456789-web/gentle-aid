@@ -120,6 +120,7 @@ PROVIDERS: list[dict[str, Any]] = [
         "name": "Cohere",
         "category": "Rerank",
         "env": "COHERE_API_KEY",
+        "prefer_pattern": r"^cohere_",
         "docs": "https://docs.cohere.com/reference/checkapikey",
         "usage": "Reranking de candidatos de pesquisa e de trechos virais.",
         "format_hint": "Chaves de trial da Cohere não têm acesso a /v1/models; o teste usa o endpoint oficial check-api-key.",
@@ -217,6 +218,7 @@ PROVIDERS: list[dict[str, Any]] = [
         "name": "Cloudflare Workers",
         "category": "Infra",
         "env": "CLOUDFLARE_API_TOKEN",
+        "prefer_pattern": r"^cfut_",
         "docs": "https://developers.cloudflare.com/api/operations/user-api-tokens-verify-token",
         "usage": "Endpoints leves, cache e camada pública de webhooks.",
         "format_hint": "Use um API Token (Meu Perfil → API Tokens). A Global API Key antiga só é aceita junto com CLOUDFLARE_EMAIL.",
@@ -1015,6 +1017,9 @@ def autofill(force: bool = False) -> dict[str, Any]:
                 for alt, src in _ALT_CANDIDATES.get(pid, [])
                 if alt != value and (not prefix or alt.startswith(prefix))
             ]
+            prefer = provider.get("prefer_pattern")
+            if prefer:
+                pool.sort(key=lambda item: 0 if re.match(prefer, item[0]) else 1)
             if len(pool) > 1:
                 for candidate_key, candidate_origin in pool:
                     if _probe_key(provider, candidate_key):
