@@ -48,6 +48,8 @@ type Video = {
   views: number;
   views_human: string;
   url: string;
+  embed_url?: string | null;
+  thumbnail?: string | null;
   is_short: boolean;
   source: string;
 };
@@ -104,6 +106,7 @@ function RadarGlobal() {
   const [liveMode, setLiveMode] = useState(true);
   const [cloneLevel, setCloneLevel] = useState("media");
   const [cloneTarget, setCloneTarget] = useState<Video | null>(null);
+  const [watchTarget, setWatchTarget] = useState<Video | null>(null);
   const cloner = useJobRunner();
 
   const cloneVideo = useCallback(
@@ -463,6 +466,7 @@ function RadarGlobal() {
                 ...(data?.youtube_trending ?? []),
               ]}
               onClone={cloneVideo}
+              onWatch={setWatchTarget}
               busy={cloner.busy}
               activeUrl={cloneTarget?.url ?? null}
             />
@@ -533,6 +537,50 @@ function RadarGlobal() {
             />
           </section>
         ) : null}
+
+        {watchTarget ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Assistir ${watchTarget.title}`}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-4 backdrop-blur-sm"
+            onClick={() => setWatchTarget(null)}
+          >
+            <div
+              className="w-full max-w-5xl overflow-hidden rounded-3xl border border-border bg-surface shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{watchTarget.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    @{watchTarget.author} · {watchTarget.views_human} visualizações ·{" "}
+                    {watchTarget.source}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWatchTarget(null)}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-medium hover:bg-background/60"
+                >
+                  Fechar
+                </button>
+              </div>
+              <div className="bg-black">
+                <div className="aspect-video w-full">
+                  <iframe
+                    src={watchTarget.embed_url ?? watchTarget.url}
+                    title={watchTarget.title}
+                    className="h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );
@@ -541,11 +589,13 @@ function RadarGlobal() {
 function VideoList({
   videos,
   onClone,
+  onWatch,
   busy,
   activeUrl,
 }: {
   videos: Video[];
   onClone: (video: Video) => void;
+  onWatch: (video: Video) => void;
   busy: boolean;
   activeUrl: string | null;
 }) {
@@ -561,33 +611,41 @@ function VideoList({
             className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2"
           >
             <div className="min-w-0 flex-1">
-              <a
-                href={v.url}
-                target="_blank"
-                rel="noreferrer"
-                className="block truncate text-sm font-medium hover:underline"
+              <button
+                type="button"
+                onClick={() => onWatch(v)}
+                className="block truncate text-left text-sm font-medium hover:underline"
               >
                 {v.title}
-              </a>
+              </button>
               <p className="text-xs text-muted-foreground">
                 @{v.author} · {v.views_human} visualizações · {v.is_short ? "curto" : "longo"} ·{" "}
                 {v.source}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => onClone(v)}
-              disabled={busy}
-              title="Baixar, esterilizar e entregar o clone virgem"
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-primary/20 disabled:opacity-50"
-            >
-              {running ? (
-                <Loader2 className="size-3.5 animate-spin text-primary" aria-hidden="true" />
-              ) : (
-                <Wand2 className="size-3.5 text-primary" aria-hidden="true" />
-              )}
-              {running ? "Clonando…" : "Clonar"}
-            </button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onWatch(v)}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface/60"
+              >
+                Assistir
+              </button>
+              <button
+                type="button"
+                onClick={() => onClone(v)}
+                disabled={busy}
+                title="Baixar, esterilizar e entregar o clone virgem"
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-primary/20 disabled:opacity-50"
+              >
+                {running ? (
+                  <Loader2 className="size-3.5 animate-spin text-primary" aria-hidden="true" />
+                ) : (
+                  <Wand2 className="size-3.5 text-primary" aria-hidden="true" />
+                )}
+                {running ? "Clonando…" : "Clonar"}
+              </button>
+            </div>
           </li>
         );
       })}

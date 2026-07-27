@@ -234,6 +234,12 @@ def _video_from_entry(entry: dict[str, Any], origin: str) -> dict[str, Any]:
     views = int(entry.get("view_count") or 0)
     duration = int(entry.get("duration") or 0)
     vid = entry.get("id") or ""
+    url = entry.get("url") or entry.get("webpage_url") or (f"https://www.youtube.com/watch?v={vid}" if vid else "")
+    embed_url = None
+    if origin.startswith("tiktok") and vid:
+        embed_url = f"https://www.tiktok.com/player/v1/{vid}?music_info=1&description=1"
+    elif vid:
+        embed_url = f"https://www.youtube.com/embed/{vid}"
     return {
         "id": vid,
         "title": entry.get("title") or "Sem título",
@@ -243,7 +249,8 @@ def _video_from_entry(entry: dict[str, Any], origin: str) -> dict[str, Any]:
         "likes": int(entry.get("like_count") or 0),
         "duration": duration,
         "is_short": bool(duration and duration <= 60),
-        "url": entry.get("url") or entry.get("webpage_url") or (f"https://www.youtube.com/watch?v={vid}" if vid else ""),
+        "url": url,
+        "embed_url": embed_url,
         "thumbnail": (entry.get("thumbnails") or [{}])[-1].get("url") if entry.get("thumbnails") else None,
         "source": origin,
     }
