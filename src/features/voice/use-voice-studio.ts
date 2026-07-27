@@ -101,6 +101,12 @@ export function useVoiceStudio() {
   const elevenReady = catalog?.engine_ready ?? false;
   const forgeReady = (catalog?.forge_ready ?? false) && personas.length > 0;
 
+  async function syncPersonas() {
+    const data = await resetVoicePersonas();
+    setCatalog(data);
+    setPersonas(data.personas ?? []);
+  }
+
   return {
     ...runner,
     busy,
@@ -112,6 +118,7 @@ export function useVoiceStudio() {
     voices,
     elevenReady,
     forgeReady,
+    syncPersonas,
     testScript: catalog?.test_script || TEST_SCRIPT,
     maxChars: catalog?.max_tts_chars ?? 40000,
     dubReady: catalog ? catalog.dub_ready !== false : true,
