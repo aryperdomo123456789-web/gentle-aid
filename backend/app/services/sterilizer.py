@@ -325,9 +325,10 @@ def build_command(
             str(max(2, gop // 2)),
             "-sc_threshold",
             "0",
-            "-video_track_timescale",
-            identity["timescale"],
         ]
+        if mp4_family:
+            cmd += ["-video_track_timescale", identity["timescale"]]
+
 
     if info.has_audio:
         cmd += ["-c:a", "aac", "-b:a", f"{rng.choice((128, 160, 192))}k", "-ar", "48000"]
@@ -362,7 +363,10 @@ def build_command(
     if info.has_audio:
         cmd += ["-metadata:s:a:0", f"handler_name={identity['handler_audio']}"]
 
-    cmd += ["-movflags", "+faststart", "-fflags", "+bitexact", str(dst)]
+    if mp4_family:
+        cmd += ["-movflags", "+faststart"]
+    cmd.append(str(dst))
+
 
     report = SterilizationReport(
         level=level,
