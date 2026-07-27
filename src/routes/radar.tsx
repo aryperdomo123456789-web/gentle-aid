@@ -148,7 +148,7 @@ function RadarGlobal() {
   const [cloneLevel, setCloneLevel] = useState("auto");
   const [cloneTarget, setCloneTarget] = useState<Video | null>(null);
   const [watchTarget, setWatchTarget] = useState<Video | null>(null);
-  const cloner = useJobRunner();
+  const cloner = useJobRunner("radar");
 
   const cloneVideo = useCallback(
     (video: Video) => {
@@ -590,6 +590,8 @@ function RadarGlobal() {
               error={cloner.error}
               busy={cloner.busy}
               emptyHint="Aguardando o download e a esterilização do viral selecionado…"
+              onCancel={cloner.cancel}
+              onDelete={cloner.remove}
             />
           </section>
         ) : null}

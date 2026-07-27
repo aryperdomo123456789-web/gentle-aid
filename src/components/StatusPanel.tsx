@@ -1,5 +1,19 @@
-import { CheckCircle2, CircleAlert, Download, Loader2, ShieldCheck, Terminal } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import {
+  CheckCircle2,
+  CircleAlert,
+  Download,
+  ExternalLink,
+  Loader2,
+  ShieldCheck,
+  StopCircle,
+  Terminal,
+  Trash2,
+} from "lucide-react";
+import { useState } from "react";
 
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
+import { formatDurationMs, stageLabel } from "@/features/jobs/job-utils";
 import { downloadUrl, type Job, type SterilizationReport } from "@/lib/api";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -16,15 +30,24 @@ export function StatusPanel({
   error,
   busy,
   emptyHint,
+  onCancel,
+  onDelete,
 }: {
   job: Job | null;
   error: string | null;
   busy: boolean;
   emptyHint: string;
+  /** Cancela o job ativo no servidor (mostra o botão quando informado). */
+  onCancel?: () => Promise<void> | void;
+  /** Apaga o job e o rastro de arquivos no servidor. */
+  onDelete?: () => Promise<void> | void;
 }) {
   const status = error ? "error" : busy ? "running" : (job?.status ?? "idle");
   const lines = job?.log ?? [];
   const auditSummary = job?.audit_summary ?? job?.sterilization?.audit_summary ?? null;
+  const [dialog, setDialog] = useState<"cancel" | "delete" | null>(null);
+  const [acting, setActing] = useState(false);
+  const live = job?.status === "running" || job?.status === "queued";
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -35,6 +58,49 @@ export function StatusPanel({
         </h2>
         <StatusPill status={status} />
       </div>
+
+      {job?.job_id ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background/50 px-3 py-2 text-[11px] text-muted-foreground">
+          <span className="break-all font-mono">{job.job_id}</span>
+          <span aria-hidden="true">·</span>
+          <span>Etapa: {stageLabel(job.stage) ?? "—"}</span>
+          <span aria-hidden="true">·</span>
+          <span>{formatDurationMs(job.duration_ms)}</span>
+          <Link
+            to="/historico/$jobId"
+            params={{ jobId: job.job_id }}
+            className="ml-auto inline-flex items-center gap-1 font-semibold text-primary"
+          >
+            Rastro completo
+            <ExternalLink className="size-3" aria-hidden="true" />
+          </Link>
+        </div>
+      ) : null}
+
+      {job?.job_id && (onCancel || onDelete) ? (
+        <div className="flex flex-wrap gap-2">
+          {onCancel && live ? (
+            <button
+              type="button"
+              onClick={() => setDialog("cancel")}
+              disabled={acting}
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/60 px-4 text-xs font-semibold disabled:opacity-50"
+            >
+              <StopCircle className="size-4" aria-hidden="true" /> Cancelar job
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={() => setDialog("delete")}
+              disabled={acting}
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-destructive/50 bg-destructive/10 px-4 text-xs font-semibold disabled:opacity-50"
+            >
+              <Trash2 className="size-4 text-destructive" aria-hidden="true" /> Apagar job
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? (
         <p className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-foreground">
@@ -48,6 +114,7 @@ export function StatusPanel({
           {job.message}
         </p>
       ) : null}
+
 
       {auditSummary ? (
         <section className="rounded-xl border border-primary/30 bg-primary/5 p-3">
@@ -102,9 +169,37 @@ export function StatusPanel({
         <Download className="size-4" aria-hidden="true" />
         {job?.download_url ? "Baixar arquivo final" : "Download indisponível"}
       </a>
+
+      <ConfirmActionDialog
+        open={Boolean(dialog)}
+        onOpenChange={(open) => {
+          if (!open) setDialog(null);
+        }}
+        title={dialog === "cancel" ? "Cancelar este job?" : "Apagar este job?"}
+        description={
+          dialog === "cancel"
+            ? `O processamento de ${job?.filename ?? job?.job_id} para imediatamente e o job fica marcado como cancelado.`
+            : `Isso remove ${job?.filename ?? job?.job_id}, os arquivos gerados e o rastro do servidor. A trilha de auditoria é preservada.`
+        }
+        confirmLabel={dialog === "cancel" ? "Sim, cancelar" : "Sim, apagar"}
+        destructive={dialog === "delete"}
+        busy={acting}
+        onConfirm={async () => {
+          const current = dialog;
+          setDialog(null);
+          setActing(true);
+          try {
+            if (current === "cancel") await onCancel?.();
+            else await onDelete?.();
+          } finally {
+            setActing(false);
+          }
+        }}
+      />
     </div>
   );
 }
+
 
 function HashRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;

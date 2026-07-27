@@ -44,7 +44,7 @@ const NICHOS = [
 ];
 
 function YoutubeBypass() {
-  const { job, error, busy, run } = useJobRunner();
+  const { job, error, busy, run, cancel, remove } = useJobRunner("youtube");
   const [links, setLinks] = useState("");
   const [nicho, setNicho] = useState(NICHOS[0]);
   const [keyword, setKeyword] = useState("");
@@ -156,6 +156,8 @@ function YoutubeBypass() {
           error={error}
           busy={busy}
           emptyHint="Nenhum job em execução. Envie um lote para acompanhar o log do FFmpeg em tempo real."
+          onCancel={cancel}
+          onDelete={remove}
         />
       }
       below={

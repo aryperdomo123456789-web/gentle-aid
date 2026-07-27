@@ -32,7 +32,7 @@ export const Route = createFileRoute("/legendar")({
 });
 
 function Legendar() {
-  const { job, error, busy, run } = useJobRunner();
+  const { job, error, busy, run, cancel, remove } = useJobRunner("legendar");
   const [hasFile, setHasFile] = useState(false);
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -120,6 +120,8 @@ function Legendar() {
           error={error}
           busy={busy}
           emptyHint="Envie um vídeo para acompanhar a renderização das legendas."
+          onCancel={cancel}
+          onDelete={remove}
         />
       }
       below={

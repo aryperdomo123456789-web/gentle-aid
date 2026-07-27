@@ -33,7 +33,7 @@ export const Route = createFileRoute("/canva-cleaner")({
 });
 
 function CanvaCleaner() {
-  const { job, error, busy, run } = useJobRunner();
+  const { job, error, busy, run, cancel, remove } = useJobRunner("canva");
   const [hasFile, setHasFile] = useState(false);
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -103,6 +103,8 @@ function CanvaCleaner() {
           error={error}
           busy={busy}
           emptyHint="Envie um vídeo para acompanhar a limpeza, o re-encode e os hashes MD5 antes/depois."
+          onCancel={cancel}
+          onDelete={remove}
         />
       }
       below={
