@@ -13,13 +13,13 @@ import { apiPostForm, type Job } from "@/lib/api";
 export const Route = createFileRoute("/canva-cleaner")({
   head: () => ({
     meta: [
-      { title: "Canva Cleaner — recodificação e limpeza pós-Canva" },
+      { title: "Limpeza Canva — recodificação e limpeza pós-Canva" },
       {
         name: "description",
         content:
           "Remova metadados ISO/Canva, recodifique em H.264/AAC e gere um hash MD5 novo para vídeos exportados de editores online.",
       },
-      { property: "og:title", content: "Canva Cleaner — limpeza pós-Canva" },
+      { property: "og:title", content: "Limpeza Canva — limpeza pós-Canva" },
       {
         property: "og:description",
         content:
@@ -115,7 +115,7 @@ function CanvaCleaner() {
           />
           <ToolHistory
             tool="canva"
-            title="Histórico · Canva Cleaner"
+            title="Histórico · Limpeza Canva"
             refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
           />
         </div>

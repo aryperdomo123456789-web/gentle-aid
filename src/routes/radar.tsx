@@ -148,9 +148,8 @@ function RadarGlobal() {
           </span>
           <h1 className="mt-3 text-3xl font-bold md:text-4xl">Radar Global de Tendências</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Sinais reais em tempo real — buscas em alta no Google Trends, vídeos com tração no
-            YouTube e TikTok e pesquisa web (Tavily/Exa) — mais a previsão de nichos que devem
-            estourar nos próximos meses.
+            Sinais reais em tempo real - buscas em alta, vídeos com tração e pesquisa na web
+            (Tavily/Exa) - além da previsão de nichos mais promissores.
           </p>
         </header>
 
@@ -189,7 +188,7 @@ function RadarGlobal() {
             className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
-            {loading ? "Varrendo…" : "Varrer radar"}
+            {loading ? "Varredura em andamento…" : "Varrer radar"}
           </button>
           <button
             type="button"
@@ -223,7 +222,7 @@ function RadarGlobal() {
                     : "border-border bg-surface/60 text-muted-foreground"
                 }`}
               >
-                {s.name}: {s.ok ? `${s.items} sinais` : "off"}
+                {s.name}: {s.ok ? `${s.items} sinais` : "desativado"}
               </span>
             ))}
           </div>
@@ -251,7 +250,7 @@ function RadarGlobal() {
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {f.horizonte} · {f.formato ?? "short"}
+                    {f.horizonte} · {f.formato ?? "curto"}
                   </p>
                   <p className="mt-2 text-xs text-muted-foreground">{f.porque}</p>
                   {f.angulos?.length ? (
@@ -431,7 +430,7 @@ function VideoList({
   activeUrl: string | null;
 }) {
   if (!videos.length)
-    return <p className="text-sm text-muted-foreground">Rode o radar para listar virais.</p>;
+    return <p className="text-sm text-muted-foreground">Rode o radar para listar os virais.</p>;
   return (
     <ul className="space-y-2">
       {videos.slice(0, 20).map((v, i) => {
@@ -451,7 +450,8 @@ function VideoList({
                 {v.title}
               </a>
               <p className="text-xs text-muted-foreground">
-                @{v.author} · {v.views_human} views · {v.is_short ? "short" : "longo"} · {v.source}
+                @{v.author} · {v.views_human} visualizações · {v.is_short ? "curto" : "longo"} ·{" "}
+                {v.source}
               </p>
             </div>
             <button

@@ -28,11 +28,11 @@ export const Route = createFileRoute("/historico")({
 });
 
 const TOOL_LABEL: Record<string, string> = {
-  youtube: "YouTube Bypass",
-  tiktok: "TikTok Clone",
+  youtube: "Desvio YouTube",
+  tiktok: "Clone TikTok",
   legendar: "Legendas",
   voice: "Voz V2V",
-  canva: "Canva Cleaner",
+  canva: "Limpeza Canva",
 };
 
 function Historico() {

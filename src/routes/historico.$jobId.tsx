@@ -10,13 +10,13 @@ import { API_BASE, apiGet, downloadUrl, friendlyError, type Job } from "@/lib/ap
 export const Route = createFileRoute("/historico/$jobId")({
   head: () => ({
     meta: [
-      { title: "Detalhe do Job — Jobs Center" },
+      { title: "Detalhe do Job — Central de Jobs" },
       {
         name: "description",
         content:
           "Timeline completa do job: vídeo final assistível, ficha da origem, relatório de esterilização, hashes e download.",
       },
-      { property: "og:title", content: "Detalhe do Job — Jobs Center" },
+      { property: "og:title", content: "Detalhe do Job — Central de Jobs" },
       {
         property: "og:description",
         content: "Prévia do vídeo, metadados da origem e relatório de esterilização do job.",
@@ -72,7 +72,7 @@ function JobDetail() {
           to="/historico"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="size-4" aria-hidden="true" /> Voltar ao Jobs Center
+          <ArrowLeft className="size-4" aria-hidden="true" /> Voltar à Central de Jobs
         </Link>
 
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">

@@ -14,13 +14,13 @@ import type { LucideIcon } from "lucide-react";
 type Tool = { to: string; label: string; icon: LucideIcon };
 
 export const TOOLS: Tool[] = [
-  { to: "/", label: "YouTube Bypass", icon: Download },
-  { to: "/tiktok", label: "TikTok Dashboard", icon: Music2 },
+  { to: "/", label: "Desvio YouTube", icon: Download },
+  { to: "/tiktok", label: "Painel TikTok", icon: Music2 },
   { to: "/legendar", label: "Legendar", icon: Captions },
   { to: "/voice-conversion", label: "Voz V2V", icon: AudioLines },
-  { to: "/canva-cleaner", label: "Canva Cleaner", icon: Sparkles },
+  { to: "/canva-cleaner", label: "Limpeza Canva", icon: Sparkles },
   { to: "/radar", label: "Radar Global", icon: Radar },
-  { to: "/historico", label: "Jobs Center", icon: History },
+  { to: "/historico", label: "Central de Jobs", icon: History },
   { to: "/apis", label: "Central de APIs", icon: KeyRound },
 ];
 
@@ -41,7 +41,7 @@ export function TopNav() {
               Ecossistema <span className="text-gradient-viral">Viral</span>
             </p>
             <p className="text-xs text-muted-foreground">
-              Pipeline FFmpeg · bypass algorítmico · aaPanel
+              Pipeline FFmpeg · desvio algorítmico · aaPanel
             </p>
           </div>
         </div>

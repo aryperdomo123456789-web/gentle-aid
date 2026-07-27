@@ -2,7 +2,7 @@ import { Field, SelectInput } from "@/components/form";
 
 /** Níveis de esterilização compartilhados por todas as ferramentas. */
 export const MUTATION_LEVELS = [
-  { value: "off", label: "Off — só limpeza de metadados" },
+  { value: "off", label: "Desativado — só limpeza de metadados" },
   { value: "leve", label: "Leve — mutação mínima, qualidade máxima" },
   { value: "media", label: "Média — recomendado (crop, EQ, PTS, áudio)" },
   { value: "agressiva", label: "Agressiva — + ruído temporal e filtros de banda" },

@@ -29,9 +29,9 @@ type SearchResponse = {
 const REGIONS = ["BR", "US", "MX", "PT", "ES", "FR", "DE", "IT", "JP", "ID"];
 
 const PLATFORMS = [
-  { value: "auto", label: "Auto (TikTok + YouTube)" },
+  { value: "auto", label: "Automático (TikTok + YouTube)" },
   { value: "tiktok", label: "TikTok" },
-  { value: "youtube", label: "YouTube / Shorts" },
+  { value: "youtube", label: "YouTube / Curtos" },
 ];
 
 /**
@@ -168,7 +168,7 @@ export function DiscoveryPanel({
                       </p>
                     </div>
                     <span className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold">
-                      {card.views_label} views
+                      {card.views_label} visualizações
                     </span>
                   </div>
 
@@ -267,7 +267,7 @@ export function DiscoveryPanel({
               )}
             </div>
             <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-              <span>{player.views_label} views</span>
+              <span>{player.views_label} visualizações</span>
               <span>❤ {player.likes_label}</span>
               <span>💬 {player.comments_label}</span>
               <span>↗ {player.shares_label}</span>

@@ -121,7 +121,7 @@ export function JobMediaPreview({ job }: { job: Job }) {
           <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
             <Meta label="Plataforma" value={source.platform} />
             <Meta label="Autor" value={source.author ?? source.nickname} />
-            <Meta label="Views" value={source.views_label} />
+            <Meta label="Visualizações" value={source.views_label} />
             <Meta label="Curtidas" value={source.likes_label} />
             <Meta label="Comentários" value={source.comments_label} />
             <Meta label="Compartilhamentos" value={source.shares_label} />

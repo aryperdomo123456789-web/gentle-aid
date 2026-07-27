@@ -13,13 +13,13 @@ import { apiGet, apiPostJson, friendlyError, type Job } from "@/lib/api";
 export const Route = createFileRoute("/tiktok")({
   head: () => ({
     meta: [
-      { title: "TikTok Dashboard — Radar de tendências e clonagem 1:1" },
+      { title: "Painel TikTok — Radar de tendências e clonagem 1:1" },
       {
         name: "description",
         content:
           "Radar de tendências do TikTok, extração de dados de vídeos virais e clonagem 1:1 com esterilização de metadados.",
       },
-      { property: "og:title", content: "TikTok Dashboard — Radar de tendências" },
+      { property: "og:title", content: "Painel TikTok — Radar de tendências" },
       {
         property: "og:description",
         content: "Extraia métricas de virais e clone 1:1 com bypass de metadados.",
@@ -82,7 +82,7 @@ function TikTokDashboard() {
   return (
     <ToolShell
       badge="Ferramenta 2 · /api/tiktok"
-      title="TikTok Dashboard"
+      title="Painel TikTok"
       subtitle="Radar de tendências por nicho e região, extração de métricas e clonagem 1:1 de virais com esterilização completa de metadados."
       left={
         <div className="space-y-6">
@@ -137,8 +137,8 @@ function TikTokDashboard() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{t.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        @{t.author} · {t.views.toLocaleString("pt-BR")} views ·{" "}
-                        {t.likes.toLocaleString("pt-BR")} likes
+                        @{t.author} · {t.views.toLocaleString("pt-BR")} visualizações ·{" "}
+                        {t.likes.toLocaleString("pt-BR")} curtidas
                       </p>
                     </div>
                     <button
@@ -213,7 +213,7 @@ function TikTokDashboard() {
           />
           <ToolHistory
             tool="tiktok"
-            title="Histórico · TikTok Clone"
+            title="Histórico · Clone TikTok"
             refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
           />
         </div>

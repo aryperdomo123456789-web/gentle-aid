@@ -13,13 +13,13 @@ import { apiPostJson, type Job } from "@/lib/api";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Ecossistema Viral — Download e Bypass de YouTube" },
+      { title: "Ecossistema Viral — Desvio e download do YouTube" },
       {
         name: "description",
         content:
           "Baixe Shorts e vídeos longos do YouTube em lote, esterilize metadados e aplique mutação estrutural com FFmpeg para bypass de algoritmo.",
       },
-      { property: "og:title", content: "Ecossistema Viral — Download e Bypass de YouTube" },
+      { property: "og:title", content: "Ecossistema Viral — Desvio e download do YouTube" },
       {
         property: "og:description",
         content:
@@ -85,7 +85,7 @@ function YoutubeBypass() {
   return (
     <ToolShell
       badge="Ferramenta 1 · /api/youtube/bypass"
-      title="Download e Bypass Universal de YouTube"
+      title="Download e desvio universal do YouTube"
       subtitle="Cole links de Shorts ou vídeos longos, escolha o nicho e dispare o bypass em lote: download, re-encode H.264/AAC, remoção de metadados e micro-mutações temporais."
       left={
         <form onSubmit={onSubmit} className="space-y-5">
@@ -168,7 +168,7 @@ function YoutubeBypass() {
           />
           <ToolHistory
             tool="youtube"
-            title="Histórico · YouTube Bypass"
+            title="Histórico · Desvio YouTube"
             refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
           />
         </div>
