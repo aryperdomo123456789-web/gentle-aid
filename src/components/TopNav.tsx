@@ -27,7 +27,7 @@ export const TOOLS: Tool[] = [
 export function TopNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 md:px-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 md:px-8">
         <div className="flex items-center gap-3">
           <span
             className="flex size-9 items-center justify-center rounded-xl text-sm font-bold text-primary-foreground"

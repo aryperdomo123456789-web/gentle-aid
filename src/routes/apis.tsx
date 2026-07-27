@@ -201,7 +201,7 @@ function ApisPage() {
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+      <main className="mx-auto w-full max-w-[1600px] px-4 py-8 md:px-8">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-foreground">
@@ -383,7 +383,7 @@ function ApisPage() {
           </div>
         )}
       </main>
-      <footer className="mx-auto max-w-7xl px-4 pb-10 text-xs text-muted-foreground md:px-8">
+      <footer className="mx-auto w-full max-w-[1600px] px-4 pb-10 text-xs text-muted-foreground md:px-8">
         Chaves gravadas em{" "}
         <code className="font-mono">fabrica_clips/_config/api_keys.json</code> (permissão 600, fora
         do Git). Variáveis de ambiente continuam valendo como fallback.
