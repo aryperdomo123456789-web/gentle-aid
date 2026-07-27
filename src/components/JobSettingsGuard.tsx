@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * salvar de novo — assim nenhum job caro roda com o preset errado.
  */
 
-type Entry = { name: string; label: string; value: string };
+export type Entry = { name: string; label: string; value: string };
 
 /** Nomes amigáveis para campos ocultos (que não têm <label>). */
 const FRIENDLY: Record<string, string> = {
