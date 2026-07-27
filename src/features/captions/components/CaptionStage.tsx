@@ -150,10 +150,10 @@ export function CaptionStage({
   const boxed = view?.boxed || animation === "boxed";
 
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", className)}>
       <div
         ref={stageRef}
-        className="relative aspect-[9/16] w-full max-h-[62vh] overflow-hidden rounded-2xl border border-border bg-black mx-auto"
+        className="relative mx-auto aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden rounded-2xl border border-border bg-black shadow-2xl"
         style={{ backgroundImage: poster && !src ? `url(${poster})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }}
       >
         {src ? (
