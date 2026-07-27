@@ -87,6 +87,20 @@ function RadarGlobal() {
   const [loading, setLoading] = useState(false);
   const [forecasting, setForecasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cloneLevel, setCloneLevel] = useState("media");
+  const [cloneTarget, setCloneTarget] = useState<Video | null>(null);
+  const cloner = useJobRunner();
+
+  const cloneVideo = useCallback(
+    (video: Video) => {
+      setCloneTarget(video);
+      void cloner.run(() =>
+        apiPostJson<Job>("/api/tiktok/clone", { url: video.url, intensity: cloneLevel }),
+      );
+    },
+    [cloneLevel, cloner],
+  );
+
 
   const load = useCallback(
     async (refresh = false) => {
