@@ -764,10 +764,13 @@ def _scan_paths() -> list:
                     except OSError:
                         continue
                 if len(found) > 4000:
+                    _scan_cache.update({"at": now, "paths": found})
                     return found
         except OSError:
             continue
+    _scan_cache.update({"at": now, "paths": found})
     return found
+
 
 
 def _harvest(text: str) -> dict[str, str]:
