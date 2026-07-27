@@ -133,6 +133,55 @@ def personas_delete(persona_id: str):
     return jsonify(ok=True)
 
 
+@bp.post("/personas/variants")
+def personas_variants():
+    """Gera vários modelos de voz derivados de uma mesma matéria-prima (sem salvar)."""
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    if not isinstance(payload, dict) or not payload:
+        return jsonify(error="Envie a voz base para gerar os modelos."), 400
+    payload = dict(payload)
+    base_payload = payload.get("base") if isinstance(payload.get("base"), dict) else payload
+    base_payload = dict(base_payload)
+    base_payload.setdefault("id", "forge_base")
+    base_payload.setdefault("name", "Voz base")
+    try:
+        base = voice_forge._from_dict(base_payload)
+        variants = voice_forge.generate_variants(
+            base,
+            count=int(payload.get("count") or 6),
+            intensity=float(payload.get("intensity") or 0.6),
+            seed=str(payload.get("seed") or "") or None,
+            base_voices=[str(v) for v in (payload.get("base_voices") or []) if v],
+        )
+    except (TypeError, ValueError) as exc:
+        return jsonify(error=f"Parâmetros inválidos: {exc}"), 400
+
+    if payload.get("save"):
+        variants = voice_forge.save_many(variants)
+
+    return jsonify(
+        saved=bool(payload.get("save")),
+        archetypes=voice_forge.ARCHETYPES,
+        variants=[v.dict() for v in variants],
+    )
+
+
+@bp.post("/personas/bulk")
+def personas_bulk():
+    """Salva de uma vez um conjunto de modelos gerados."""
+    payload = request.get_json(silent=True) or {}
+    items = payload.get("personas")
+    if not isinstance(items, list) or not items:
+        return jsonify(error="Envie a lista de vozes para salvar."), 400
+    try:
+        saved = voice_forge.save_many([i for i in items if isinstance(i, dict)])
+    except (TypeError, ValueError) as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(personas=[p.dict() for p in saved]), 201
+
+
+
+
 @bp.post("/personas/preview")
 def personas_preview():
     """Gera uma amostra curta (síncrona) da voz própria para escuta imediata."""
