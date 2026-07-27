@@ -11,7 +11,8 @@ if [ "${VIRAL_BACKUP_MIRROR:-1}" = "0" ]; then
   exit 0
 fi
 
-exec 9>"$APP_DIR/.viral-backup-mirror.lock"
+LOCK_FILE="${TMPDIR:-/tmp}/viral-backup-mirror.lock"
+exec 9>"$LOCK_FILE"
 flock -n 9 || exit 0
 
 cd "$APP_DIR"
