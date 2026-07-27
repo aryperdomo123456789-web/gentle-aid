@@ -699,7 +699,12 @@ _MAX_FILE_BYTES = 2_000_000
 
 
 def _scan_roots() -> list:
-    """Diretórios onde as chaves podem estar (app atual, app legado, extras)."""
+    """Diretórios onde as chaves podem estar (app atual, app legado, extras).
+
+    `/root` e outros caminhos fora do app NÃO entram por padrão: a varredura de
+    home do root deixava o boot do Gunicorn lentíssimo. Para incluir extras use
+    `VIRAL_KEY_SCAN_PATHS=/root:/outro/caminho` no .env.
+    """
     from pathlib import Path
 
     extra = os.environ.get("VIRAL_KEY_SCAN_PATHS", "")
@@ -709,7 +714,6 @@ def _scan_roots() -> list:
         Path("/www/wwwroot/viral.vr766.com"),
         Path("/www/wwwroot/viral.vr766.com.bak"),
         Path("/www/wwwroot/viral"),
-        Path("/root"),
     ]
     roots += [Path(p) for p in extra.split(":") if p.strip()]
     seen, out = set(), []
@@ -726,12 +730,21 @@ def _scan_roots() -> list:
     return out
 
 
+_scan_cache: dict[str, Any] = {"at": 0.0, "paths": []}
+_SCAN_TTL = 120.0
+
+
 def _scan_paths() -> list:
     """Varredura recursiva (profundidade limitada) por arquivos de configuração."""
     from pathlib import Path
 
+    now = time.time()
+    if _scan_cache["paths"] and now - _scan_cache["at"] < _SCAN_TTL:
+        return _scan_cache["paths"]
+
     found: list[Path] = []
     for root in _scan_roots():
+
         base_depth = len(root.parts)
         try:
             for dirpath, dirnames, filenames in os.walk(root):
