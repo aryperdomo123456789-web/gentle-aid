@@ -139,9 +139,14 @@ function VoiceStudio() {
   function submit(path: string) {
     return (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      run(() => apiPostForm<Job>(path, new FormData(e.currentTarget)));
+      const form = new FormData(e.currentTarget);
+      const card = path.endsWith("/dub") ? dubCard : mediaCard;
+      const url = String(form.get("url") || "").trim();
+      if (card && card.url === url) form.set("source_card", JSON.stringify(card));
+      run(() => apiPostForm<Job>(path, form));
     };
   }
+
 
   const mediaPicker = (
     <VoicePicker
