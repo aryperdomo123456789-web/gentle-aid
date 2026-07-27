@@ -5,7 +5,7 @@ import type { InspectedCard } from "@/components/LinkInspector";
 import type { Persona } from "@/components/VoiceForgePanel";
 import { TEST_SCRIPT, type VoiceSelection } from "@/components/VoicePicker";
 import { useJobRunner } from "@/hooks/use-job-runner";
-import { fetchVoiceCatalog, submitVoiceJob, VOICE_ENDPOINT } from "./api";
+import { fetchVoiceCatalog, resetVoicePersonas, submitVoiceJob, VOICE_ENDPOINT } from "./api";
 import type { VoiceCatalog, VoiceMode } from "./types";
 
 const DEFAULT_SELECTION: VoiceSelection = {
