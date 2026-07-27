@@ -403,11 +403,11 @@ def convert():
         try:
             src = save_upload(upload, job["job_id"], MEDIA_EXT)
         except ValidationError as exc:
-            jobs.update(job["job_id"], status="error", message=str(exc))
+            jobs.fail(job["job_id"], str(exc))
             return jsonify(error=str(exc)), 400
     elif not ingest.is_supported_url(source_url):
         msg = "Envie um vídeo/áudio ou selecione um conteúdo na pesquisa."
-        jobs.update(job["job_id"], status="error", message=msg)
+        jobs.fail(job["job_id"], msg)
         return jsonify(error=msg), 400
 
     settings = _settings_from_form()
@@ -523,7 +523,7 @@ def _work_convert(
     if not info.has_audio:
         raise RuntimeError("O arquivo enviado não tem trilha de áudio para converter.")
 
-    jobs.update(job_id, progress=15)
+    jobs.stage(job_id, "preparando", "Áudio de origem validado.", progress=15)
 
     if engine == "forge" and persona is not None:
         # Voz própria por DSP: reescreve o timbre do narrador original mantendo
@@ -573,7 +573,7 @@ def _work_convert(
     except VoiceEngineError as exc:
         raise RuntimeError(str(exc)) from exc
 
-    jobs.update(job_id, progress=88)
+    jobs.stage(job_id, "mixando", "Montando a trilha dublada com a mídia final.", progress=88)
 
     # Acabamento opcional: a persona vira uma assinatura própria por cima da voz
     # realista, o que também descaracteriza o timbre original do provedor.
@@ -610,7 +610,7 @@ def _work_tts(
     settings: Settings,
     persona: "voice_forge.Persona | None" = None,
 ) -> None:
-    jobs.update(job_id, progress=12)
+    jobs.stage(job_id, "narrando", "Sintetizando a narração.", progress=12)
     work_dir = output_path("voice", job_id, ".tmp").parent
     narrated = work_dir / f"{job_id}_tts.wav"
 
@@ -633,7 +633,7 @@ def _work_tts(
             raise RuntimeError(str(exc)) from exc
         source_label = "voz realista"
 
-    jobs.update(job_id, progress=90)
+    jobs.stage(job_id, "esterilizando", "Aplicando assinatura acústica e removendo rastro.", progress=90)
     chain = voice_forge.filter_chain(persona, preserve_duration=False) if persona else None
     dst = output_path("voice", job_id, FORMATS[fmt])
     report = media.sterilize(
@@ -719,11 +719,11 @@ def dub():
         try:
             src = save_upload(upload, job["job_id"], MEDIA_EXT)
         except ValidationError as exc:
-            jobs.update(job["job_id"], status="error", message=str(exc))
+            jobs.fail(job["job_id"], str(exc))
             return jsonify(error=str(exc)), 400
     elif not ingest.is_supported_url(source_url):
         msg = "Cole o link do YouTube/TikTok ou envie um arquivo para dublar."
-        jobs.update(job["job_id"], status="error", message=msg)
+        jobs.fail(job["job_id"], msg)
         return jsonify(error=msg), 400
 
     jobs.submit(
@@ -755,7 +755,7 @@ def _work_dub(
     if not info.has_audio:
         raise RuntimeError("Esse conteúdo não tem trilha de áudio para dublar.")
 
-    jobs.update(job_id, progress=10)
+    jobs.stage(job_id, "transcrevendo", "Ouvindo o áudio original para mapear a narrativa.", progress=10)
     try:
         segments, detected = transcribe.transcribe(src, job_id=job_id, language=source_lang)
     except TranscribeError as exc:
@@ -781,7 +781,7 @@ def _work_dub(
         signed = work_dir / f"{job_id}_dubvoice.wav"
         track = dubbing.apply_persona(track, signed, persona, job_id)
 
-    jobs.update(job_id, progress=88)
+    jobs.stage(job_id, "mixando", "Montando a trilha dublada com a mídia final.", progress=88)
     voice_label = persona.name if persona else voice_id
 
     if keep_video and info.has_video:

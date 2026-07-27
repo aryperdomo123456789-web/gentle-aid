@@ -5,7 +5,18 @@ import { useCallback, useEffect, useState } from "react";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { StatusPill } from "@/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
-import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError, type Job } from "@/lib/api";
+import { cancelJob, deleteJob, fetchJobList } from "@/features/jobs/api";
+import {
+  formatDurationMs,
+  isCancellable,
+  sourceLabel,
+  stageLabel,
+  TOOL_LABEL,
+  toolLabel,
+} from "@/features/jobs/job-utils";
+import { formatBytes, formatDateTime } from "@/lib/format";
+import { downloadUrl, friendlyError } from "@/lib/api";
+import type { Job, JobStats } from "@/types/job";
 
 export const Route = createFileRoute("/historico")({
   head: () => ({
@@ -28,12 +39,21 @@ export const Route = createFileRoute("/historico")({
   component: Historico,
 });
 
-const TOOL_LABEL: Record<string, string> = {
-  youtube: "Desvio YouTube",
-  tiktok: "Clone TikTok",
-  legendar: "Legendas",
-  voice: "Voz V2V",
-  canva: "Limpeza Canva",
+const STATUS_FILTERS: { key: string; label: string }[] = [
+  { key: "todos", label: "Todos" },
+  { key: "running", label: "Em andamento" },
+  { key: "done", label: "Concluídos" },
+  { key: "error", label: "Com erro" },
+  { key: "cancelled", label: "Cancelados" },
+];
+
+const EMPTY_STATS: JobStats = {
+  total: 0,
+  done: 0,
+  error: 0,
+  cancelled: 0,
+  running: 0,
+  bytes: 0,
 };
 
 function Historico() {
@@ -41,6 +61,9 @@ function Historico() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("todos");
+  const [statusFilter, setStatusFilter] = useState("todos");
+  const [search, setSearch] = useState("");
+  const [stats, setStats] = useState<JobStats>(EMPTY_STATS);
   const [dialog, setDialog] = useState<{ job: Job; kind: "cancel" | "delete" } | null>(null);
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
 
@@ -48,15 +71,21 @@ function Historico() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<{ jobs: Job[] }>("/api/jobs");
-      setJobs(data.jobs ?? []);
+      const data = await fetchJobList({
+        tool: filter === "todos" ? undefined : filter,
+        status: statusFilter === "todos" ? undefined : statusFilter,
+        q: search.trim() || undefined,
+      });
+      setJobs(data.jobs);
+      setStats(data.stats);
     } catch (err) {
       setError(friendlyError(err));
       setJobs([]);
+      setStats(EMPTY_STATS);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filter, statusFilter, search]);
 
   useEffect(() => {
     void load();
@@ -73,7 +102,7 @@ function Historico() {
     setBusyJobId(jobId);
     setError(null);
     try {
-      await apiPostJson(`/api/jobs/${jobId}/cancel`, {});
+      await cancelJob(jobId);
       await load();
     } catch (err) {
       setError(friendlyError(err));
@@ -87,7 +116,7 @@ function Historico() {
     setBusyJobId(jobId);
     setError(null);
     try {
-      await apiDelete(`/api/jobs/${jobId}`);
+      await deleteJob(jobId);
       await load();
     } catch (err) {
       setError(friendlyError(err));
@@ -97,7 +126,7 @@ function Historico() {
     }
   }
 
-  const visible = filter === "todos" ? jobs : jobs.filter((j) => j.tool === filter);
+  const visible = jobs;
 
   return (
     <div className="min-h-screen">
@@ -122,7 +151,15 @@ function Historico() {
           </button>
         </div>
 
-        <div className="scroll-x -mx-3 mb-6 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+        <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <StatCard label="Jobs listados" value={String(stats.total)} />
+          <StatCard label="Em andamento" value={String(stats.running)} />
+          <StatCard label="Concluídos" value={String(stats.done)} />
+          <StatCard label="Com erro" value={String(stats.error + stats.cancelled)} />
+          <StatCard label="Volume entregue" value={formatBytes(stats.bytes)} />
+        </div>
+
+        <div className="scroll-x -mx-3 mb-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           {["todos", ...Object.keys(TOOL_LABEL)].map((key) => (
             <button
               key={key}
@@ -134,10 +171,38 @@ function Historico() {
                   : "border-border bg-surface/60 text-muted-foreground hover:text-foreground"
               }`}
             >
-              {key === "todos" ? "Todos" : TOOL_LABEL[key]}
+              {key === "todos" ? "Todas as ferramentas" : TOOL_LABEL[key]}
             </button>
           ))}
         </div>
+
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="scroll-x -mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+            {STATUS_FILTERS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setStatusFilter(item.key)}
+                className={`min-h-9 shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  statusFilter === item.key
+                    ? "border-primary/60 bg-primary/15 text-foreground"
+                    : "border-border bg-surface/60 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por id, arquivo ou origem…"
+            aria-label="Buscar jobs"
+            className="min-h-10 w-full rounded-full border border-border bg-surface/60 px-4 text-xs outline-none focus:border-primary/60 sm:w-72"
+          />
+        </div>
+
 
         {error ? (
           <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
@@ -157,27 +222,29 @@ function Historico() {
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="font-display text-sm font-semibold break-words">
-                    {TOOL_LABEL[job.tool] ?? job.tool}
+                    {toolLabel(job.tool)}
                     <span className="ml-2 break-all font-mono text-xs text-muted-foreground">
                       {job.job_id}
                     </span>
                   </p>
                   <p className="break-words text-xs text-muted-foreground">
-                    {job.filename ?? "—"} · {job.created_at ?? "sem data"}
+                    {job.filename ?? "—"} · {formatDateTime(job.created_at)} ·{" "}
+                    {formatBytes(job.size_bytes)} · {formatDurationMs(job.duration_ms)}
                   </p>
-                  {job.source_kind || job.meta?.source_card ? (
+                  {stageLabel(job.stage) ? (
+                    <p className="mt-1 text-[11px] uppercase tracking-wide text-primary">
+                      Etapa: {stageLabel(job.stage)}
+                    </p>
+                  ) : null}
+                  {sourceLabel(job) ? (
                     <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                      {job.source_kind === "upload"
-                        ? `Origem: upload${job.source_label ? ` · ${job.source_label}` : ""}`
-                        : job.source_kind === "download"
-                          ? `Origem: URL${job.source_label ? ` · ${job.source_label}` : ""}`
-                          : "Origem: card rastreado"}
+                      Origem rastreada: {sourceLabel(job)}
                     </p>
                   ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <StatusPill status={job.status} />
-                  {job.status === "queued" || job.status === "running" ? (
+                  {isCancellable(job) ? (
                     <button
                       type="button"
                       onClick={() => setDialog({ job, kind: "cancel" })}
@@ -266,6 +333,15 @@ function Historico() {
           }
         }}
       />
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface/50 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="font-display text-lg font-semibold">{value}</p>
     </div>
   );
 }
