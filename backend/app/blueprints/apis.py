@@ -71,3 +71,9 @@ def test_all():
         if provider.get("test"):
             results[provider["id"]] = api_keys.test_provider(provider["id"])
     return jsonify(results=results, providers=api_keys.list_all())
+
+
+@bp.get("/scan")
+def scan():
+    """Diagnóstico da varredura: onde procurou, quantos arquivos leu e o que achou."""
+    return jsonify(report=api_keys.scan_report())
