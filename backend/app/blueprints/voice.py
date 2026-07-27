@@ -875,12 +875,18 @@ def _work_dub(
     try:
         segments, detected = transcribe.transcribe(src, job_id=job_id, language=source_lang)
     except TranscribeError as exc:
+        _sweep(src)
         raise RuntimeError(str(exc)) from exc
 
-    if target_lang not in ("", "auto") and detected and detected.lower().startswith(target_lang):
+    jobs.log(job_id, f"Idioma detectado no áudio original: {detected or 'não informado'}")
+    if dubbing.same_language(detected, target_lang):
         jobs.log(job_id, "Idioma alvo igual ao original — tradução dispensada.")
     else:
-        segments = dubbing.translate(segments, target_lang, job_id)
+        try:
+            segments = dubbing.translate(segments, target_lang, job_id)
+        except dubbing.DubbingError as exc:
+            _sweep(src)
+            raise RuntimeError(str(exc)) from exc
 
     work_dir = output_path("voice", job_id, ".tmp").parent
     track = work_dir / f"{job_id}_dubtrack.wav"
@@ -888,11 +894,13 @@ def _work_dub(
     signed: Path | None = None
     muxed: Path | None = None
     base_voice = persona.base_voice if (engine == "forge" and persona) else voice_id
+    base_voice = dubbing.resolve_voice(engine, base_voice, target_lang, job_id)
     try:
         dubbing.build_track(
             segments, track,
             engine=engine, voice=base_voice, job_id=job_id, total_duration=info.duration,
         )
+
     except (EdgeTTSError, VoiceEngineError, dubbing.DubbingError) as exc:
         _sweep(raw_track, src)
         raise RuntimeError(str(exc)) from exc
