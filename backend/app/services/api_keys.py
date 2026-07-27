@@ -120,6 +120,7 @@ PROVIDERS: list[dict[str, Any]] = [
         "name": "Cohere",
         "category": "Rerank",
         "env": "COHERE_API_KEY",
+        "prefer_pattern": r"^cohere_",
         "docs": "https://docs.cohere.com/reference/checkapikey",
         "usage": "Reranking de candidatos de pesquisa e de trechos virais.",
         "format_hint": "Chaves de trial da Cohere não têm acesso a /v1/models; o teste usa o endpoint oficial check-api-key.",
@@ -217,6 +218,7 @@ PROVIDERS: list[dict[str, Any]] = [
         "name": "Cloudflare Workers",
         "category": "Infra",
         "env": "CLOUDFLARE_API_TOKEN",
+        "prefer_pattern": r"^cfut_",
         "docs": "https://developers.cloudflare.com/api/operations/user-api-tokens-verify-token",
         "usage": "Endpoints leves, cache e camada pública de webhooks.",
         "format_hint": "Use um API Token (Meu Perfil → API Tokens). A Global API Key antiga só é aceita junto com CLOUDFLARE_EMAIL.",
@@ -243,19 +245,26 @@ PROVIDERS: list[dict[str, Any]] = [
         "name": "Whisper API",
         "category": "Transcrição",
         "env": "WHISPER_API_KEY",
-        "docs": "https://platform.openai.com/docs/api-reference/audio",
+        "docs": "https://whisper-api.com/docs/",
         "usage": "Fallback de transcrição quando a Groq falha ou estoura limite.",
-        "format_hint": "Aceita chave OpenAI (sk-...) ou endpoint compatível definido em WHISPER_API_BASE.",
-        "remediation": "Cole uma chave OpenAI (sk-...) ou aponte WHISPER_API_BASE para o endpoint compatível (ex.: https://api.groq.com/openai/v1) antes de testar de novo.",
+        "format_hint": "Chave do whisper-api.com (header X-API-Key). Para usar OpenAI ou outro endpoint compatível, defina WHISPER_API_BASE.",
+        "remediation": "Copie a chave do dashboard em whisper-api.com/login, ou aponte WHISPER_API_BASE para um endpoint compatível com a OpenAI.",
         "test": [
+            # whisper-api.com: base https://api.whisper-api.com, autenticação por X-API-Key.
+            {
+                "url": "https://api.whisper-api.com/transcriptions",
+                "auth": "header",
+                "header": "X-API-Key",
+            },
+            # Endpoint compatível com OpenAI, quando configurado.
             {
                 "url": os.environ.get("WHISPER_API_BASE", "https://api.openai.com/v1").rstrip("/") + "/models",
                 "auth": "bearer",
             },
-            # Fallback: muitos deploys reaproveitam a Groq como endpoint Whisper.
             {"url": "https://api.groq.com/openai/v1/models", "auth": "bearer"},
         ],
     },
+
     {
         "id": "tikapi",
         "name": "TikAPI",
@@ -550,7 +559,21 @@ def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
         return {"ok": False, "status": 0, "message": f"Erro inesperado: {exc}"}
 
 
+def _probe_key(provider: dict[str, Any], key: str) -> bool:
+    """Testa uma chave candidata sem gravar nada no cofre."""
+    spec = provider.get("test")
+    specs = [s for s in (spec if isinstance(spec, list) else [spec]) if s]
+    for candidate in specs:
+        try:
+            if _run_probe(candidate, key).get("ok"):
+                return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
+
+
 def test_provider(provider_id: str) -> dict[str, Any]:
+
     provider = PROVIDER_BY_ID[provider_id]
     spec = provider.get("test")
     specs = [s for s in (spec if isinstance(spec, list) else [spec]) if s]
@@ -867,9 +890,18 @@ def _parse_legacy_catalog(text: str) -> dict[str, str]:
     return out
 
 
+_ALT_CANDIDATES: dict[str, list[tuple[str, str]]] = {}
+
+
 def _collect() -> tuple[dict[str, str], dict[str, str]]:
     harvested: dict[str, str] = {}
     sources: dict[str, str] = {}
+    alts: dict[str, list[tuple[str, str]]] = {}
+
+    def remember(pid: str, value: str, origin: str) -> None:
+        bucket = alts.setdefault(pid, [])
+        if value not in [v for v, _ in bucket]:
+            bucket.append((value, origin))
 
     for key, value in os.environ.items():
         if value and len(value) >= 12:
@@ -887,16 +919,21 @@ def _collect() -> tuple[dict[str, str], dict[str, str]]:
                 sources[name] = str(path)
         for pid, value in _parse_legacy_catalog(text).items():
             marker = f"__SIG__{pid}"
+            remember(pid, value, f"{path} (catálogo legado)")
             if marker not in harvested:
                 harvested[marker] = value
                 sources[marker] = f"{path} (catálogo legado)"
         for pid, value in _harvest_signatures(text).items():
             marker = f"__SIG__{pid}"
+            remember(pid, value, str(path))
             if marker not in harvested:
                 harvested[marker] = value
                 sources[marker] = str(path)
 
+    _ALT_CANDIDATES.clear()
+    _ALT_CANDIDATES.update(alts)
     return harvested, sources
+
 
 
 def sync_env(data: dict[str, dict[str, Any]] | None = None) -> str | None:
@@ -972,6 +1009,24 @@ def autofill(force: bool = False) -> dict[str, Any]:
                 # nunca importa credencial com formato incompatível (ex.: token OAuth
                 # "AQ." caindo no slot do Gemini, que exige "AIza")
                 continue
+
+            # Quando o legado tem mais de uma chave para o mesmo provedor (ex.: Lamatok
+            # com uma chave sem saldo e outra ativa), testa de verdade e importa a que passa.
+            pool = [(value, origin)] + [
+                (alt, src)
+                for alt, src in _ALT_CANDIDATES.get(pid, [])
+                if alt != value and (not prefix or alt.startswith(prefix))
+            ]
+            prefer = provider.get("prefer_pattern")
+            if prefer:
+                pool.sort(key=lambda item: 0 if re.match(prefer, item[0]) else 1)
+            if len(pool) > 1:
+                for candidate_key, candidate_origin in pool:
+                    if _probe_key(provider, candidate_key):
+                        value, origin = candidate_key, candidate_origin
+                        break
+
+
 
 
             entry = data.get(pid, {})
