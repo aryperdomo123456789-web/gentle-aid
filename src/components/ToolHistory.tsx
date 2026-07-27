@@ -36,6 +36,12 @@ function sourceLabel(job: Job): string | null {
   return null;
 }
 
+function hasPreview(job: Job): boolean {
+  if (job.download_url || (job.outputs?.length ?? 0) > 0) return true;
+  const rawCard = job.meta?.source_card;
+  return Boolean(rawCard && typeof rawCard === "object" && !Array.isArray(rawCard));
+}
+
 /**
  * Histórico local da ferramenta — mesmo padrão do legado:
  * lista dos arquivos prontos, com data, tamanho, hash e download direto.
@@ -161,7 +167,7 @@ export function ToolHistory({
                 <button
                   type="button"
                   onClick={() => setPreview(job)}
-                  disabled={!job.download_url && !(job.outputs?.length ?? 0)}
+                  disabled={!hasPreview(job)}
                   className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50 disabled:opacity-50"
                 >
                   <Eye className="size-3.5" aria-hidden="true" />

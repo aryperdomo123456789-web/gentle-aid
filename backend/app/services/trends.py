@@ -26,6 +26,7 @@ from . import api_keys, media
 _CACHE: dict[str, tuple[float, Any]] = {}
 _CACHE_LOCK = threading.Lock()
 DEFAULT_TTL = 120  # 2 min, para o radar ficar mais vivo
+_RADAR_SNAPSHOT_FILE = config.storage_dir / "_config" / "radar_snapshot.json"
 
 
 # --------------------------------------------------------------------------- #
@@ -41,6 +42,38 @@ def _cached(key: str, ttl: int, producer: Callable[[], Any]) -> Any:
     with _CACHE_LOCK:
         _CACHE[key] = (now, value)
     return value
+
+
+def _snapshot_key(nicho: str, region: str) -> str:
+    return f"{(region or 'BR').upper()[:2]}::{(nicho or '').strip().lower()}"
+
+
+def _read_snapshot_file() -> dict[str, Any]:
+    try:
+        raw = _RADAR_SNAPSHOT_FILE.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _write_snapshot_file(data: dict[str, Any]) -> None:
+    _RADAR_SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _RADAR_SNAPSHOT_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_radar_snapshot(nicho: str, region: str) -> dict[str, Any] | None:
+    data = _read_snapshot_file()
+    snapshot = data.get(_snapshot_key(nicho, region))
+    return snapshot if isinstance(snapshot, dict) else None
+
+
+def save_radar_snapshot(nicho: str, region: str, snapshot: dict[str, Any]) -> None:
+    data = _read_snapshot_file()
+    data[_snapshot_key(nicho, region)] = snapshot
+    _write_snapshot_file(data)
 
 
 def _http_json(url: str, *, method: str = "GET", headers: dict[str, str] | None = None,
@@ -733,7 +766,7 @@ def forecast(nicho: str, region: str = "BR") -> dict[str, Any]:
         ] or _heuristic_forecast(nicho or "conteúdo viral", trends, videos)
         provider = None
 
-    return {
+    payload = {
         "nicho": nicho,
         "region": region,
         "generated_at": _now_iso(),
@@ -741,6 +774,20 @@ def forecast(nicho: str, region: str = "BR") -> dict[str, Any]:
         "forecast": items,
         "signals": {"trends": trends[:12], "videos": videos[:10], "web": web, "intelligence": intelligence},
     }
+    existing = load_radar_snapshot(nicho, region) or {}
+    if isinstance(existing, dict):
+        merged = {
+            **existing,
+            "nicho": nicho,
+            "region": region,
+            "forecast": {
+                "engine": payload["engine"],
+                "generated_at": payload["generated_at"],
+                "forecast": items,
+            },
+        }
+        save_radar_snapshot(nicho, region, merged)
+    return payload
 
 
 # --------------------------------------------------------------------------- #
@@ -748,6 +795,10 @@ def forecast(nicho: str, region: str = "BR") -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 def radar(nicho: str = "", region: str = "BR", *, refresh: bool = False) -> dict[str, Any]:
     key = f"radar:{region}:{nicho.lower()}"
+    if not refresh:
+        snapshot = load_radar_snapshot(nicho, region)
+        if snapshot:
+            return snapshot
     if refresh:
         with _CACHE_LOCK:
             _CACHE.pop(key, None)
@@ -791,4 +842,11 @@ def radar(nicho: str = "", region: str = "BR", *, refresh: bool = False) -> dict
             ],
         }
 
-    return _cached(key, DEFAULT_TTL, build)
+    value = _cached(key, DEFAULT_TTL, build)
+    if isinstance(value, dict):
+        existing = load_radar_snapshot(nicho, region) or {}
+        merged = {**existing, **value}
+        if isinstance(existing, dict) and existing.get("forecast"):
+            merged["forecast"] = existing["forecast"]
+        save_radar_snapshot(nicho, region, merged)
+    return value

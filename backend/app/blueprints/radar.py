@@ -29,6 +29,19 @@ def global_radar():
         return jsonify(error=f"Radar indisponível: {exc}"), 502
 
 
+@bp.get("/snapshot")
+def snapshot():
+    try:
+        nicho, region = _params()
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(
+        snapshot=trends_service.load_radar_snapshot(nicho, region),
+        nicho=nicho,
+        region=region,
+    )
+
+
 @bp.get("/forecast")
 def forecast():
     try:

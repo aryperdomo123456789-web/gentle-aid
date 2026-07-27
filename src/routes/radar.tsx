@@ -131,6 +131,12 @@ function saveRadarSnapshot(snapshot: RadarSnapshot) {
   }
 }
 
+function isSnapshot(value: unknown): value is RadarSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as RadarSnapshot;
+  return typeof candidate.nicho === "string" && typeof candidate.region === "string";
+}
+
 function RadarGlobal() {
   const [nicho, setNicho] = useState("");
   const [region, setRegion] = useState("BR");
@@ -180,6 +186,31 @@ function RadarGlobal() {
     setData(snapshot.data);
     setForecast(snapshot.forecast);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (readRadarSnapshot()) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const qs = new URLSearchParams({ nicho, region });
+        const payload = await apiGet<{ snapshot: unknown }>(`/api/radar/snapshot?${qs}`);
+        if (cancelled || !isSnapshot(payload.snapshot) || !payload.snapshot.data) return;
+        setNicho(payload.snapshot.nicho);
+        setRegion(payload.snapshot.region);
+        setData(payload.snapshot.data);
+        setForecast(payload.snapshot.forecast);
+        saveRadarSnapshot(payload.snapshot);
+      } catch {
+        // silencioso: se não houver snapshot salvo, o botão continua sendo a origem da verdade.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nicho, region]);
 
   async function runForecast() {
     setForecasting(true);

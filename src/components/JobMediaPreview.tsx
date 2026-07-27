@@ -30,6 +30,13 @@ function getPlayableUrl(job: Job): string | null {
   return first ? downloadUrl(first) : null;
 }
 
+function getSourcePlayableUrl(job: Job): string | null {
+  const source = getSourceCard(job);
+  if (!source) return null;
+  if (source.embed_url) return source.embed_url;
+  return source.url ?? null;
+}
+
 function getOrientation(job: Job): "portrait" | "landscape" | "square" | "unknown" {
   return job.sterilization?.source_orientation ?? "unknown";
 }
@@ -45,8 +52,11 @@ function isVideoAsset(url: string): boolean {
 
 export function JobMediaPreview({ job }: { job: Job }) {
   const playable = getPlayableUrl(job);
+  const sourcePlayable = getSourcePlayableUrl(job);
   const source = getSourceCard(job);
   const orientation = getOrientation(job);
+  const playableIsVideo = playable ? isVideoAsset(playable) : false;
+  const sourceIsVideo = sourcePlayable ? isVideoAsset(sourcePlayable) : false;
 
   return (
     <div className="space-y-4">
@@ -58,7 +68,7 @@ export function JobMediaPreview({ job }: { job: Job }) {
         }}
       >
         {playable ? (
-          isVideoAsset(playable) ? (
+          playableIsVideo ? (
             <video
               controls
               src={playable}
@@ -69,6 +79,23 @@ export function JobMediaPreview({ job }: { job: Job }) {
             <div className="flex h-full w-full items-center justify-center p-6">
               <audio controls src={playable} className="w-full" />
             </div>
+          )
+        ) : sourcePlayable ? (
+          sourceIsVideo ? (
+            <video
+              controls
+              src={sourcePlayable}
+              className="h-full w-full bg-black object-contain"
+              playsInline
+            />
+          ) : (
+            <iframe
+              title={`Prévia da origem de ${source?.author ?? job.job_id}`}
+              src={sourcePlayable}
+              className="h-full w-full rounded-xl"
+              allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+            />
           )
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -161,6 +188,18 @@ export function JobMediaPreview({ job }: { job: Job }) {
           >
             <Play className="size-3.5" aria-hidden="true" />
             Abrir player
+          </a>
+        </div>
+      ) : sourcePlayable ? (
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={sourcePlayable}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-4 py-2 text-xs font-semibold hover:border-primary/50"
+          >
+            <Play className="size-3.5" aria-hidden="true" />
+            Assistir origem
           </a>
         </div>
       ) : null}
