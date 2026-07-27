@@ -122,6 +122,10 @@ export type SterilizationReport = {
   identity: Record<string, string>;
   steps: string[];
   unique: boolean;
+  source_width?: number;
+  source_height?: number;
+  source_orientation?: "portrait" | "landscape" | "square" | "unknown";
+  source_aspect_ratio?: number;
 };
 
 export type JobOutput = {

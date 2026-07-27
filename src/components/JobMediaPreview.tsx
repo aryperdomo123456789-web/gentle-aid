@@ -30,6 +30,16 @@ function getPlayableUrl(job: Job): string | null {
   return first ? downloadUrl(first) : null;
 }
 
+function getOrientation(job: Job): "portrait" | "landscape" | "square" | "unknown" {
+  return job.sterilization?.source_orientation ?? "unknown";
+}
+
+function previewAspectClass(orientation: ReturnType<typeof getOrientation>): string {
+  if (orientation === "portrait") return "aspect-[9/16]";
+  if (orientation === "square") return "aspect-square";
+  return "aspect-video";
+}
+
 function isVideoAsset(url: string): boolean {
   return /\.(mp4|webm|mkv|mov)(?:$|\?)/i.test(url);
 }
@@ -37,18 +47,26 @@ function isVideoAsset(url: string): boolean {
 export function JobMediaPreview({ job }: { job: Job }) {
   const playable = getPlayableUrl(job);
   const source = getSourceCard(job);
+  const orientation = getOrientation(job);
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-border bg-black/90">
+      <div
+        className={`overflow-hidden rounded-2xl border border-border bg-black/90 ${previewAspectClass(orientation)}`}
+      >
         {playable ? (
           isVideoAsset(playable) ? (
-            <video controls src={playable} className="aspect-video w-full bg-black" playsInline />
+            <video
+              controls
+              src={playable}
+              className="h-full w-full bg-black object-contain"
+              playsInline
+            />
           ) : (
             <audio controls src={playable} className="w-full" />
           )
         ) : (
-          <div className="flex aspect-video items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             Prévia indisponível
           </div>
         )}
@@ -67,12 +85,30 @@ export function JobMediaPreview({ job }: { job: Job }) {
               <p className="mt-1 text-sm text-muted-foreground">
                 {source.desc ?? "Sem descrição."}
               </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                <span className="rounded-full border border-border bg-background/60 px-2.5 py-1 text-muted-foreground">
+                  {orientation === "unknown"
+                    ? "orientação: não detectada"
+                    : `orientação: ${orientation}`}
+                </span>
+                {job.sterilization?.source_width && job.sterilization?.source_height ? (
+                  <span className="rounded-full border border-border bg-background/60 px-2.5 py-1 text-muted-foreground">
+                    {job.sterilization.source_width}x{job.sterilization.source_height}
+                  </span>
+                ) : null}
+              </div>
             </div>
             {source.thumbnail ? (
               <img
                 src={source.thumbnail}
                 alt={source.title ?? "Miniatura do vídeo"}
-                className="h-24 w-40 rounded-lg object-cover"
+                className={`rounded-lg object-cover ${
+                  orientation === "portrait"
+                    ? "h-28 w-20"
+                    : orientation === "square"
+                      ? "h-24 w-24"
+                      : "h-24 w-40"
+                }`}
               />
             ) : null}
           </div>

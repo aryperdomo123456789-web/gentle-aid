@@ -9,44 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VoiceConversionRouteImport } from './routes/voice-conversion'
-import { Route as TiktokRouteImport } from './routes/tiktok'
-import { Route as RadarRouteImport } from './routes/radar'
-import { Route as LegendarRouteImport } from './routes/legendar'
-import { Route as HistoricoRouteImport } from './routes/historico'
-import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
-import { Route as ApisRouteImport } from './routes/apis'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApisRouteImport } from './routes/apis'
+import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
+import { Route as HistoricoRouteImport } from './routes/historico'
+import { Route as LegendarRouteImport } from './routes/legendar'
+import { Route as RadarRouteImport } from './routes/radar'
+import { Route as TiktokRouteImport } from './routes/tiktok'
+import { Route as VoiceConversionRouteImport } from './routes/voice-conversion'
 import { Route as HistoricoJobIdRouteImport } from './routes/historico.$jobId'
 
-const VoiceConversionRoute = VoiceConversionRouteImport.update({
-  id: '/voice-conversion',
-  path: '/voice-conversion',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TiktokRoute = TiktokRouteImport.update({
-  id: '/tiktok',
-  path: '/tiktok',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RadarRoute = RadarRouteImport.update({
-  id: '/radar',
-  path: '/radar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LegendarRoute = LegendarRouteImport.update({
-  id: '/legendar',
-  path: '/legendar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HistoricoRoute = HistoricoRouteImport.update({
-  id: '/historico',
-  path: '/historico',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CanvaCleanerRoute = CanvaCleanerRouteImport.update({
-  id: '/canva-cleaner',
-  path: '/canva-cleaner',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApisRoute = ApisRouteImport.update({
@@ -54,9 +29,34 @@ const ApisRoute = ApisRouteImport.update({
   path: '/apis',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const CanvaCleanerRoute = CanvaCleanerRouteImport.update({
+  id: '/canva-cleaner',
+  path: '/canva-cleaner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoricoRoute = HistoricoRouteImport.update({
+  id: '/historico',
+  path: '/historico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegendarRoute = LegendarRouteImport.update({
+  id: '/legendar',
+  path: '/legendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RadarRoute = RadarRouteImport.update({
+  id: '/radar',
+  path: '/radar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TiktokRoute = TiktokRouteImport.update({
+  id: '/tiktok',
+  path: '/tiktok',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VoiceConversionRoute = VoiceConversionRouteImport.update({
+  id: '/voice-conversion',
+  path: '/voice-conversion',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoricoJobIdRoute = HistoricoJobIdRouteImport.update({
@@ -148,46 +148,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/voice-conversion': {
-      id: '/voice-conversion'
-      path: '/voice-conversion'
-      fullPath: '/voice-conversion'
-      preLoaderRoute: typeof VoiceConversionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tiktok': {
-      id: '/tiktok'
-      path: '/tiktok'
-      fullPath: '/tiktok'
-      preLoaderRoute: typeof TiktokRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/radar': {
-      id: '/radar'
-      path: '/radar'
-      fullPath: '/radar'
-      preLoaderRoute: typeof RadarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/legendar': {
-      id: '/legendar'
-      path: '/legendar'
-      fullPath: '/legendar'
-      preLoaderRoute: typeof LegendarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/historico': {
-      id: '/historico'
-      path: '/historico'
-      fullPath: '/historico'
-      preLoaderRoute: typeof HistoricoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/canva-cleaner': {
-      id: '/canva-cleaner'
-      path: '/canva-cleaner'
-      fullPath: '/canva-cleaner'
-      preLoaderRoute: typeof CanvaCleanerRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/apis': {
@@ -197,11 +162,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApisRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/canva-cleaner': {
+      id: '/canva-cleaner'
+      path: '/canva-cleaner'
+      fullPath: '/canva-cleaner'
+      preLoaderRoute: typeof CanvaCleanerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/historico': {
+      id: '/historico'
+      path: '/historico'
+      fullPath: '/historico'
+      preLoaderRoute: typeof HistoricoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legendar': {
+      id: '/legendar'
+      path: '/legendar'
+      fullPath: '/legendar'
+      preLoaderRoute: typeof LegendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/radar': {
+      id: '/radar'
+      path: '/radar'
+      fullPath: '/radar'
+      preLoaderRoute: typeof RadarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tiktok': {
+      id: '/tiktok'
+      path: '/tiktok'
+      fullPath: '/tiktok'
+      preLoaderRoute: typeof TiktokRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/voice-conversion': {
+      id: '/voice-conversion'
+      path: '/voice-conversion'
+      fullPath: '/voice-conversion'
+      preLoaderRoute: typeof VoiceConversionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/historico/$jobId': {

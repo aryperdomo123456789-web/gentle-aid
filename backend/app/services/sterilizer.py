@@ -77,6 +77,8 @@ class Probe:
     duration: float = 0.0
     has_audio: bool = False
     has_video: bool = False
+    orientation: str = "unknown"
+    aspect_ratio: float = 0.0
 
 
 @dataclass
@@ -94,6 +96,10 @@ class SterilizationReport:
     audio_filters: list[str] = field(default_factory=list)
     identity: dict[str, str] = field(default_factory=dict)
     steps: list[str] = field(default_factory=list)
+    source_width: int = 0
+    source_height: int = 0
+    source_orientation: str = "unknown"
+    source_aspect_ratio: float = 0.0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -109,6 +115,10 @@ class SterilizationReport:
             "identity": self.identity,
             "steps": self.steps,
             "unique": bool(self.md5_after) and self.md5_after != self.md5_before,
+            "source_width": self.source_width,
+            "source_height": self.source_height,
+            "source_orientation": self.source_orientation,
+            "source_aspect_ratio": self.source_aspect_ratio,
         }
 
 
@@ -157,6 +167,14 @@ def probe(path: Path) -> Probe:
                 info.fps = 30.0
         elif kind == "audio":
             info.has_audio = True
+    if info.width > 0 and info.height > 0:
+        info.aspect_ratio = info.width / info.height
+        if info.width > info.height * 1.05:
+            info.orientation = "landscape"
+        elif info.height > info.width * 1.05:
+            info.orientation = "portrait"
+        else:
+            info.orientation = "square"
     return info
 
 
@@ -178,11 +196,16 @@ def build_video_filters(level: str, info: Probe, rng: random.Random) -> list[str
 
     intensity = {"leve": 0.35, "media": 1.0, "agressiva": 1.7, "extrema": 2.4}.get(level, 1.0)
     filters: list[str] = []
+    orientation_bias = {
+        "portrait": (1.15, 0.9),
+        "landscape": (0.9, 1.15),
+        "square": (1.0, 1.0),
+    }.get(info.orientation, (1.0, 1.0))
 
     # 1. Crop microscópico em posição aleatória + rescale para a grade original.
     if info.width and info.height:
-        cut_x = _even(int(rng.uniform(2, 6 * intensity)))
-        cut_y = _even(int(rng.uniform(2, 6 * intensity)))
+        cut_x = _even(int(rng.uniform(2, 6 * intensity) * orientation_bias[0]))
+        cut_y = _even(int(rng.uniform(2, 6 * intensity) * orientation_bias[1]))
         w = _even(info.width - cut_x)
         h = _even(info.height - cut_y)
         off_x = _even(rng.randint(0, max(0, cut_x)))
@@ -384,6 +407,10 @@ def build_command(
         video_filters=vf,
         audio_filters=af,
         identity=identity,
+        source_width=info.width,
+        source_height=info.height,
+        source_orientation=info.orientation,
+        source_aspect_ratio=info.aspect_ratio,
     )
     return cmd, report
 
