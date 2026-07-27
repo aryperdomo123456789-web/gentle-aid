@@ -705,15 +705,17 @@ def autofill(force: bool = False) -> dict[str, Any]:
             value = next((harvested[c.upper()] for c in candidates if harvested.get(c.upper())), None)
             origin = next((sources[c.upper()] for c in candidates if harvested.get(c.upper())), "")
 
+            from_catalog = False
             if not value:
                 marker = f"__SIG__{pid}"
                 if harvested.get(marker):
                     value, origin = harvested[marker], sources.get(marker, "")
+                    from_catalog = True
 
             if not value:
                 continue
             prefix = provider.get("prefix")
-            if prefix and not value.startswith(prefix):
+            if prefix and not from_catalog and not value.startswith(prefix):
                 continue
 
             entry = data.get(pid, {})
@@ -728,14 +730,17 @@ def autofill(force: bool = False) -> dict[str, Any]:
 
         if imported:
             _save(data)
+        env_file = sync_env(data)
 
     return {
         "imported": imported,
         "skipped": skipped,
         "scanned": len(_scan_paths()),
         "roots": [str(r) for r in _scan_roots()],
+        "env_file": env_file,
         "total_configured": sum(1 for p in list_all() if p["configured"]),
     }
+
 
 
 def autofill_once() -> None:
