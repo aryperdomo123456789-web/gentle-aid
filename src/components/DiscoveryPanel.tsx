@@ -96,7 +96,10 @@ export function DiscoveryPanel({
         <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
       </header>
 
-      <form onSubmit={submit} className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+      <form
+        onSubmit={submit}
+        className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end"
+      >
         <Field label="Busca">
           {(id) => (
             <TextInput
@@ -141,8 +144,8 @@ export function DiscoveryPanel({
 
       {searched && !busy && cards.length === 0 && !error ? (
         <p className="mt-4 text-sm text-muted-foreground">
-          Nenhum pico de tráfego orgânico localizado para esse termo. Tente outra palavra-chave,
-          um @perfil ou cole a URL direta do vídeo.
+          Nenhum pico de tráfego orgânico localizado para esse termo. Tente outra palavra-chave, um
+          @perfil ou cole a URL direta do vídeo.
         </p>
       ) : null}
 
@@ -229,10 +232,7 @@ export function DiscoveryPanel({
           className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-4 backdrop-blur-sm"
           onClick={() => setPlayer(null)}
         >
-          <div
-            className="panel w-full max-w-xl p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="panel w-full max-w-xl p-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold">@{player.author}</p>
