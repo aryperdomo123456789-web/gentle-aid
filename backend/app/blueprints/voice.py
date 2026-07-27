@@ -58,6 +58,26 @@ PREVIEW_TEXT = (
     "pronto para narrar qualquer conteúdo."
 )
 
+# Roteiro de teste pronto: longo o bastante para revelar respiração, ritmo,
+# graves, agudos, números, siglas e pontuação forte em uma única escuta.
+TEST_SCRIPT = (
+    "Testando a voz deste canal, do começo ao fim, sem cortes.\n\n"
+    "Presta atenção no que vou te contar agora, porque isso muda completamente a forma "
+    "como você enxerga o próximo vídeo que aparecer na sua tela. Em dois mil e vinte e "
+    "quatro, mais de setenta por cento do conteúdo que viralizou não tinha nada de "
+    "especial na imagem: o que segurava a pessoa era a voz. O tom, a pausa, a respiração "
+    "no lugar certo.\n\n"
+    "Repara na diferença: uma frase curta prende. Uma frase longa, bem construída, com "
+    "vírgulas no lugar certo, conduz a pessoa por dentro da história até ela esquecer que "
+    "está assistindo a um vídeo de trinta segundos.\n\n"
+    "E tem os detalhes técnicos: números como 3, 17, 250 mil e 1,8 milhão; siglas como "
+    "IA, CPU, TikTok e YouTube; perguntas — você faria isso? — e exclamações. Tudo isso "
+    "precisa sair limpo, natural, sem parecer robô.\n\n"
+    "Se você chegou até aqui e a voz continuou agradável, sem chiado e sem cansar o "
+    "ouvido, é essa a voz do canal. Salva ela e vamos pro próximo."
+)
+
+
 
 
 def _settings_from_form() -> Settings:
