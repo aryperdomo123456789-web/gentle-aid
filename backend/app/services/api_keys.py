@@ -125,7 +125,14 @@ PROVIDERS: list[dict[str, Any]] = [
         "format_hint": "Chaves de trial da Cohere não têm acesso a /v1/models; o teste usa o endpoint oficial check-api-key.",
         "remediation": "Gere uma nova chave em dashboard.cohere.com → API Keys (Trial serve) e cole aqui.",
         "test": [
-            {"url": "https://api.cohere.com/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
+            {
+                "url": "https://api.cohere.com/v1/check-api-key",
+                "auth": "bearer",
+                "method": "POST",
+                "body": {},
+                "expect_json": {"valid": True},
+                "invalid_message": "A Cohere respondeu que esta chave não é válida (valid=false) — ela foi revogada ou pertence a outra conta.",
+            },
             {"url": "https://api.cohere.ai/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
             {
                 "url": "https://api.cohere.com/v1/tokenize",
@@ -247,7 +254,13 @@ PROVIDERS: list[dict[str, Any]] = [
         "usage": "Radar de tendências e metadados de vídeos do TikTok.",
         "remediation": "403 aqui quase sempre é plano expirado ou chave revogada — gere uma nova em tikapi.io → Dashboard → API Key.",
         "test": [
-            {"url": "https://api.tikapi.io/public/check", "auth": "header", "header": "X-API-KEY"},
+            {
+                "url": "https://api.tikapi.io/public/check",
+                "auth": "header",
+                "header": "X-API-KEY",
+                "expect_json": {"status": "success"},
+                "invalid_message": "A TikAPI aceitou a requisição mas não confirmou a chave (assinatura inativa).",
+            },
             {"url": "https://api.tikapi.io/public/check", "auth": "bearer"},
             {
                 "url": "https://api.tikapi.io/public/explore?country=br&count=1",
@@ -474,7 +487,24 @@ def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
     ctx = ssl.create_default_context()
     try:
         with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
-            resp.read(2048)
+            raw = resp.read(8192)
+            # Alguns provedores respondem HTTP 200 com um corpo dizendo que a chave é inválida.
+            checks = spec.get("expect_json") or {}
+            if checks:
+                try:
+                    payload = json.loads(raw.decode("utf-8", "replace"))
+                except Exception:  # noqa: BLE001
+                    payload = None
+                if isinstance(payload, dict):
+                    for field, expected in checks.items():
+                        actual = payload.get(field)
+                        if actual != expected:
+                            return {
+                                "ok": False,
+                                "status": resp.status,
+                                "message": spec.get("invalid_message")
+                                or f"O provedor respondeu 200 mas recusou a chave ({field}={actual!r}).",
+                            }
             return {"ok": True, "status": resp.status, "message": "Chave válida e respondendo."}
     except urllib.error.HTTPError as exc:
         status = exc.code
