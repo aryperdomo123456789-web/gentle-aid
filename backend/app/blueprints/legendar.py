@@ -70,7 +70,7 @@ def run_job():
         "animation": animation,
         "uppercase": request.form.get("uppercase") in ("1", "true", "on"),
         "uppercase_set": request.form.get("uppercase") is not None,
-        "font_scale": _float("font_scale", 1.0, 0.6, 1.8),
+        "font_scale": _float("font_scale", 1.0, 0.35, 1.8),
         "margin_ratio": _float("margin_ratio", 0.14, 0.02, 0.45),
         "words_per_line": int(_float("words_per_line", preset["words_per_line"], 1, 10)),
         "accent": (request.form.get("accent") or "").strip(),
@@ -80,6 +80,9 @@ def run_job():
     }
 
     source_url = (request.form.get("url") or "").strip()
+    aspect = (request.form.get("aspect") or "auto").strip().lower()
+    if aspect not in ("auto", "9:16", "16:9", "1:1"):
+        aspect = "auto"
     job = jobs.create_job(
         "legendar",
         meta={
@@ -88,6 +91,7 @@ def run_job():
             "position": position,
             "animation": animation if animation != "auto" else preset["animation"],
             "mutation": mutation,
+            "aspect": aspect,
             "url": source_url,
             **({"source_card": source_card} if source_card else {}),
         },

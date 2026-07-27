@@ -35,10 +35,12 @@ import { EditorTimeline } from "@/features/captions/components/EditorTimeline";
 import { PresetGallery } from "@/features/captions/components/PresetGallery";
 import {
   applyStyle,
+  ASPECT_LABEL,
   DEFAULT_STYLE,
   POSITION_LABEL,
   positionFromY,
   yFromPosition,
+  type CaptionAspect,
   type CaptionStyle,
 } from "@/features/captions/style";
 import { useCaptionDraft } from "@/features/captions/use-caption-draft";
@@ -110,6 +112,7 @@ function Legendar() {
   const [saved, setSaved] = useState(false);
   const [clock, setClock] = useState({ time: 0, duration: 12, playing: false });
   const [zoom, setZoom] = useState(1);
+  const [detected, setDetected] = useState<Exclude<CaptionAspect, "auto"> | null>(null);
   const stageApi = useRef<CaptionStageApi | null>(null);
 
   const preset = presets.find((p) => p.id === style.preset) ?? presets[0] ?? null;
@@ -509,18 +512,64 @@ function Legendar() {
                     />
                   )}
                 </Field>
-                <Field label={`Tamanho da fonte · ${style.fontScale.toFixed(2)}x`}>
+                <Field
+                  label={`Tamanho da fonte · ${style.fontScale.toFixed(2)}x`}
+                  hint="Arraste para a esquerda para deixar a legenda menor e mais discreta."
+                >
                   {(id) => (
                     <input
                       id={id}
                       type="range"
-                      min={0.6}
+                      min={0.35}
                       max={1.8}
                       step={0.05}
                       value={style.fontScale}
                       onChange={(e) => patch({ fontScale: Number(e.target.value) })}
                       className="w-full accent-primary"
                     />
+                  )}
+                </Field>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "Pequena", value: 0.6 },
+                    { label: "Média", value: 1 },
+                    { label: "Grande", value: 1.4 },
+                  ].map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => patch({ fontScale: opt.value })}
+                      className={cn(
+                        "rounded-lg border px-3 py-1.5 text-xs transition",
+                        Math.abs(style.fontScale - opt.value) < 0.03
+                          ? "border-primary bg-primary/15 text-foreground"
+                          : "border-border text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <Field
+                  label="Formato do vídeo"
+                  hint={
+                    style.aspect === "auto"
+                      ? `Detectado automaticamente: ${detected ?? "aguardando o vídeo"}`
+                      : "Formato fixado manualmente para a prévia."
+                  }
+                >
+                  {(id) => (
+                    <SelectInput
+                      id={id}
+                      value={style.aspect}
+                      onChange={(e) => patch({ aspect: e.target.value as CaptionAspect })}
+                    >
+                      {(Object.keys(ASPECT_LABEL) as CaptionAspect[]).map((key) => (
+                        <option key={key} value={key}>
+                          {ASPECT_LABEL[key]}
+                        </option>
+                      ))}
+                    </SelectInput>
                   )}
                 </Field>
               </div>
@@ -592,6 +641,43 @@ function Legendar() {
 
         {/* ===== Palco + timeline ===== */}
         <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border/60 bg-card/40 px-3 py-1.5">
+            <span className="mr-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+              Formato
+            </span>
+            {(["auto", "9:16", "16:9", "1:1"] as CaptionAspect[]).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => patch({ aspect: opt })}
+                title={ASPECT_LABEL[opt]}
+                className={cn(
+                  "rounded-lg border px-2.5 py-1 text-[11px] transition",
+                  style.aspect === opt
+                    ? "border-primary bg-primary/15 text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {opt === "auto" ? `Auto${detected ? ` · ${detected}` : ""}` : opt}
+              </button>
+            ))}
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground">Legenda</span>
+              <input
+                type="range"
+                min={0.35}
+                max={1.8}
+                step={0.05}
+                value={style.fontScale}
+                onChange={(e) => patch({ fontScale: Number(e.target.value) })}
+                className="w-24 accent-primary sm:w-36"
+                aria-label="Tamanho da legenda"
+              />
+              <span className="w-10 shrink-0 font-mono text-[11px] text-muted-foreground">
+                {style.fontScale.toFixed(2)}x
+              </span>
+            </div>
+          </div>
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-muted/30 p-3 sm:p-6">
             <CaptionStage
               className="flex h-full min-h-0 w-full items-center justify-center"
@@ -603,9 +689,11 @@ function Legendar() {
               onYChange={(y) => patch({ yPct: y })}
               onTick={onTick}
               onReady={onReady}
+              onDetectAspect={setDetected}
               hideControls
             />
           </div>
+
 
           <EditorTimeline
             duration={clock.duration}

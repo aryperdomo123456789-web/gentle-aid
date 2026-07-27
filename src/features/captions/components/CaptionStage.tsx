@@ -5,8 +5,11 @@ import { cn } from "@/lib/utils";
 
 import type { CaptionPreset } from "../api";
 import {
+  ASPECT_RATIO,
+  detectAspect,
   POSITION_LABEL,
   positionFromY,
+  type CaptionAspect,
   type CaptionStyle,
 } from "../style";
 import {
@@ -46,6 +49,7 @@ export function CaptionStage({
   onYChange,
   onTick,
   onReady,
+  onDetectAspect,
   hideControls = false,
   className,
 }: {
@@ -57,6 +61,8 @@ export function CaptionStage({
   onYChange: (y: number) => void;
   onTick?: (time: number, duration: number, playing: boolean) => void;
   onReady?: (api: CaptionStageApi) => void;
+  /** Reporta o formato lido do arquivo real (9:16, 16:9 ou 1:1). */
+  onDetectAspect?: (aspect: Exclude<CaptionAspect, "auto">) => void;
   hideControls?: boolean;
   className?: string;
 }) {
@@ -68,6 +74,7 @@ export function CaptionStage({
   const [playing, setPlaying] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [blocks, setBlocks] = useState<PreviewBlock[]>([]);
+  const [natural, setNatural] = useState<Exclude<CaptionAspect, "auto"> | null>(null);
 
   useEffect(() => {
     setBlocks(groupWords(buildWords(transcript, duration), style.wordsPerLine));
@@ -92,6 +99,7 @@ export function CaptionStage({
   useEffect(() => {
     setTime(0);
     setPlaying(false);
+    setNatural(null);
   }, [src]);
 
   const toggle = useCallback(() => {
@@ -148,13 +156,21 @@ export function CaptionStage({
   const accent = style.accent || view?.accent || "#ffe500";
   const primary = style.primary || view?.color || "#ffffff";
   const boxed = view?.boxed || animation === "boxed";
+  const effectiveAspect: Exclude<CaptionAspect, "auto"> =
+    style.aspect === "auto" ? natural ?? "9:16" : style.aspect;
 
   return (
     <div className={cn("space-y-3", className)}>
       <div
         ref={stageRef}
-        className="relative mx-auto aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden rounded-2xl border border-border bg-black shadow-2xl"
-        style={{ backgroundImage: poster && !src ? `url(${poster})` : undefined, backgroundSize: "cover", backgroundPosition: "center" }}
+        className="relative mx-auto h-full max-h-full w-auto max-w-full overflow-hidden rounded-2xl border border-border bg-black shadow-2xl"
+        style={{
+          aspectRatio: ASPECT_RATIO[effectiveAspect],
+          containerType: "inline-size",
+          backgroundImage: poster && !src ? `url(${poster})` : undefined,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
       >
         {src ? (
           <video
@@ -162,7 +178,13 @@ export function CaptionStage({
             src={src}
             playsInline
             className="absolute inset-0 size-full object-contain"
-            onLoadedMetadata={(e) => setDuration(Math.max(1, e.currentTarget.duration || 12))}
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget;
+              setDuration(Math.max(1, el.duration || 12));
+              const found = detectAspect(el.videoWidth, el.videoHeight);
+              setNatural(found);
+              onDetectAspect?.(found);
+            }}
             onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -212,7 +234,7 @@ export function CaptionStage({
               color: primary,
               fontWeight: view?.weight ?? 800,
               fontStyle: view?.italic ? "italic" : "normal",
-              fontSize: `${1.55 * style.fontScale}rem`,
+              fontSize: `clamp(0.62rem, ${(7 * style.fontScale).toFixed(2)}cqw, ${(2.3 * style.fontScale).toFixed(2)}rem)`,
               textShadow: boxed ? "none" : "0 2px 0 rgba(0,0,0,.9), 0 0 14px rgba(0,0,0,.65)",
             }}
           >
@@ -240,7 +262,8 @@ export function CaptionStage({
         </div>
 
         <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
-          {POSITION_LABEL[positionFromY(style.yPct)]} · {style.yPct}%
+          {effectiveAspect} · {POSITION_LABEL[positionFromY(style.yPct)]} · {style.yPct}%
+          {style.aspect === "auto" ? " · auto" : ""}
         </span>
       </div>
 
