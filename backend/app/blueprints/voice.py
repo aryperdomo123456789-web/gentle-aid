@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 
 from ..services import ingest, jobs, media
 from ..services.delivery import deliver
-from ..services.sterilizer import LEVELS
+from ..services.sterilizer import normalize_level
 from ..services.validation import AUDIO_EXT, ValidationError, output_path, parse_json_object, save_upload
 
 bp = Blueprint("voice", __name__, url_prefix="/api/voice")
@@ -42,14 +42,17 @@ def convert():
     target = request.form.get("target_voice", "masc_grave")
     fmt = request.form.get("format", "wav")
     preserve = request.form.get("preserve_timing", "strict")
-    mutation = request.form.get("mutation", "leve")
+    raw_mutation = request.form.get("mutation")
+    mutation = normalize_level(raw_mutation)
 
     if target not in VOICES:
         return jsonify(error="Timbre alvo inválido."), 400
     if fmt not in FORMATS:
         return jsonify(error="Formato de saída inválido."), 400
-    if mutation not in LEVELS:
+    if raw_mutation not in (None, "") and mutation is None:
         return jsonify(error="Nível de mutação inválido."), 400
+    if mutation is None:
+        mutation = "leve"
 
     try:
         source_card = parse_json_object(request.form.get("source_card"), field="source_card")

@@ -26,6 +26,7 @@ import hashlib
 import json
 import random
 import subprocess
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -36,6 +37,18 @@ from ..config import config
 # Níveis suportados por todas as ferramentas.
 LEVELS = ("auto", "off", "leve", "media", "agressiva", "extrema")
 DEFAULT_LEVEL = "media"
+_LEVEL_ALIASES = {
+    "auto": "auto",
+    "automatico": "auto",
+    "auto inteligente": "auto",
+    "desativado": "off",
+    "off": "off",
+    "leve": "leve",
+    "media": "media",
+    "avancado": "agressiva",
+    "agressiva": "agressiva",
+    "extrema": "extrema",
+}
 
 # Identidades falsas plausíveis para o campo encoder/handler.
 _FAKE_ENCODERS = (
@@ -68,6 +81,18 @@ def file_hashes(path: Path, chunk: int = 1 << 20) -> dict[str, str]:
 
 def md5(path: Path) -> str:
     return file_hashes(path)["md5"]
+
+
+def normalize_level(level: str | None) -> str | None:
+    if level is None:
+        return None
+    raw = str(level).strip().lower()
+    if not raw:
+        return None
+    normalized = unicodedata.normalize("NFKD", raw)
+    normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    normalized = re.sub(r"\s+", " ", normalized)
+    return _LEVEL_ALIASES.get(normalized, normalized if normalized in LEVELS else None)
 
 
 @dataclass
@@ -313,8 +338,9 @@ def pick_bitrate(profile: str, rng: random.Random) -> str:
 
 def resolve_level(level: str, info: Probe) -> str:
     """Escolhe o melhor preset quando o operador deixa em modo automático."""
-    if level != "auto":
-        return level if level in LEVELS else DEFAULT_LEVEL
+    canonical = normalize_level(level) or DEFAULT_LEVEL
+    if canonical != "auto":
+        return canonical
 
     duration = max(float(info.duration or 0.0), 0.0)
     if not info.has_video:
@@ -509,8 +535,7 @@ def sterilize(
     from . import media  # import tardio evita ciclo
 
     execute = runner or media.run
-    if level not in LEVELS:
-        level = DEFAULT_LEVEL
+    level = normalize_level(level) or DEFAULT_LEVEL
 
     info = probe(src)
     level = resolve_level(level, info)

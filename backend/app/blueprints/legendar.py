@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 
 from ..services import ingest, jobs, media
 from ..services.delivery import deliver
-from ..services.sterilizer import LEVELS
+from ..services.sterilizer import normalize_level
 from ..services.validation import (
     VIDEO_EXT,
     ValidationError,
@@ -28,12 +28,15 @@ POSITIONS = set(media.SUBTITLE_ALIGNMENT)
 def run_job():
     style = request.form.get("style", "viral")
     position = request.form.get("position", "center")
-    mutation = request.form.get("mutation", "media")
+    raw_mutation = request.form.get("mutation")
+    mutation = normalize_level(raw_mutation)
 
     if style not in STYLES or position not in POSITIONS:
         return jsonify(error="Estilo ou posição inválidos."), 400
-    if mutation not in LEVELS:
+    if raw_mutation not in (None, "") and mutation is None:
         return jsonify(error="Nível de mutação inválido."), 400
+    if mutation is None:
+        mutation = "media"
 
     try:
         srt_text = clean_text(request.form.get("srt"), max_length=20000, field="srt")

@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 
 from ..services import ingest, jobs, media
 from ..services.delivery import deliver
-from ..services.sterilizer import LEVELS
+from ..services.sterilizer import normalize_level
 from ..services.validation import VIDEO_EXT, ValidationError, output_path, parse_json_object, save_upload
 
 bp = Blueprint("canva_cleaner", __name__, url_prefix="/api/canva-cleaner")
@@ -16,11 +16,14 @@ bp = Blueprint("canva_cleaner", __name__, url_prefix="/api/canva-cleaner")
 
 @bp.post("/run")
 def run_job():
-    mutation = request.form.get("mutation", "media")
+    raw_mutation = request.form.get("mutation")
+    mutation = normalize_level(raw_mutation)
     bitrate = request.form.get("bitrate", "auto")
 
-    if mutation not in LEVELS:
+    if raw_mutation not in (None, "") and mutation is None:
         return jsonify(error="Nível de mutação inválido."), 400
+    if mutation is None:
+        mutation = "media"
     if bitrate != "auto" and not bitrate.endswith("k"):
         return jsonify(error="Perfil de bitrate inválido."), 400
 

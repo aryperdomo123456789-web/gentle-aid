@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request
 from ..config import config
 from ..services import jobs, media
 from ..services.delivery import deliver
-from ..services.sterilizer import LEVELS
+from ..services.sterilizer import normalize_level
 from ..services.validation import (
     YOUTUBE_RE,
     ValidationError,
@@ -43,9 +43,12 @@ def bypass():
     except ValidationError as exc:
         return jsonify(error=str(exc)), 400
 
-    intensity = payload.get("intensity", "media")
-    if intensity not in LEVELS:
+    raw_intensity = payload.get("intensity")
+    intensity = normalize_level(raw_intensity)
+    if raw_intensity not in (None, "") and intensity is None:
         return jsonify(error="Intensidade inválida."), 400
+    if intensity is None:
+        intensity = "media"
 
     job = jobs.create_job(
         "youtube",

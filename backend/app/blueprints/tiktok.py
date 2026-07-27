@@ -7,7 +7,7 @@ from flask import Blueprint, jsonify, request
 from ..config import config
 from ..services import jobs, media, trends as trends_service
 from ..services.delivery import deliver
-from ..services.sterilizer import LEVELS
+from ..services.sterilizer import normalize_level
 from ..services.validation import (
     TIKTOK_RE,
     ValidationError,
@@ -42,14 +42,17 @@ def trends():
 def clone():
     payload = request.get_json(silent=True) or {}
     url = str(payload.get("url", "")).strip()
-    level = str(payload.get("intensity") or "media")
+    raw_level = payload.get("intensity")
+    level = normalize_level(raw_level)
 
     if not url:
         return jsonify(error="Informe o link do vídeo."), 400
     if not (TIKTOK_RE.match(url) or url.startswith("https://")):
         return jsonify(error="Link inválido."), 400
-    if level not in LEVELS:
+    if raw_level not in (None, "") and level is None:
         return jsonify(error="Intensidade inválida."), 400
+    if level is None:
+        level = "media"
 
     source_card = payload.get("source_card")
     if source_card is not None and not isinstance(source_card, dict):
