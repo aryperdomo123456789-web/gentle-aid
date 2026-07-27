@@ -202,10 +202,19 @@ PROVIDERS: list[dict[str, Any]] = [
         "env": "CLOUDFLARE_API_TOKEN",
         "docs": "https://developers.cloudflare.com/api/operations/user-api-tokens-verify-token",
         "usage": "Endpoints leves, cache e camada pública de webhooks.",
-        "format_hint": "Use um API Token (Meu Perfil → API Tokens). A Global API Key antiga responde 400 nesse endpoint.",
+        "format_hint": "Use um API Token (Meu Perfil → API Tokens). A Global API Key antiga só é aceita junto com CLOUDFLARE_EMAIL.",
+        "remediation": "Gere um API Token em dash.cloudflare.com → Meu Perfil → API Tokens (template 'Edit Cloudflare Workers') e cole aqui. Se preferir manter a Global API Key, defina também CLOUDFLARE_EMAIL no .env.",
         "test": [
             {"url": "https://api.cloudflare.com/client/v4/user/tokens/verify", "auth": "bearer"},
             {"url": "https://api.cloudflare.com/client/v4/accounts", "auth": "bearer"},
+            # Global API Key legada: exige e-mail da conta.
+            {
+                "url": "https://api.cloudflare.com/client/v4/user",
+                "auth": "header",
+                "header": "X-Auth-Key",
+                "extra_headers_env": {"X-Auth-Email": "CLOUDFLARE_EMAIL"},
+                "requires_env": ["CLOUDFLARE_EMAIL"],
+            },
         ],
     },
     {
@@ -216,11 +225,14 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://platform.openai.com/docs/api-reference/audio",
         "usage": "Fallback de transcrição quando a Groq falha ou estoura limite.",
         "format_hint": "Aceita chave OpenAI (sk-...) ou endpoint compatível definido em WHISPER_API_BASE.",
+        "remediation": "Cole uma chave OpenAI (sk-...) ou aponte WHISPER_API_BASE para o endpoint compatível (ex.: https://api.groq.com/openai/v1) antes de testar de novo.",
         "test": [
             {
                 "url": os.environ.get("WHISPER_API_BASE", "https://api.openai.com/v1").rstrip("/") + "/models",
                 "auth": "bearer",
-            }
+            },
+            # Fallback: muitos deploys reaproveitam a Groq como endpoint Whisper.
+            {"url": "https://api.groq.com/openai/v1/models", "auth": "bearer"},
         ],
     },
     {
@@ -230,8 +242,15 @@ PROVIDERS: list[dict[str, Any]] = [
         "env": "TIKAPI_KEY",
         "docs": "https://tikapi.io/documentation/",
         "usage": "Radar de tendências e metadados de vídeos do TikTok.",
+        "remediation": "403 aqui quase sempre é plano expirado ou chave revogada — gere uma nova em tikapi.io → Dashboard → API Key.",
         "test": [
             {"url": "https://api.tikapi.io/public/check", "auth": "header", "header": "X-API-KEY"},
+            {"url": "https://api.tikapi.io/public/check", "auth": "bearer"},
+            {
+                "url": "https://api.tikapi.io/public/explore?country=br&count=1",
+                "auth": "header",
+                "header": "X-API-KEY",
+            },
         ],
     },
     {
@@ -241,14 +260,21 @@ PROVIDERS: list[dict[str, Any]] = [
         "env": "LAMATOK_API_KEY",
         "docs": "https://api.lamatok.com/docs",
         "usage": "Download direto de mídia do TikTok por URL.",
+        "remediation": "402 significa saldo zerado: recarregue créditos em lamatok.com (a chave em si continua válida).",
         "test": [
             {
                 "url": "https://api.lamatok.com/v1/user/by/username?username=tiktok",
                 "auth": "query",
                 "param": "access_key",
-            }
+            },
+            {
+                "url": "https://api.lamatok.com/v1/user/by/username?username=tiktok",
+                "auth": "header",
+                "header": "x-access-key",
+            },
         ],
     },
+
 
 ]
 
