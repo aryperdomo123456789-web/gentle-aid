@@ -41,6 +41,14 @@ def download_source(url: str, job_id: str) -> Path:
     )
     if not dest.exists() or dest.stat().st_size == 0:
         raise ValidationError("Não foi possível baixar o vídeo dessa URL.")
+    jobs.update(
+        job_id,
+        source_kind="download",
+        source_label=url,
+        source_path=str(dest),
+        source_url=url,
+    )
+    jobs.register_artifact(job_id, dest, "input")
     return dest
 
 

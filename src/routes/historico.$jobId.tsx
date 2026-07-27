@@ -62,6 +62,7 @@ function JobDetail() {
 
   const meta = Object.entries(job?.meta ?? {});
   const sourceCard = getSourceCard(job);
+  const sourceSummary = getSourceSummary(job);
 
   return (
     <div className="min-h-screen">
@@ -139,6 +140,9 @@ function JobDetail() {
             <dl className="grid gap-2 text-xs">
               <Row label="Status" value={job?.status} />
               <Row label="Arquivo" value={job?.filename} />
+              <Row label="Origem" value={sourceSummary} />
+              <Row label="Caminho origem" value={job?.source_path} />
+              <Row label="URL origem" value={job?.source_url} />
               <Row label="Criado em" value={job?.created_at} />
               <Row label="Finalizado em" value={job?.finished_at} />
               <Row
@@ -207,6 +211,20 @@ function getSourceCard(job: Job | null) {
     duration_label?: string;
     published_label?: string;
   };
+}
+
+function getSourceSummary(job: Job | null) {
+  if (!job) return null;
+  if (job.source_kind === "upload")
+    return `Upload local${job.source_label ? ` · ${job.source_label}` : ""}`;
+  if (job.source_kind === "download")
+    return `Baixado por URL${job.source_label ? ` · ${job.source_label}` : ""}`;
+  const raw = job.meta?.source_card;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const title = (raw as { title?: string }).title;
+    if (title) return `Card de descoberta · ${title}`;
+  }
+  return null;
 }
 
 function formatMetaValue(value: unknown): string {

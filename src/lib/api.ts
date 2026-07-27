@@ -152,6 +152,11 @@ export type Job = {
   sha256_after?: string | null;
   sterilization?: SterilizationReport | null;
   outputs?: JobOutput[];
+  artifacts?: { path: string; kind: string }[];
+  source_kind?: "upload" | "download" | null;
+  source_label?: string | null;
+  source_path?: string | null;
+  source_url?: string | null;
   log?: string[];
   meta?: Record<string, unknown>;
 };

@@ -10,6 +10,7 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from ..config import config
+from . import jobs
 
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -36,6 +37,14 @@ def save_upload(file: FileStorage | None, job_id: str, allowed: set[str]) -> Pat
     if dest.stat().st_size == 0:
         dest.unlink(missing_ok=True)
         raise ValidationError("Arquivo vazio.")
+    jobs.update(
+        job_id,
+        source_kind="upload",
+        source_label=name,
+        source_path=str(dest),
+        source_url=None,
+    )
+    jobs.register_artifact(job_id, dest, "input")
     return dest
 
 

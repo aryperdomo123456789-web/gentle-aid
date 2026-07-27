@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+import shutil
 
 from ..config import config
 
@@ -43,7 +44,11 @@ def create_job(tool: str, meta: dict[str, Any] | None = None) -> dict[str, Any]:
         "sha256_after": None,
         "sterilization": None,
         "outputs": [],
-
+        "artifacts": [],
+        "source_kind": None,
+        "source_label": None,
+        "source_path": None,
+        "source_url": None,
         "log": [],
         "meta": meta or {},
     }
@@ -68,7 +73,20 @@ def log(job_id: str, line: str) -> None:
         if not job:
             return
         job["log"].append(line)
-        job["log"] = job["log"][-400:]
+    job["log"] = job["log"][-400:]
+    persist(job_id)
+
+
+def register_artifact(job_id: str, path: Path, kind: str) -> None:
+    with _lock:
+        job = _jobs.get(job_id)
+        if not job:
+            return
+        artifacts = list(job.get("artifacts") or [])
+        entry = {"path": str(path), "kind": kind}
+        if entry not in artifacts:
+            artifacts.append(entry)
+        job["artifacts"] = artifacts
     persist(job_id)
 
 
@@ -132,15 +150,43 @@ def submit(job_id: str, work: Callable[[str], None]) -> None:
 
 def delete(job_id: str) -> None:
     """Remove o job do registro em memória, o JSON e os arquivos gerados."""
-    import shutil
-
     job = get(job_id)
     with _lock:
         _jobs.pop(job_id, None)
-    _job_file(job_id).unlink(missing_ok=True)
-    if not job:
-        return
-    tool = job.get("tool") or ""
-    folder = config.tool_dir(tool) / job_id
-    if folder.exists() and folder.is_dir():
-        shutil.rmtree(folder, ignore_errors=True)
+    paths: list[Path] = [_job_file(job_id)]
+    if job:
+        for raw in job.get("artifacts") or []:
+            if isinstance(raw, str) and raw:
+                paths.append(Path(raw))
+            elif isinstance(raw, dict):
+                path = raw.get("path")
+                if isinstance(path, str) and path:
+                    paths.append(Path(path))
+        tool = job.get("tool") or ""
+        folder = config.tool_dir(tool) / job_id
+        paths.append(folder)
+
+    # Remove qualquer rastro no storage, mesmo quando o job morreu no meio.
+    try:
+        for match in config.storage_dir.rglob(f"{job_id}*"):
+            paths.append(match)
+    except OSError:
+        pass
+
+    seen: set[str] = set()
+    ordered: list[Path] = []
+    for path in paths:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(path)
+
+    for path in sorted(ordered, key=lambda p: len(p.parts), reverse=True):
+        try:
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink(missing_ok=True)
+        except OSError:
+            continue

@@ -127,6 +127,15 @@ function Historico() {
                   <p className="text-xs text-muted-foreground">
                     {job.filename ?? "—"} · {job.created_at ?? "sem data"}
                   </p>
+                  {job.source_kind || job.meta?.source_card ? (
+                    <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {job.source_kind === "upload"
+                        ? `Origem: upload${job.source_label ? ` · ${job.source_label}` : ""}`
+                        : job.source_kind === "download"
+                          ? `Origem: URL${job.source_label ? ` · ${job.source_label}` : ""}`
+                          : "Origem: card rastreado"}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-3">
                   <StatusPill status={job.status} />

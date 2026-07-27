@@ -25,6 +25,17 @@ function formatDate(iso?: string): string {
   return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+function sourceLabel(job: Job): string | null {
+  if (job.source_kind === "upload") return `Upload · ${job.source_label ?? "arquivo local"}`;
+  if (job.source_kind === "download")
+    return `URL · ${job.source_label ?? job.source_url ?? "remota"}`;
+  const rawCard = job.meta?.source_card;
+  if (!rawCard || typeof rawCard !== "object" || Array.isArray(rawCard)) return null;
+  const card = rawCard as { title?: string };
+  if (card?.title) return `Card · ${card.title}`;
+  return null;
+}
+
 /**
  * Histórico local da ferramenta — mesmo padrão do legado:
  * lista dos arquivos prontos, com data, tamanho, hash e download direto.
@@ -139,6 +150,11 @@ export function ToolHistory({
                     - {(job.meta.source_card as { desc?: string }).desc ?? "Sem descrição."}
                   </p>
                 ) : null}
+                {sourceLabel(job) ? (
+                  <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Origem rastreada: {sourceLabel(job)}
+                  </p>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
                 <StatusPill status={job.status} />
@@ -197,6 +213,9 @@ export function ToolHistory({
                 <p className="truncate text-xs text-muted-foreground">
                   {preview.tool} · {formatDate(preview.created_at)}
                 </p>
+                {sourceLabel(preview) ? (
+                  <p className="truncate text-xs text-muted-foreground">{sourceLabel(preview)}</p>
+                ) : null}
               </div>
               <button
                 type="button"
