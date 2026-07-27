@@ -113,7 +113,89 @@ def catalog():
         timings=list(TIMINGS),
         levels=list(LEVELS),
         max_tts_chars=MAX_TTS_CHARS,
+        test_script=TEST_SCRIPT,
+        local_voices=[
+            {"id": "masc_grave", "name": "Masculino grave"},
+            {"id": "masc_jovem", "name": "Masculino jovem"},
+            {"id": "fem_suave", "name": "Feminino suave"},
+            {"id": "fem_energetica", "name": "Feminino energética"},
+            {"id": "narrador", "name": "Narrador documentário"},
+        ],
     )
+
+
+@bp.post("/preview")
+def preview():
+    """Escuta rápida de qualquer voz do catálogo (ElevenLabs, Forge ou timbre local)."""
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    payload = dict(payload) if isinstance(payload, dict) else {}
+    engine = str(payload.get("engine") or "forge").lower()
+    if engine not in ENGINES:
+        return jsonify(error="Motor de voz inválido."), 400
+
+    text = str(payload.get("text") or TEST_SCRIPT).strip()[:1200]
+    if len(text) < 2:
+        return jsonify(error="Escreva um texto de teste."), 400
+
+    job_id = f"preview-{engine}-{int(time.time() * 1000)}"
+    dst = output_path("voice", job_id, ".mp3")
+
+    try:
+        if engine == "elevenlabs":
+            voice_id = str(payload.get("voice_id") or "").strip()
+            if not voice_engine.available():
+                return jsonify(error="Cadastre a chave ElevenLabs em /apis para testar as vozes realistas."), 400
+            if not voice_id:
+                return jsonify(error="Escolha uma voz realista."), 400
+            wav = output_path("voice", job_id, ".raw.wav")
+            voice_engine.text_to_speech(text, wav, voice_id=voice_id, job_id=job_id)
+            media.run(
+                [
+                    config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", str(wav), "-c:a", "libmp3lame", "-b:a", "192k", str(dst),
+                ],
+                job_id=None,
+            )
+            wav.unlink(missing_ok=True)
+            return jsonify(url=public_url(dst), engine=engine, voice_id=voice_id)
+
+        if not edge_tts.available():
+            return jsonify(
+                error="Motor gratuito indisponível: instale `edge-tts` no servidor e reinicie o viral-api."
+            ), 400
+
+        raw = output_path("voice", job_id, ".raw.wav")
+        if engine == "forge":
+            persona = voice_forge.get(str(payload.get("persona_id") or "").strip())
+            if persona is None:
+                return jsonify(error="Escolha (ou crie) uma voz própria no Forge."), 400
+            edge_tts.synthesize(text, raw, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate)
+            chain = voice_forge.filter_chain(persona, preserve_duration=False)
+            label = persona.name
+        else:
+            target = str(payload.get("target_voice") or "masc_grave")
+            if target not in VOICES:
+                return jsonify(error="Timbre alvo inválido."), 400
+            base = (edge_tts.list_voices() or ["pt-BR-AntonioNeural"])[0]
+            edge_tts.synthesize(text, raw, voice=base, job_id=job_id)
+            chain = build_timbre_chain(target, "natural")
+            label = target
+
+        media.run(
+            [
+                config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(raw), "-af", ",".join(chain),
+                "-c:a", "libmp3lame", "-b:a", "192k", str(dst),
+            ],
+            job_id=None,
+        )
+        raw.unlink(missing_ok=True)
+        return jsonify(url=public_url(dst), engine=engine, voice=label)
+    except (EdgeTTSError, VoiceEngineError, RuntimeError) as exc:
+        return jsonify(error=str(exc)), 400
+
+
+
 
 
 @bp.get("/voices")
