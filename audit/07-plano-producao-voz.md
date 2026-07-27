@@ -24,6 +24,10 @@ O que ela faz agora:
 - Permite cancelamento e exclusão.
 - Aplica mutação de áudio com filtros de pitch, tempo, equalização e normalização.
 - Entrega o arquivo final com limpeza estrutural e relatório auditável.
+- Na aba **Dublagem IA**, o gargalo real é a etapa de transcrição do áudio
+  original.
+- O fluxo de dublagem depende de uma chave valida de **Groq** ou **Whisper**
+  em `/apis`.
 
 O que ela ainda não faz de forma completa:
 
@@ -66,6 +70,13 @@ Antes de converter, o sistema precisa entender o arquivo:
 - Medir duração real, pico, LUFS e faixa dinâmica.
 - Classificar se o conteúdo é fala limpa, podcast, narração, vídeo externo ou
   áudio misto.
+
+Na dublagem atual, o passo mais importante para desbloquear o job é:
+
+1. Transcrever o audio.
+2. Gerar os segmentos com timestamps.
+3. Recriar a locucao com a voz escolhida.
+4. Reencaixar o audio final no video.
 
 ### 2. Pipeline de voz IA
 
@@ -199,6 +210,7 @@ A ferramenta de voz só deve ser considerada pronta para produção quando:
 - Preservar ou alterar o timing conforme o modo escolhido.
 - Entregar voz com qualidade consistente.
 - Ter comportamento previsível em produção.
+- Validar Groq e Whisper com audio real antes de marcar `dub_ready: true`.
 
 ## Riscos atuais
 
@@ -218,6 +230,57 @@ A ferramenta de voz só deve ser considerada pronta para produção quando:
 3. Implementar análise de áudio antes da conversão.
 4. Adicionar chunking e retomada por segmentos.
 5. Criar perfis profissionais de voz e presets de exportação.
+
+## Runbook de validacao da Dublagem IA
+
+Use este checklist sempre que a dublagem falhar com `401` ou `403`:
+
+```bash
+cd /www/wwwroot/gentle-aid && bash deploy/safe-update.sh
+```
+
+Depois:
+
+1. Abra `/apis`.
+2. Clique em **Testar todas**.
+3. Confirme que **Groq** e **Whisper** ficaram verdes.
+4. Verifique o backend:
+
+```bash
+curl -s http://127.0.0.1:8010/api/voice/catalog | head -c 400
+```
+
+5. Confirme que `dub_ready` nao esta `false`.
+6. Vá para `/voice-conversion` → aba **Dublagem IA**.
+7. Escolha uma persona do **Voice Forge**.
+8. Rode um job novo com link ou upload.
+9. Acompanhe o historico do job e confirme mensagens como:
+   - `Ouvindo o áudio original`
+   - `Transcrição via Groq · whisper-large-v3`
+   - `Whisper compatível`
+   - `Dublagem X/Y trechos narrados`
+
+Se o job parar em `403` na Groq:
+
+- a chave existe, mas a organizacao/plano nao liberou o Whisper da Groq;
+- a API deve cair para a **Whisper** como fallback;
+- se Groq e Whisper falharem, a chave precisa ser trocada no cofre de `/apis`.
+
+Se o job parar em `401`:
+
+- a chave foi revogada, digitada errado ou copiada de outra conta;
+- corrija em `/apis` e teste novamente.
+
+## Resumo operacional
+
+O fluxo certo da Dublagem IA, em producao, é:
+
+1. Atualizar o deploy.
+2. Validar Groq/Whisper em `/apis`.
+3. Confirmar `dub_ready` no catálogo de voz.
+4. Rodar um job novo.
+5. Acompanhar logs vivos e o historico do job.
+6. Só então considerar a dublagem operacional.
 
 ## Resumo executivo
 

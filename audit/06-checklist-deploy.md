@@ -11,6 +11,7 @@ O que verificar:
 
 - nao sobrescrever mudancas do usuario
 - manter o branch atual coerente com o Lovable
+- nao mexer em arquivos sensiveis sem backup do cofre
 
 ## Validacao de servicos
 
@@ -37,8 +38,8 @@ Esperado:
 ## Health check local
 
 ```bash
-curl -i http://127.0.0.1:8000/api/health
-curl -i http://127.0.0.1:8000/api/apis
+curl -i http://127.0.0.1:8010/api/health
+curl -i http://127.0.0.1:8010/api/apis
 ```
 
 Esperado:
@@ -46,6 +47,7 @@ Esperado:
 - `200 OK`
 - JSON com `status: ok`
 - JSON com `providers`
+- `api/voice/catalog` tambem responde com `dub_ready`
 
 ## Validacao pelo dominio
 
@@ -82,6 +84,7 @@ Esperado:
 - `0600`
 - owner correto
 - arquivo presente
+- chaves lidas por `api_keys.get_key(...)`, nao direto por `os.environ`
 
 ## Conferencia das variaveis
 
@@ -93,6 +96,28 @@ Esperado:
 
 - `VIRAL_ROOT=/www/wwwroot/gentle-aid`
 - `VIRAL_STORAGE=/www/wwwroot/gentle-aid/fabrica_clips`
+- `VIRAL_API_PORT=8010` ou valor equivalente usado pelo Gunicorn
+
+## Atualizacao segura
+
+```bash
+cd /www/wwwroot/gentle-aid && bash deploy/safe-update.sh
+```
+
+O que esse comando faz:
+
+- verifica se ha alteracoes locais nao commitadas
+- faz backup do `.env`
+- puxa o estado mais recente da branch remota configurada
+- restaura o `.env`
+- executa `deploy/update.sh`
+- sincroniza o catalogo de vozes e o estúdio de legendas
+
+Se o deploy parar em erro:
+
+- confira `journalctl -u viral-api -n 120 --no-pager`
+- confira `journalctl -u viral-web -n 120 --no-pager`
+- confirme `curl -s http://127.0.0.1:8010/api/health`
 
 ## Teste da tela
 
@@ -105,6 +130,8 @@ Esperado:
 - nao ficar preso em "Carregando..."
 - mostrar lista de provedores
 - permitir teste de conectividade
+- o botão "Testar todas" precisa validar as chaves reais no servidor
+- Groq e Whisper precisam responder antes de liberar a Dublagem IA
 
 ## Sinal verde final
 
@@ -113,4 +140,4 @@ Esperado:
 - Nginx encaminha `/api/`
 - o cofre existe no path atual
 - nenhum arquivo sensivel foi versionado
-
+- `curl -s http://127.0.0.1:8010/api/voice/catalog | head -c 400` mostra `dub_ready: true`

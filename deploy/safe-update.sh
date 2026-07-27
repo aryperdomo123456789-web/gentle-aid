@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ecossistema Viral — puxa a última versão do GitHub e aplica no aaPanel com segurança.
 # Uso (um único comando no servidor):
-#   cd /www/wwwroot/viral.vr766.com && bash deploy/safe-update.sh
+#   cd /www/wwwroot/gentle-aid && bash deploy/safe-update.sh
 #
 # O que ele faz:
 #   1. Aborta se houver alterações locais não commitadas (evita perda de trabalho).
@@ -91,12 +91,11 @@ else
 fi
 
 if printf '%s' "$PRESETS" | grep -qE '"transcription": ?true'; then
-  ok "Transcrição automática (Whisper) ativa"
+  ok "Transcrição automática (Groq/Whisper) ativa"
 else
-  warn "Transcrição automática indisponível — confira a chave Groq/OpenAI em /apis"
+  warn "Transcrição automática indisponível — confira Groq/Whisper em /apis"
 fi
 
 printf '\n\033[1;32m✔ Atualização segura concluída.\033[0m\n'
 printf '   Legendas: https://viral.vr766.com/legendar\n'
 printf '   Vozes:    https://viral.vr766.com/voice-conversion\n'
-
