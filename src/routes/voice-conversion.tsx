@@ -273,7 +273,32 @@ function VoiceStudio() {
                 )}
               </Field>
 
-              <Field label="Voz da narração">{voiceSelect}</Field>
+              <Field label="Motor da narração">
+                {(id) => (
+                  <SelectInput
+                    id={id}
+                    name="engine"
+                    value={ttsEngine}
+                    onChange={(e) => setTtsEngine(e.target.value as Engine)}
+                  >
+                    <option value="elevenlabs" disabled={!ready}>
+                      ElevenLabs — voz realista
+                    </option>
+                    <option value="forge" disabled={!forgeReady}>
+                      Voice Forge — sua voz própria (sem custo)
+                    </option>
+                  </SelectInput>
+                )}
+              </Field>
+
+              {ttsEngine === "forge" ? (
+                <Field label="Voz própria" hint="Narração gerada no motor gratuito com a sua assinatura acústica.">
+                  {personaSelect}
+                </Field>
+              ) : (
+                <Field label="Voz da narração">{voiceSelect}</Field>
+              )}
+
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field label="Velocidade">
