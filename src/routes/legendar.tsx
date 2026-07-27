@@ -310,18 +310,19 @@ function Legendar() {
             type="button"
             onClick={exportVideo}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60 sm:px-4"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60 sm:px-4"
           >
-            {busy ? "Renderizando…" : "Exportar legendado"}
+            <span className="sm:hidden">{busy ? "…" : "Exportar"}</span>
+            <span className="hidden sm:inline">{busy ? "Renderizando…" : "Exportar legendado"}</span>
           </button>
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
         {/* ===== Rail lateral de ferramentas ===== */}
         <nav
           aria-label="Ferramentas"
-          className="flex w-16 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-border bg-card py-2 sm:w-[74px]"
+          className="scroll-x flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-card px-1 py-1 md:w-16 md:flex-col md:items-center md:overflow-x-visible md:overflow-y-auto md:border-b-0 md:border-r md:px-0 md:py-2 lg:w-[74px]"
         >
           {RAIL.map((item) => {
             const Icon = item.icon;
@@ -333,7 +334,7 @@ function Legendar() {
                 onClick={() => setPanel(active ? null : item.id)}
                 aria-pressed={active}
                 className={cn(
-                  "flex w-full flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] leading-tight transition",
+                  "flex min-h-14 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-[10px] leading-tight transition md:w-full",
                   active
                     ? "bg-primary/15 text-foreground"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -350,8 +351,9 @@ function Legendar() {
         {panel ? (
           <aside
             aria-label="Painel de edição"
-            className="absolute inset-y-14 left-16 z-30 w-[min(100vw-4rem,340px)] overflow-y-auto border-r border-border bg-card p-3 shadow-xl sm:left-[74px] md:static md:inset-auto md:z-auto md:w-[320px] md:shadow-none lg:w-[360px]"
+            className="absolute inset-0 z-30 w-full overflow-y-auto overscroll-contain border-border bg-card p-3 shadow-xl md:static md:inset-auto md:z-auto md:w-[300px] md:border-r md:shadow-none lg:w-[340px] xl:w-[360px]"
           >
+
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-sm font-semibold text-foreground">
                 {RAIL.find((r) => r.id === panel)?.label}
