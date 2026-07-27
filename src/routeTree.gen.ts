@@ -14,6 +14,7 @@ import { Route as ApisRouteImport } from './routes/apis'
 import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as LegendarRouteImport } from './routes/legendar'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as TiktokRouteImport } from './routes/tiktok'
 import { Route as VoiceConversionRouteImport } from './routes/voice-conversion'
@@ -44,6 +45,11 @@ const LegendarRoute = LegendarRouteImport.update({
   path: '/legendar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RadarRoute = RadarRouteImport.update({
   id: '/radar',
   path: '/radar',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
+  '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
+  '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
+  '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/canva-cleaner'
     | '/historico'
     | '/legendar'
+    | '/login'
     | '/radar'
     | '/tiktok'
     | '/voice-conversion'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/canva-cleaner'
     | '/historico'
     | '/legendar'
+    | '/login'
     | '/radar'
     | '/tiktok'
     | '/voice-conversion'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/canva-cleaner'
     | '/historico'
     | '/legendar'
+    | '/login'
     | '/radar'
     | '/tiktok'
     | '/voice-conversion'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   CanvaCleanerRoute: typeof CanvaCleanerRoute
   HistoricoRoute: typeof HistoricoRouteWithChildren
   LegendarRoute: typeof LegendarRoute
+  LoginRoute: typeof LoginRoute
   RadarRoute: typeof RadarRoute
   TiktokRoute: typeof TiktokRoute
   VoiceConversionRoute: typeof VoiceConversionRoute
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/legendar'
       fullPath: '/legendar'
       preLoaderRoute: typeof LegendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/radar': {
@@ -232,6 +252,7 @@ const rootRouteChildren: RootRouteChildren = {
   CanvaCleanerRoute: CanvaCleanerRoute,
   HistoricoRoute: HistoricoRouteWithChildren,
   LegendarRoute: LegendarRoute,
+  LoginRoute: LoginRoute,
   RadarRoute: RadarRoute,
   TiktokRoute: TiktokRoute,
   VoiceConversionRoute: VoiceConversionRoute,
