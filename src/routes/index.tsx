@@ -145,9 +145,12 @@ function YoutubeBypass() {
             )}
           </Field>
 
-          <SubmitButton busy={busy}>
-            {busy ? "Processando lote…" : "Disparar bypass em lote"}
-          </SubmitButton>
+          <JobSettingsGuard
+            busy={busy}
+            label="Disparar bypass em lote"
+            busyLabel="Processando lote…"
+          />
+
         </form>
       }
       right={
