@@ -361,6 +361,7 @@ def _work_convert(
     source_url: str,
     keep_video: bool,
     settings: Settings,
+    persona: "voice_forge.Persona | None" = None,
 ) -> None:
     src = ingest.resolve_source(src, source_url, job_id)
     info = media.probe(src)
@@ -368,6 +369,30 @@ def _work_convert(
         raise RuntimeError("O arquivo enviado não tem trilha de áudio para converter.")
 
     jobs.update(job_id, progress=15)
+
+    if engine == "forge" and persona is not None:
+        # Voz própria por DSP: reescreve o timbre do narrador original mantendo
+        # a narrativa, o ritmo e a sincronia com a imagem — custo zero.
+        jobs.log(
+            job_id,
+            f"Voice Forge · persona '{persona.name}' · timing {timing} · {info.duration:.1f}s de áudio",
+        )
+        chain = voice_forge.filter_chain(persona, preserve_duration=(timing == "strict"))
+        if keep_video and info.has_video:
+            dst = output_path("voice", job_id, ".mp4")
+            report = media.sterilize(
+                src, dst, job_id=job_id, level=mutation, extra_audio_filters=chain,
+            )
+            message = f"Narração reescrita com a voz própria '{persona.name}' e vídeo esterilizado."
+        else:
+            dst = output_path("voice", job_id, FORMATS[fmt])
+            report = media.sterilize(
+                src, dst, job_id=job_id, level=mutation, extra_audio_filters=chain, audio_only=True,
+            )
+            message = f"Áudio reescrito com a voz própria '{persona.name}' e sem rastro de origem."
+        src.unlink(missing_ok=True)
+        deliver(job_id, dst, report, message=message)
+        return
 
     if engine == "local":
         jobs.log(
@@ -395,21 +420,28 @@ def _work_convert(
 
     jobs.update(job_id, progress=88)
 
+    # Acabamento opcional: a persona vira uma assinatura própria por cima da voz
+    # realista, o que também descaracteriza o timbre original do provedor.
+    finish = voice_forge.filter_chain(persona, preserve_duration=True) if persona else None
+
     if keep_video and info.has_video:
         muxed = work_dir / f"{job_id}_muxed.mp4"
         voice_engine.swap_video_audio(src, converted, muxed, job_id)
         dst = output_path("voice", job_id, ".mp4")
-        report = media.sterilize(muxed, dst, job_id=job_id, level=mutation)
+        report = media.sterilize(muxed, dst, job_id=job_id, level=mutation, extra_audio_filters=finish)
         muxed.unlink(missing_ok=True)
         message = "Narrador trocado, vídeo remuxado e arquivo esterilizado."
     else:
         dst = output_path("voice", job_id, FORMATS[fmt])
-        report = media.sterilize(converted, dst, job_id=job_id, level=mutation, audio_only=True)
+        report = media.sterilize(
+            converted, dst, job_id=job_id, level=mutation, extra_audio_filters=finish, audio_only=True
+        )
         message = "Narrador trocado com narrativa e timing preservados."
 
     converted.unlink(missing_ok=True)
     src.unlink(missing_ok=True)
     deliver(job_id, dst, report, message=message)
+
 
 
 def _work_tts(
