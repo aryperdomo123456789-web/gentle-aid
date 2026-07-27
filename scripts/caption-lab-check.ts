@@ -129,5 +129,52 @@ check("typewriter esconde o resto com \\alpha&HFF&", typed.ass.includes("\\alpha
 const pop = buildAss(baseLines, { presetId: "hormozi", videoWidth: 1080, videoHeight: 1920, animation: "pop" });
 check("pop reseta o estilo após a palavra ativa", pop.ass.includes("{\\r}"));
 
+
+// 13. Pacote viral de animações — todas geram ASS válido e tags próprias
+const VIRAL: Array<[string, string]> = [
+  ["beat", "\\fscx142"],
+  ["zoom", "\\fscx165"],
+  ["slide", "\\fay-0.12"],
+  ["blur", "\\blur9"],
+  ["wave", "\\fay"],
+  ["glitch", "\\xshad-5"],
+  ["neon", "\\blur6"],
+  ["rainbow", "\\c&H0000FF&"],
+  ["stamp", "\\frz-12"],
+  ["flip", "\\fry88"],
+];
+for (const [anim, tag] of VIRAL) {
+  const built = buildAss(baseLines, {
+    presetId: "hormozi",
+    videoWidth: 1080,
+    videoHeight: 1920,
+    animation: anim as never,
+  });
+  const braces = (built.ass.match(/\{/g) ?? []).length === (built.ass.match(/\}/g) ?? []).length;
+  check(`animação ${anim} emite ${tag}`, built.ass.includes(tag));
+  check(`animação ${anim} com chaves balanceadas`, braces);
+  check(`animação ${anim} reseta após a palavra ativa`, built.ass.includes("{\\r}"));
+}
+check("wave alterna o lado da onda", buildAss(baseLines, { presetId: "hormozi", videoWidth: 1080, videoHeight: 1920, animation: "wave" }).ass.includes("\\fay0.10"));
+check("rainbow cicla mais de uma cor", RAINBOW.filter((c) => buildAss(baseLines, { presetId: "hormozi", videoWidth: 1080, videoHeight: 1920, animation: "rainbow" }).ass.includes(c)).length >= 2);
+
+// 14. Beat sync — grade de batidas e encaixe
+const grid = beatsFromBpm(120, 10);
+check("grade de 120 BPM tem passo de 0.5s", Math.abs(grid[1] - grid[0] - 0.5) < 1e-6, `${grid.length} batidas`);
+check("BPM inválido não gera grade", beatsFromBpm(0, 10).length === 0);
+const snapped = snapLinesToBeats(baseLines, grid);
+const flat = snapped.flatMap((l) => l.words);
+const original = baseLines.flatMap((l) => l.words);
+check("snap mantém o texto", flat.map((w) => w.text).join(" ") === original.map((w) => w.text).join(" "));
+check("snap mantém a ordem", flat.every((w, i) => i === 0 || flat[i - 1].start <= w.start));
+check("snap nunca cria evento negativo", flat.every((w) => w.end > w.start));
+const onBeat = flat.filter((w) => grid.some((b) => Math.abs(b - w.start) < 0.001)).length;
+check("snap encaixa a maioria na batida", onBeat >= flat.length * 0.5, `${onBeat}/${flat.length}`);
+const far = snapLinesToBeats(baseLines, [50, 60]);
+check("batida distante não move a palavra", far[0].words[0].start === baseLines[0].words[0].start);
+
+// 15. WrapStyle 0 evita legenda cortada nas bordas (bug visto em render real)
+check("ASS usa WrapStyle 0", buildAss(baseLines, { presetId: "hormozi", videoWidth: 1080, videoHeight: 1920 }).ass.includes("WrapStyle: 0"));
+
 console.log(failures === 0 ? "\nTODOS OS TESTES PASSARAM" : `\n${failures} TESTE(S) FALHARAM`);
 if (failures) process.exit(1);
