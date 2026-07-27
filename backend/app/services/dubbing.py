@@ -39,7 +39,16 @@ LANGUAGES = {
     "fr": "francês",
     "it": "italiano",
     "de": "alemão",
+    "ja": "japonês",
+    "ko": "coreano",
+    "zh": "chinês mandarim",
+    "ru": "russo",
+    "ar": "árabe",
+    "hi": "híndi",
+    "tr": "turco",
+    "id": "indonésio",
 }
+
 
 
 class DubbingError(RuntimeError):
