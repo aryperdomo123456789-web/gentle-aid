@@ -707,6 +707,10 @@ def test_provider(provider_id: str) -> dict[str, Any]:
         attempts.append(attempt)
         if attempt.get("ok"):
             break
+        # Probe de áudio é decisivo: se a transcrição recusou a chave, não adianta
+        # o /models responder 200 — a dublagem vai falhar do mesmo jeito.
+        if candidate.get("audio_probe") and attempt.get("status") in (401, 402, 403):
+            break
 
     if not attempt.get("ok"):
         # Mantém a tentativa mais informativa (ignora probes puladas por falta de env).
