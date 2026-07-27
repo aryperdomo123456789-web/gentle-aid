@@ -502,7 +502,9 @@ _PREFIX_OWNER = {
     "hf_": "huggingface",
     "jina_": "jina",
     "sk-lf-": "langfuse",
+    "AIza": "gemini",
 }
+
 
 _KV = None  # regex compilada sob demanda
 _autofill_done = False
