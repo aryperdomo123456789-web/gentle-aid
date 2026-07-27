@@ -7,17 +7,22 @@ import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
 import { ToolHistory } from "@/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
+import { VoiceForgePanel, type Persona } from "@/components/VoiceForgePanel";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { apiGet, apiPostForm, type Job } from "@/lib/api";
 
 type RealisticVoice = { id: string; name: string; labels?: string; preview_url?: string };
 type Catalog = {
   engine_ready: boolean;
+  forge_ready: boolean;
   realistic_voices: RealisticVoice[];
+  personas: Persona[];
   max_tts_chars: number;
 };
 
-type Mode = "media" | "text";
+type Engine = "elevenlabs" | "local" | "forge";
+type Mode = "media" | "text" | "forge";
+
 
 export const Route = createFileRoute("/voice-conversion")({
   head: () => ({
