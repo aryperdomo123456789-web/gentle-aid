@@ -721,7 +721,12 @@ _MAX_FILE_BYTES = 2_000_000
 
 
 def _scan_roots() -> list:
-    """Diretórios onde as chaves podem estar (app atual, app legado, extras)."""
+    """Diretórios onde as chaves podem estar (app atual, app legado, extras).
+
+    `/root` e outros caminhos fora do app NÃO entram por padrão: a varredura de
+    home do root deixava o boot do Gunicorn lentíssimo. Para incluir extras use
+    `VIRAL_KEY_SCAN_PATHS=/root:/outro/caminho` no .env.
+    """
     from pathlib import Path
 
     extra = os.environ.get("VIRAL_KEY_SCAN_PATHS", "")
@@ -731,7 +736,6 @@ def _scan_roots() -> list:
         Path("/www/wwwroot/viral.vr766.com"),
         Path("/www/wwwroot/viral.vr766.com.bak"),
         Path("/www/wwwroot/viral"),
-        Path("/root"),
     ]
     roots += [Path(p) for p in extra.split(":") if p.strip()]
     seen, out = set(), []
@@ -748,12 +752,21 @@ def _scan_roots() -> list:
     return out
 
 
+_scan_cache: dict[str, Any] = {"at": 0.0, "paths": []}
+_SCAN_TTL = 120.0
+
+
 def _scan_paths() -> list:
     """Varredura recursiva (profundidade limitada) por arquivos de configuração."""
     from pathlib import Path
 
+    now = time.time()
+    if _scan_cache["paths"] and now - _scan_cache["at"] < _SCAN_TTL:
+        return _scan_cache["paths"]
+
     found: list[Path] = []
     for root in _scan_roots():
+
         base_depth = len(root.parts)
         try:
             for dirpath, dirnames, filenames in os.walk(root):
@@ -773,10 +786,13 @@ def _scan_paths() -> list:
                     except OSError:
                         continue
                 if len(found) > 4000:
+                    _scan_cache.update({"at": now, "paths": found})
                     return found
         except OSError:
             continue
+    _scan_cache.update({"at": now, "paths": found})
     return found
+
 
 
 def _harvest(text: str) -> dict[str, str]:
@@ -998,7 +1014,7 @@ def sync_env(data: dict[str, dict[str, Any]] | None = None) -> str | None:
 
 
 
-def autofill(force: bool = False, repair: bool = False) -> dict[str, Any]:
+def autofill(force: bool = False, repair: bool = False, probe: bool = True) -> dict[str, Any]:
     """Preenche o cofre com chaves encontradas no ambiente e em arquivos legados."""
     harvested, sources = _collect()
 
@@ -1045,7 +1061,8 @@ def autofill(force: bool = False, repair: bool = False) -> dict[str, Any]:
             if prefer:
                 pool.sort(key=lambda item: 0 if re.match(prefer, item[0]) else 1)
             probed_ok = False
-            if len(pool) > 1 or (existing and value != existing):
+            if probe and (len(pool) > 1 or (existing and value != existing)):
+
                 for candidate_key, candidate_origin in pool:
                     if _probe_key(provider, candidate_key):
                         value, origin, probed_ok = candidate_key, candidate_origin, True
@@ -1087,21 +1104,24 @@ def autofill(force: bool = False, repair: bool = False) -> dict[str, Any]:
 
 
 def autofill_once() -> None:
-    """Roda uma vez por processo, no boot da aplicação.
+    """Dispara a importação uma vez por processo, sem bloquear o boot.
 
-    O autofill completo pode varrer caminhos grandes e fazer probes de rede.
-    Por padrão ele fica desativado no boot e só roda quando explicitamente
-    habilitado via ``VIRAL_AUTO_IMPORT_ON_BOOT=1``. A Central de APIs continua
-    com o fluxo manual de importação exatamente como antes.
+    O fluxo fica assíncrono para não atrasar a subida do Gunicorn. Por padrão
+    ele tenta importar sem sondagem de rede; para desativar por completo use
+    ``VIRAL_DISABLE_AUTOFILL=1``. A Central de APIs segue com o botão manual.
     """
     global _autofill_done
     if _autofill_done:
         return
     _autofill_done = True
-    enabled = os.environ.get(_BOOT_AUTOFILL_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
-    if not enabled:
+
+    if os.environ.get("VIRAL_DISABLE_AUTOFILL") == "1":
         return
-    try:
-        threading.Thread(target=_autofill_worker, daemon=True).start()
-    except Exception:  # noqa: BLE001 — nunca derruba o boot
-        pass
+
+    def _run() -> None:
+        try:
+            autofill(force=False, probe=False)
+        except Exception:  # noqa: BLE001 — nunca derruba o boot
+            pass
+
+    threading.Thread(target=_run, name="api-keys-autofill", daemon=True).start()
