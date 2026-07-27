@@ -1,22 +1,19 @@
+import { Activity, CircleAlert, DownloadCloud, KeyRound, Loader2, RefreshCw, Wrench } from "lucide-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Activity,
-  CheckCircle2,
-  CircleAlert,
-  CircleHelp,
-  ExternalLink,
-  KeyRound,
-  Loader2,
-  DownloadCloud,
-  RefreshCw,
-  Save,
-  Trash2,
-  Wrench,
-} from "lucide-react";
 
 import { TopNav } from "@/components/TopNav";
-import { apiGet, friendlyError, API_BASE } from "@/lib/api";
+import {
+  fetchProviders,
+  importKeys,
+  scanKeys,
+  testAllProviders,
+  type ImportReport,
+} from "@/features/apis/api";
+import { ProviderCard } from "@/features/apis/components/ProviderCard";
+import { ScanReportPanel } from "@/features/apis/components/ScanReportPanel";
+import type { Provider, ScanReport } from "@/features/apis/types";
+import { friendlyError } from "@/lib/http";
 
 export const Route = createFileRoute("/apis")({
   head: () => ({
@@ -39,57 +36,20 @@ export const Route = createFileRoute("/apis")({
   component: ApisPage,
 });
 
-type TestResult = {
-  ok: boolean | null;
-  status: number;
-  message: string;
-  action?: "replace_key" | "billing" | "scope" | "wait" | "network" | "check" | null;
-  remediation?: string | null;
-  latency_ms?: number;
-  at?: string;
-};
+const ALL_CATEGORIES = "todas";
 
-type Provider = {
-  id: string;
-  name: string;
-  category: string;
-  env: string;
-  docs: string;
-  usage: string;
-  prefix?: string | null;
-  format_hint?: string | null;
-  format_ok?: boolean | null;
-  testable: boolean;
-
-  configured: boolean;
-  source: "cofre" | "env" | "vazio";
-  project_active: boolean;
-  project_label: string;
-  masked: string;
-  note: string;
-  updated_at?: string | null;
-  last_test?: TestResult | null;
-};
-
-async function apiSend<T>(path: string, method: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new Error(data?.error ?? `Falha na requisição (HTTP ${res.status}).`);
-  return data as T;
+function describeImport(report: ImportReport | undefined): string {
+  const imported = report?.imported ?? [];
+  if (imported.length > 0) {
+    const envInfo = report?.env_file
+      ? ` Espelhadas com permissão 600 em ${report.env_file}.`
+      : "";
+    return `${imported.length} chave(s) importada(s) automaticamente: ${imported.join(", ")}.${envInfo}`;
+  }
+  return `Nenhuma chave encontrada. Foram lidos ${report?.scanned ?? 0} arquivo(s) em: ${(
+    report?.roots ?? []
+  ).join(", ")}. Use "Diagnóstico" para ver os detalhes.`;
 }
-
-type ScanReport = {
-  roots: string[];
-  files_scanned: number;
-  files: string[];
-  env_vars_seen: number;
-  hits: { id: string; name: string; found: boolean; var?: string | null; origin?: string }[];
-};
 
 function ApisPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -98,7 +58,7 @@ function ApisPage() {
   const [testingAll, setTestingAll] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importReport, setImportReport] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>("todas");
+  const [filter, setFilter] = useState<string>(ALL_CATEGORIES);
   const [scanning, setScanning] = useState(false);
   const [scan, setScan] = useState<ScanReport | null>(null);
 
@@ -106,8 +66,7 @@ function ApisPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<{ providers: Provider[] }>("/api/apis");
-      setProviders(data.providers ?? []);
+      setProviders(await fetchProviders());
     } catch (err) {
       setError(friendlyError(err));
     } finally {
@@ -120,28 +79,27 @@ function ApisPage() {
   }, [load]);
 
   const categories = useMemo(
-    () => ["todas", ...Array.from(new Set(providers.map((p) => p.category)))],
+    () => [ALL_CATEGORIES, ...Array.from(new Set(providers.map((p) => p.category)))],
     [providers],
   );
 
   const visible = useMemo(
-    () => providers.filter((p) => filter === "todas" || p.category === filter),
+    () => providers.filter((p) => filter === ALL_CATEGORIES || p.category === filter),
     [providers, filter],
   );
 
   const configured = providers.filter((p) => p.configured).length;
   const failing = providers.filter((p) => p.last_test?.ok === false).length;
 
-  function replace(next: Provider) {
+  const replace = useCallback((next: Provider) => {
     setProviders((list) => list.map((p) => (p.id === next.id ? next : p)));
-  }
+  }, []);
 
   async function testAll() {
     setTestingAll(true);
     setError(null);
     try {
-      const data = await apiSend<{ providers: Provider[] }>("/api/apis/test-all", "POST");
-      setProviders(data.providers ?? []);
+      setProviders(await testAllProviders());
     } catch (err) {
       setError(friendlyError(err));
     } finally {
@@ -149,31 +107,14 @@ function ApisPage() {
     }
   }
 
-  async function importKeys(force: boolean, repair = false) {
+  async function runImport(force: boolean, repair = false) {
     setImporting(true);
     setError(null);
     setImportReport(null);
     try {
-      const data = await apiSend<{
-        providers: Provider[];
-        report: {
-          imported: string[];
-          skipped: string[];
-          scanned: number;
-          roots?: string[];
-          env_file?: string | null;
-        };
-      }>("/api/apis/import", "POST", { force, repair });
+      const data = await importKeys({ force, repair });
       setProviders(data.providers ?? []);
-      const n = data.report?.imported?.length ?? 0;
-      const envInfo = data.report?.env_file
-        ? ` Espelhadas com permissão 600 em ${data.report.env_file}.`
-        : "";
-      setImportReport(
-        n > 0
-          ? `${n} chave(s) importada(s) automaticamente: ${data.report.imported.join(", ")}.${envInfo}`
-          : `Nenhuma chave encontrada. Foram lidos ${data.report?.scanned ?? 0} arquivo(s) em: ${(data.report?.roots ?? []).join(", ")}. Use "Diagnóstico" para ver os detalhes.`,
-      );
+      setImportReport(describeImport(data.report));
     } catch (err) {
       setError(friendlyError(err));
     } finally {
@@ -185,8 +126,7 @@ function ApisPage() {
     setScanning(true);
     setError(null);
     try {
-      const data = await apiGet<{ report: ScanReport }>("/api/apis/scan");
-      setScan(data.report);
+      setScan(await scanKeys());
     } catch (err) {
       setError(friendlyError(err));
     } finally {
@@ -204,7 +144,9 @@ function ApisPage() {
               <KeyRound className="size-3.5" aria-hidden="true" />
               Cofre · /api/apis
             </span>
-            <h1 className="mt-3 text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Central de APIs</h1>
+            <h1 className="mt-3 text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">
+              Central de APIs
+            </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               Todas as integrações do pipeline em um só lugar. Substitua uma chave que estourou o
               limite, remova a que não usa mais e teste a conectividade sem sair do painel — as
@@ -222,7 +164,7 @@ function ApisPage() {
             </button>
             <button
               type="button"
-              onClick={() => void importKeys(false)}
+              onClick={() => void runImport(false)}
               disabled={importing}
               title="Varre .env, o app antigo e configurações legadas do servidor e preenche as chaves sozinho"
               className="inline-flex items-center gap-2 rounded-xl border border-accent/50 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-accent disabled:opacity-60"
@@ -236,7 +178,7 @@ function ApisPage() {
             </button>
             <button
               type="button"
-              onClick={() => void importKeys(false, true)}
+              onClick={() => void runImport(false, true)}
               disabled={importing}
               title="Só nas integrações que falharam: procura outra chave do mesmo provedor no legado, testa de verdade e troca apenas se a nova funcionar"
               className="inline-flex items-center gap-2 rounded-xl border border-success/50 bg-success/10 px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-success disabled:opacity-60"
@@ -285,49 +227,7 @@ function ApisPage() {
           </p>
         ) : null}
 
-        {scan ? (
-          <section className="panel mb-6 p-5">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="font-display text-base font-semibold">Diagnóstico da varredura</h2>
-              <button
-                type="button"
-                onClick={() => setScan(null)}
-                className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs"
-              >
-                Fechar
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {scan.files_scanned} arquivo(s) lidos · {scan.env_vars_seen} variáveis de ambiente ·
-              diretórios: <span className="font-mono">{scan.roots.join(", ")}</span>
-            </p>
-            <ul className="mt-3 grid gap-1 text-xs sm:grid-cols-2">
-              {scan.hits.map((hit) => (
-                <li
-                  key={hit.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background/40 px-3 py-1.5"
-                >
-                  <span>{hit.name}</span>
-                  <span className={hit.found ? "text-success" : "text-muted-foreground"}>
-                    {hit.found ? `achou · ${hit.var}` : "não encontrada"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {scan.files.length ? (
-              <details className="mt-3">
-                <summary className="cursor-pointer text-xs text-muted-foreground">
-                  Ver arquivos varridos ({scan.files.length})
-                </summary>
-                <ul className="mt-2 max-h-56 space-y-0.5 overflow-auto font-mono text-[11px] text-muted-foreground">
-                  {scan.files.map((f) => (
-                    <li key={f}>{f}</li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-          </section>
-        ) : null}
+        {scan ? <ScanReportPanel report={scan} onClose={() => setScan(null)} /> : null}
 
         <dl className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Stat label="Integrações mapeadas" value={String(providers.length)} />
@@ -346,7 +246,10 @@ function ApisPage() {
           </p>
         ) : null}
 
-        <nav aria-label="Filtrar por categoria" className="scroll-x -mx-3 mb-6 overflow-x-auto pb-1 sm:-mx-1">
+        <nav
+          aria-label="Filtrar por categoria"
+          className="scroll-x -mx-3 mb-6 overflow-x-auto pb-1 sm:-mx-1"
+        >
           <ul className="flex min-w-max gap-2 px-3 sm:px-1">
             {categories.map((cat) => (
               <li key={cat}>
@@ -418,257 +321,5 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "go
         {value}
       </dd>
     </div>
-  );
-}
-
-function ProviderCard({
-  provider,
-  onChange,
-}: {
-  provider: Provider;
-  onChange: (p: Provider) => void;
-}) {
-  const [value, setValue] = useState("");
-  const [note, setNote] = useState(provider.note ?? "");
-  const [busy, setBusy] = useState<"save" | "test" | "delete" | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  async function save() {
-    setBusy("save");
-    setFeedback(null);
-    setFailed(false);
-    try {
-      const data = await apiSend<{ provider: Provider }>(`/api/apis/${provider.id}`, "PUT", {
-        key: value,
-        note,
-      });
-      onChange(data.provider);
-      setValue("");
-      setFeedback("Chave atualizada.");
-    } catch (err) {
-      setFailed(true);
-      setFeedback(friendlyError(err));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function test() {
-    setBusy("test");
-    setFeedback(null);
-    setFailed(false);
-    try {
-      const data = await apiSend<{ provider: Provider; result: TestResult }>(
-        `/api/apis/${provider.id}/test`,
-        "POST",
-      );
-      onChange(data.provider);
-      setFailed(data.result.ok === false);
-      setFeedback(data.result.message);
-    } catch (err) {
-      setFailed(true);
-      setFeedback(friendlyError(err));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function remove() {
-    setBusy("delete");
-    setFeedback(null);
-    setFailed(false);
-    try {
-      const data = await apiSend<{ provider: Provider }>(`/api/apis/${provider.id}`, "DELETE");
-      onChange(data.provider);
-      setFeedback("Chave removida do cofre.");
-    } catch (err) {
-      setFailed(true);
-      setFeedback(friendlyError(err));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const last = provider.last_test;
-  const inputId = `key-${provider.id}`;
-
-  return (
-    <article className="panel flex min-w-0 flex-col gap-4 p-4 sm:p-5">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-        <div className="min-w-0">
-          <h2 className="break-words text-base font-semibold">{provider.name}</h2>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <p className="text-xs text-muted-foreground">{provider.category}</p>
-            <span
-              className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                provider.project_active
-                  ? "border-success/40 bg-success/10 text-success"
-                  : "border-border bg-surface/60 text-muted-foreground"
-              }`}
-            >
-              {provider.project_label}
-            </span>
-          </div>
-        </div>
-        <HealthPill provider={provider} />
-      </header>
-
-      <p className="text-sm text-muted-foreground">{provider.usage}</p>
-
-      <dl className="grid gap-2 text-xs">
-        <Row label="Chave atual" value={provider.masked || "não configurada"} mono />
-        <Row label="Variável" value={provider.env} mono />
-        <Row
-          label="Origem"
-          value={
-            provider.source === "cofre"
-              ? "Cofre do painel"
-              : provider.source === "env"
-                ? "Variável de ambiente"
-                : "—"
-          }
-        />
-        {provider.updated_at ? <Row label="Atualizada em" value={provider.updated_at} /> : null}
-        {last ? (
-          <Row
-            label="Último teste"
-            value={`${last.message}${last.latency_ms ? ` · ${last.latency_ms} ms` : ""}`}
-          />
-        ) : null}
-      </dl>
-
-      {provider.format_ok === false ? (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          Formato incompatível: esta chave deveria começar com{" "}
-          <code className="font-mono">{provider.prefix}</code>. Substitua por uma credencial válida.
-        </p>
-      ) : null}
-      {last?.remediation ? (
-        <p className="rounded-lg border border-electric/40 bg-electric/10 px-3 py-2 text-xs text-electric">
-          <span className="font-semibold">Como resolver: </span>
-          {last.remediation}
-        </p>
-      ) : null}
-      {provider.format_hint ? (
-        <p className="text-xs text-muted-foreground">{provider.format_hint}</p>
-      ) : null}
-
-      <div className="space-y-3 rounded-xl border border-border bg-background/40 p-3">
-        <label htmlFor={inputId} className="block text-xs font-medium text-muted-foreground">
-          Nova chave {provider.prefix ? `(começa com ${provider.prefix})` : ""}
-        </label>
-        <input
-          id={inputId}
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Cole aqui a chave de substituição"
-          className="w-full min-h-11 rounded-lg border border-border bg-background px-3 py-2 font-mono text-base outline-none focus:border-primary sm:text-sm"
-        />
-        <input
-          type="text"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Anotação (ex.: conta de produção, plano pago)"
-          className="w-full min-h-11 rounded-lg border border-border bg-background px-3 py-2 text-base outline-none focus:border-primary sm:text-sm"
-        />
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={!value.trim() || busy !== null}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold sm:flex-none text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            {busy === "save" ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Save className="size-4" aria-hidden="true" />
-            )}
-            Salvar
-          </button>
-          <button
-            type="button"
-            onClick={() => void test()}
-            disabled={busy !== null || !provider.configured}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium sm:flex-none transition-colors hover:border-primary/50 disabled:opacity-50"
-          >
-            {busy === "test" ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Activity className="size-4" aria-hidden="true" />
-            )}
-            Testar
-          </button>
-          <button
-            type="button"
-            onClick={() => void remove()}
-            disabled={busy !== null || provider.source !== "cofre"}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium sm:flex-none text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-            Remover
-          </button>
-          <a
-            href={provider.docs}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="inline-flex min-h-11 items-center gap-1.5 text-sm sm:ml-auto text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          >
-            Documentação
-            <ExternalLink className="size-3.5" aria-hidden="true" />
-          </a>
-        </div>
-
-        {feedback ? (
-          <p className={`text-xs ${failed ? "text-destructive" : "text-success"}`}>{feedback}</p>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
-function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-lg border border-border bg-background/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-      <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className={`min-w-0 break-all sm:truncate sm:text-right ${mono ? "font-mono" : ""}`}>{value}</dd>
-    </div>
-  );
-}
-
-function HealthPill({ provider }: { provider: Provider }) {
-  const ok = provider.last_test?.ok;
-  if (!provider.configured) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
-        <CircleHelp className="size-3" aria-hidden="true" />
-        Sem chave
-      </span>
-    );
-  }
-  if (ok === true) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-success/50 bg-success/15 px-3 py-1 text-xs">
-        <CheckCircle2 className="size-3 text-success" aria-hidden="true" />
-        Operacional
-      </span>
-    );
-  }
-  if (ok === false) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-destructive/50 bg-destructive/15 px-3 py-1 text-xs">
-        <CircleAlert className="size-3 text-destructive" aria-hidden="true" />
-        Falhando
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-electric/50 bg-electric/10 px-3 py-1 text-xs">
-      <KeyRound className="size-3" aria-hidden="true" />
-      Configurada
-    </span>
   );
 }

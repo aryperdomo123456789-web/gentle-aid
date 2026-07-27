@@ -1,186 +1,28 @@
 /**
- * Cliente HTTP do Ecossistema Viral.
+ * Barrel público da camada de dados.
  *
- * Em produção (aaPanel/Nginx) o frontend é servido no mesmo domínio do Flask,
- * então BASE = "" e todas as chamadas são relativas (`/api/...`) — sem CORS.
- * Em desenvolvimento, defina VITE_API_BASE=http://127.0.0.1:8000 no .env.
+ * Mantido para que qualquer módulo continue importando de `@/lib/api`,
+ * enquanto a implementação vive em `@/lib/http` e os tipos em `@/types/job`.
  */
-export const API_BASE: string =
-  (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ?? "";
+export {
+  API_BASE,
+  ViralApiError,
+  apiDelete,
+  apiGet,
+  apiPostForm,
+  apiPostJson,
+  apiPutJson,
+  buildQuery,
+  downloadUrl,
+  friendlyError,
+} from "@/lib/http";
+export type { ApiError } from "@/lib/http";
 
-export type ApiError = { status: number; message: string };
-
-export class ViralApiError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-    this.name = "ViralApiError";
-  }
-}
-
-async function parse<T>(res: Response): Promise<T> {
-  const text = await res.text();
-  let data: unknown = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = null;
-  }
-
-  if (!res.ok) {
-    const message =
-      (data as { error?: string; message?: string } | null)?.error ??
-      (data as { error?: string; message?: string } | null)?.message ??
-      (res.status === 404
-        ? "Rota não encontrada. Verifique se o backend Flask está rodando no servidor."
-        : `Falha na requisição (HTTP ${res.status}).`);
-    throw new ViralApiError(res.status, message);
-  }
-
-  return data as T;
-}
-
-export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 25_000);
-  if (signal) signal.addEventListener("abort", () => ctrl.abort(), { once: true });
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "include",
-      signal: ctrl.signal,
-    });
-    return await parse<T>(res);
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw new ViralApiError(
-        504,
-        "O backend não respondeu em 25s. Verifique se o serviço viral-api está ativo e se o Nginx faz proxy de /api para a porta do Gunicorn.",
-      );
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-export async function apiPostJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    credentials: "include",
-    body: JSON.stringify(body),
-  });
-  return parse<T>(res);
-}
-
-export async function apiPutJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    credentials: "include",
-    body: JSON.stringify(body),
-  });
-  return parse<T>(res);
-}
-
-export async function apiPostForm<T>(path: string, form: FormData): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { Accept: "application/json" },
-    credentials: "include",
-    body: form,
-  });
-  return parse<T>(res);
-}
-
-export async function apiDelete<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "DELETE",
-    headers: { Accept: "application/json" },
-    credentials: "include",
-  });
-  return parse<T>(res);
-}
-
-export function downloadUrl(path: string): string {
-  if (!path) return "#";
-  if (/^https?:\/\//.test(path)) return path;
-  return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-export function friendlyError(err: unknown): string {
-  if (err instanceof ViralApiError) return err.message;
-  if (err instanceof TypeError)
-    return "Não foi possível falar com o servidor. Confirme que o serviço Flask está ativo atrás do Nginx.";
-  if (err instanceof Error) return err.message;
-  return "Erro inesperado.";
-}
-
-/** Status normalizado de um job de processamento. */
-export type JobStatus = "queued" | "running" | "done" | "error" | "cancelled";
-
-/** Relatório de esterilização devolvido pelo backend. */
-export type SterilizationReport = {
-  level: string;
-  seed: number;
-  md5_before: string;
-  md5_after: string;
-  sha256_after: string;
-  bitrate: string;
-  attempts: number;
-  video_filters: string[];
-  audio_filters: string[];
-  identity: Record<string, string>;
-  steps: string[];
-  unique: boolean;
-  source_width?: number;
-  source_height?: number;
-  source_orientation?: "portrait" | "landscape" | "square" | "unknown";
-  source_aspect_ratio?: number;
-  source_duration?: number;
-  source_bitrate?: number;
-  source_size_bytes?: number;
-  source_video_codec?: string;
-  output_duration?: number;
-  output_bitrate?: number;
-  output_size_bytes?: number;
-  output_video_codec?: string;
-  audit_summary?: string;
-};
-
-export type JobOutput = {
-  url?: string;
-  download_url: string;
-  filename: string;
-  md5_before?: string;
-  md5_after?: string;
-};
-
-export type Job = {
-  job_id: string;
-  tool: string;
-  status: JobStatus;
-  message?: string;
-  progress?: number;
-  created_at?: string;
-  finished_at?: string;
-  download_url?: string | null;
-  filename?: string | null;
-  size_bytes?: number;
-  md5_before?: string | null;
-  md5_after?: string | null;
-  sha256_after?: string | null;
-  audit_summary?: string | null;
-  sterilization?: SterilizationReport | null;
-  outputs?: JobOutput[];
-  artifacts?: { path: string; kind: string }[];
-  source_kind?: "upload" | "download" | null;
-  source_label?: string | null;
-  source_path?: string | null;
-  source_url?: string | null;
-  log?: string[];
-  meta?: Record<string, unknown>;
-};
+export { isTerminalStatus } from "@/types/job";
+export type {
+  Job,
+  JobOutput,
+  JobStatus,
+  SterilizationReport,
+  ToolId,
+} from "@/types/job";
