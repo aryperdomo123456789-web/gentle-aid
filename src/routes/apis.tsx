@@ -55,7 +55,10 @@ type Provider = {
   docs: string;
   usage: string;
   prefix?: string | null;
+  format_hint?: string | null;
+  format_ok?: boolean | null;
   testable: boolean;
+
   configured: boolean;
   source: "cofre" | "env" | "vazio";
   masked: string;
