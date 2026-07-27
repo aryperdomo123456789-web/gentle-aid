@@ -13,7 +13,9 @@ import ssl
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -41,12 +43,23 @@ PROVIDERS: list[dict[str, Any]] = [
         "env": "GEMINI_API_KEY",
         "docs": "https://ai.google.dev/gemini-api/docs",
         "usage": "Geração de roteiros, títulos e análise multimodal de clipes.",
-        "test": {
-            "url": "https://generativelanguage.googleapis.com/v1beta/models",
-            "auth": "query",
-            "param": "key",
-        },
+        "prefix": "AIza",
+        "format_hint": "A chave do Gemini (AI Studio) começa com 'AIza'. Tokens 'AQ.' ou 'ya29.' são credenciais OAuth do Google Cloud e não funcionam aqui.",
+        # Doc oficial: autenticação por header x-goog-api-key.
+        "test": [
+            {
+                "url": "https://generativelanguage.googleapis.com/v1beta/models",
+                "auth": "header",
+                "header": "x-goog-api-key",
+            },
+            {
+                "url": "https://generativelanguage.googleapis.com/v1beta/models",
+                "auth": "query",
+                "param": "key",
+            },
+        ],
     },
+
     {
         "id": "groq",
         "name": "Groq",
@@ -94,17 +107,26 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://huggingface.co/docs",
         "usage": "Download de modelos RVC/Coqui e inferência serverless.",
         "prefix": "hf_",
-        "test": {"url": "https://huggingface.co/api/whoami-v2", "auth": "bearer"},
+        "format_hint": "Use um Access Token do tipo 'Read' (Settings → Access Tokens). Tokens fine-grained sem escopo de leitura respondem 401.",
+        "test": [
+            {"url": "https://huggingface.co/api/whoami-v2", "auth": "bearer"},
+            {"url": "https://huggingface.co/api/models?limit=1", "auth": "bearer"},
+        ],
     },
     {
         "id": "cohere",
         "name": "Cohere",
         "category": "Rerank",
         "env": "COHERE_API_KEY",
-        "docs": "https://docs.cohere.com/",
+        "docs": "https://docs.cohere.com/reference/checkapikey",
         "usage": "Reranking de candidatos de pesquisa e de trechos virais.",
-        "test": {"url": "https://api.cohere.com/v1/models", "auth": "bearer"},
+        "format_hint": "Chaves de trial da Cohere não têm acesso a /v1/models; o teste usa o endpoint oficial check-api-key.",
+        "test": [
+            {"url": "https://api.cohere.com/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
+            {"url": "https://api.cohere.com/v1/models", "auth": "bearer"},
+        ],
     },
+
     {
         "id": "tavily",
         "name": "Tavily",
@@ -154,34 +176,55 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://langfuse.com/docs/api-and-data-platform/features/public-api",
         "usage": "Rastreio de job_id, custo, latência, modelo e resultado final.",
         "prefix": "sk-lf-",
-        "test": None,
+        "format_hint": "Requer também LANGFUSE_PUBLIC_KEY (pk-lf-...) — o teste usa Basic auth (public:secret).",
+        # Basic auth pk:sk contra /api/public/projects.
+        "test": [
+            {
+                "url": os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com").rstrip("/")
+                + "/api/public/projects",
+                "auth": "basic",
+                "basic_user_env": "LANGFUSE_PUBLIC_KEY",
+            }
+        ],
     },
     {
         "id": "cloudflare",
         "name": "Cloudflare Workers",
         "category": "Infra",
         "env": "CLOUDFLARE_API_TOKEN",
-        "docs": "https://developers.cloudflare.com/workers/",
+        "docs": "https://developers.cloudflare.com/api/operations/user-api-tokens-verify-token",
         "usage": "Endpoints leves, cache e camada pública de webhooks.",
-        "test": {"url": "https://api.cloudflare.com/client/v4/user/tokens/verify", "auth": "bearer"},
+        "format_hint": "Use um API Token (Meu Perfil → API Tokens). A Global API Key antiga responde 400 nesse endpoint.",
+        "test": [
+            {"url": "https://api.cloudflare.com/client/v4/user/tokens/verify", "auth": "bearer"},
+            {"url": "https://api.cloudflare.com/client/v4/accounts", "auth": "bearer"},
+        ],
     },
     {
         "id": "whisper",
         "name": "Whisper API",
         "category": "Transcrição",
         "env": "WHISPER_API_KEY",
-        "docs": "https://whisper-api.com/docs/",
+        "docs": "https://platform.openai.com/docs/api-reference/audio",
         "usage": "Fallback de transcrição quando a Groq falha ou estoura limite.",
-        "test": None,
+        "format_hint": "Aceita chave OpenAI (sk-...) ou endpoint compatível definido em WHISPER_API_BASE.",
+        "test": [
+            {
+                "url": os.environ.get("WHISPER_API_BASE", "https://api.openai.com/v1").rstrip("/") + "/models",
+                "auth": "bearer",
+            }
+        ],
     },
     {
         "id": "tikapi",
         "name": "TikAPI",
         "category": "TikTok",
         "env": "TIKAPI_KEY",
-        "docs": "https://tikapi.io/",
+        "docs": "https://tikapi.io/documentation/",
         "usage": "Radar de tendências e metadados de vídeos do TikTok.",
-        "test": None,
+        "test": [
+            {"url": "https://api.tikapi.io/public/check", "auth": "header", "header": "X-API-KEY"},
+        ],
     },
     {
         "id": "lamatok",
@@ -190,8 +233,15 @@ PROVIDERS: list[dict[str, Any]] = [
         "env": "LAMATOK_API_KEY",
         "docs": "https://api.lamatok.com/docs",
         "usage": "Download direto de mídia do TikTok por URL.",
-        "test": None,
+        "test": [
+            {
+                "url": "https://api.lamatok.com/v1/user/by/username?username=tiktok",
+                "auth": "query",
+                "param": "access_key",
+            }
+        ],
     },
+
 ]
 
 PROVIDER_BY_ID = {p["id"]: p for p in PROVIDERS}
@@ -291,7 +341,10 @@ def describe(provider_id: str) -> dict[str, Any]:
         "docs": provider["docs"],
         "usage": provider["usage"],
         "prefix": provider.get("prefix"),
+        "format_hint": provider.get("format_hint"),
+        "format_ok": (not provider.get("prefix")) or key.startswith(provider["prefix"]) if key else None,
         "testable": bool(provider.get("test")),
+
         "configured": bool(key),
         "source": "cofre" if stored_key else ("env" if env_key else "vazio"),
         "masked": mask(key),
@@ -304,26 +357,20 @@ def describe(provider_id: str) -> dict[str, Any]:
 def list_all() -> list[dict[str, Any]]:
     return [describe(p["id"]) for p in PROVIDERS]
 
-
 # --- Teste de conectividade --------------------------------------------------
-def test_provider(provider_id: str) -> dict[str, Any]:
-    provider = PROVIDER_BY_ID[provider_id]
-    spec = provider.get("test")
-    key = get_key(provider_id)
+_HTTP_MESSAGES = {
+    400: "Requisição rejeitada (400) — normalmente formato de credencial errado.",
+    401: "Chave inválida ou revogada (401).",
+    402: "Créditos esgotados / pagamento pendente (402).",
+    403: "Sem permissão para este recurso (403).",
+    404: "Endpoint não encontrado (404).",
+    429: "Limite de requisições atingido (429).",
+}
 
-    if not key:
-        result = {"ok": False, "status": 0, "message": "Nenhuma chave configurada.", "at": _now()}
-        _record_test(provider_id, result)
-        return result
-    if not spec:
-        result = {
-            "ok": None,
-            "status": 0,
-            "message": "Provedor sem endpoint de teste — validação manual.",
-            "at": _now(),
-        }
-        _record_test(provider_id, result)
-        return result
+
+def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
+    """Executa um único endpoint de verificação e devolve status/ok/mensagem."""
+    import base64
 
     url = spec["url"]
     headers = {"Accept": "application/json", "User-Agent": "EcossistemaViral/1.0"}
@@ -337,45 +384,96 @@ def test_provider(provider_id: str) -> dict[str, Any]:
         headers[spec.get("header", "x-api-key")] = key
     elif auth == "query":
         sep = "&" if "?" in url else "?"
-        url = f"{url}{sep}{spec.get('param', 'key')}={key}"
+        url = f"{url}{sep}{spec.get('param', 'key')}={urllib.parse.quote(key)}"
+    elif auth == "basic":
+        user = os.environ.get(spec.get("basic_user_env", ""), "") or spec.get("basic_user", "")
+        if not user:
+            return {
+                "ok": None,
+                "status": 0,
+                "message": f"Defina {spec.get('basic_user_env')} para validar esta chave.",
+            }
+        token = base64.b64encode(f"{user}:{key}".encode()).decode()
+        headers["Authorization"] = f"Basic {token}"
 
     if spec.get("body") is not None:
         body = json.dumps(spec["body"]).encode()
         headers["Content-Type"] = "application/json"
 
-    started = time.perf_counter()
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     ctx = ssl.create_default_context()
     try:
         with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
-            status = resp.status
             resp.read(2048)
-        ok, message = True, "Chave válida e respondendo."
+            return {"ok": True, "status": resp.status, "message": "Chave válida e respondendo."}
     except urllib.error.HTTPError as exc:
         status = exc.code
-        ok = status not in (401, 402, 403, 429)
-        message = {
-            401: "Chave inválida ou revogada (401).",
-            402: "Créditos esgotados / pagamento pendente (402).",
-            403: "Sem permissão para este recurso (403).",
-            429: "Limite de requisições atingido (429).",
-        }.get(status, f"Endpoint respondeu HTTP {status}.")
+        return {
+            "ok": status not in (400, 401, 402, 403, 429),
+            "status": status,
+            "message": _HTTP_MESSAGES.get(status, f"Endpoint respondeu HTTP {status}."),
+        }
     except urllib.error.URLError as exc:
-        status, ok = 0, False
-        message = f"Falha de rede: {exc.reason}"
+        return {"ok": False, "status": 0, "message": f"Falha de rede: {exc.reason}"}
     except Exception as exc:  # noqa: BLE001
-        status, ok = 0, False
-        message = f"Erro inesperado: {exc}"
+        return {"ok": False, "status": 0, "message": f"Erro inesperado: {exc}"}
+
+
+def test_provider(provider_id: str) -> dict[str, Any]:
+    provider = PROVIDER_BY_ID[provider_id]
+    spec = provider.get("test")
+    specs = [s for s in (spec if isinstance(spec, list) else [spec]) if s]
+    key = get_key(provider_id)
+    hint = provider.get("format_hint")
+
+    if not key:
+        result = {"ok": False, "status": 0, "message": "Nenhuma chave configurada.", "at": _now()}
+        _record_test(provider_id, result)
+        return result
+
+    prefix = provider.get("prefix")
+    if prefix and not key.startswith(prefix):
+        result = {
+            "ok": False,
+            "status": 0,
+            "message": f"Formato inesperado: a chave deveria começar com '{prefix}'."
+            + (f" {hint}" if hint else ""),
+            "at": _now(),
+        }
+        _record_test(provider_id, result)
+        return result
+
+    if not specs:
+        result = {
+            "ok": None,
+            "status": 0,
+            "message": "Provedor sem endpoint de teste — validação manual.",
+            "at": _now(),
+        }
+        _record_test(provider_id, result)
+        return result
+
+    started = time.perf_counter()
+    attempt: dict[str, Any] = {}
+    for candidate in specs:
+        attempt = _run_probe(candidate, key)
+        if attempt.get("ok"):
+            break
+
+    message = attempt.get("message", "Falha desconhecida.")
+    if attempt.get("ok") is False and hint:
+        message = f"{message} {hint}"
 
     result = {
-        "ok": ok,
-        "status": status,
+        "ok": attempt.get("ok"),
+        "status": attempt.get("status", 0),
         "message": message,
         "latency_ms": int((time.perf_counter() - started) * 1000),
         "at": _now(),
     }
     _record_test(provider_id, result)
     return result
+
 
 
 # --- Auto-preenchimento (importação de chaves existentes) --------------------
@@ -409,7 +507,9 @@ _PREFIX_OWNER = {
     "hf_": "huggingface",
     "jina_": "jina",
     "sk-lf-": "langfuse",
+    "AIza": "gemini",
 }
+
 
 _KV = None  # regex compilada sob demanda
 _autofill_done = False
@@ -718,8 +818,11 @@ def autofill(force: bool = False) -> dict[str, Any]:
             if not value:
                 continue
             prefix = provider.get("prefix")
-            if prefix and not from_catalog and not value.startswith(prefix):
+            if prefix and not value.startswith(prefix):
+                # nunca importa credencial com formato incompatível (ex.: token OAuth
+                # "AQ." caindo no slot do Gemini, que exige "AIza")
                 continue
+
 
             entry = data.get(pid, {})
             entry.update({

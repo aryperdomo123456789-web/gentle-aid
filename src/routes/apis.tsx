@@ -55,7 +55,10 @@ type Provider = {
   docs: string;
   usage: string;
   prefix?: string | null;
+  format_hint?: string | null;
+  format_ok?: boolean | null;
   testable: boolean;
+
   configured: boolean;
   source: "cofre" | "env" | "vazio";
   masked: string;
@@ -493,7 +496,18 @@ function ProviderCard({
         ) : null}
       </dl>
 
+      {provider.format_ok === false ? (
+        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          Formato incompatível: esta chave deveria começar com{" "}
+          <code className="font-mono">{provider.prefix}</code>. Substitua por uma credencial válida.
+        </p>
+      ) : null}
+      {provider.format_hint ? (
+        <p className="text-xs text-muted-foreground">{provider.format_hint}</p>
+      ) : null}
+
       <div className="space-y-3 rounded-xl border border-border bg-background/40 p-3">
+
         <label htmlFor={inputId} className="block text-xs font-medium text-muted-foreground">
           Nova chave {provider.prefix ? `(começa com ${provider.prefix})` : ""}
         </label>
