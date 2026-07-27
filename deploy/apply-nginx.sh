@@ -55,22 +55,28 @@ src = "\n".join(
 )
 
 # comenta 'location /', regras estáticas por extensão e includes do aaPanel que
-# roubam os assets (.js/.css) do frontend Node
+# roubam os assets (.js/.css) do frontend Node.
+# ATENCAO: no aaPanel a chave '{' costuma vir na LINHA SEGUINTE ao location.
+EXT = r'(?:js|css|mjs|map|json|txt|xml|gif|jpe?g|png|bmp|swf|svg|ico|webp|avif|woff2?|ttf|eot|mp4|webm|mp3|wav)'
 STEAL = (
-    re.compile(r'^location\s+/\s*\{'),
-    re.compile(r'^location\s+[~^=][^\{]*\{'),
+    re.compile(r'^location\s+/\s*\{?\s*$'),
+    re.compile(r'^location\s+[~^=][^\n]*' + EXT + r'[^\n]*$', re.I),
 )
+# nao comentar o bloco de seguranca (.env/.git/.user.ini)
+KEEP = re.compile(r'user\.ini|htaccess|\.git|\.env|\.svn|LICENSE|README', re.I)
 INCLUDES = re.compile(r'^\s*include\s+.*(enable-php|rewrite/|pathinfo)', re.I)
 
-lines, out, depth, commenting = src.split("\n"), [], 0, False
+lines, out, depth, commenting, seen_brace = src.split("\n"), [], 0, False, False
 for line in lines:
     stripped = line.strip()
-    if not commenting and any(p.match(stripped) for p in STEAL):
-        commenting, depth = True, 0
+    if not commenting and any(p.match(stripped) for p in STEAL) and not KEEP.search(stripped):
+        commenting, depth, seen_brace = True, 0, False
     if commenting:
         depth += line.count("{") - line.count("}")
-        out.append("    # [viral] " + line.strip())
-        if depth <= 0:
+        if line.count("{"):
+            seen_brace = True
+        out.append("    # [viral] " + stripped)
+        if seen_brace and depth <= 0:
             commenting = False
         continue
     if INCLUDES.match(line):
@@ -78,6 +84,7 @@ for line in lines:
         continue
     out.append(line)
 src = "\n".join(out)
+
 
 # injeta o include logo após a abertura do primeiro server { que tenha o domínio
 idx = src.find("server")
