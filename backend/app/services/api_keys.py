@@ -657,8 +657,11 @@ def _probe_key(provider: dict[str, Any], key: str) -> bool:
     specs = [s for s in (spec if isinstance(spec, list) else [spec]) if s]
     for candidate in specs:
         try:
-            if _run_probe(candidate, key).get("ok"):
+            result = _run_probe(candidate, key)
+            if result.get("ok"):
                 return True
+            if candidate.get("audio_probe") and result.get("status") in (401, 402, 403):
+                return False
         except Exception:  # noqa: BLE001
             continue
     return False
