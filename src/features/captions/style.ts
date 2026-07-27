@@ -93,6 +93,7 @@ export function applyStyle(form: FormData, style: CaptionStyle): FormData {
   form.set("font_scale", style.fontScale.toFixed(2));
   form.set("uppercase", style.uppercase ? "1" : "0");
   form.set("emoji", style.emoji ? "1" : "0");
+  form.set("aspect", style.aspect);
   if (style.accent) form.set("accent", style.accent);
   if (style.primary) form.set("primary", style.primary);
   return form;
