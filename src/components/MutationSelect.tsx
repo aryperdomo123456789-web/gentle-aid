@@ -13,18 +13,30 @@ export const MUTATION_LEVELS = [
 export function MutationSelect({
   name = "mutation",
   defaultValue = "auto",
+  value,
+  onChange,
   label = "Nível de esterilização",
   hint = "Todo arquivo sai virgem: metadados destruídos, identidade forjada e hash inédito. O nível controla só a intensidade da mutação estrutural.",
 }: {
   name?: string;
   defaultValue?: string;
+  /** Modo controlado — quando informado, `defaultValue` é ignorado. */
+  value?: string;
+  onChange?: (value: string) => void;
   label?: string;
   hint?: string;
 }) {
+  const controlled = value !== undefined;
   return (
     <Field label={label} hint={hint}>
       {(id) => (
-        <SelectInput id={id} name={name} defaultValue={defaultValue}>
+        <SelectInput
+          id={id}
+          name={name}
+          {...(controlled
+            ? { value, onChange: (e: React.ChangeEvent<HTMLSelectElement>) => onChange?.(e.target.value) }
+            : { defaultValue })}
+        >
           {MUTATION_LEVELS.map((level) => (
             <option key={level.value} value={level.value}>
               {level.label}
@@ -35,3 +47,4 @@ export function MutationSelect({
     </Field>
   );
 }
+

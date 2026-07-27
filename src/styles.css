@@ -224,8 +224,77 @@
   animation: caption-demo-pulse 1.6s ease-in-out infinite;
 }
 
+/* Palco de edição estilo Canva — animações da palavra ativa */
+@keyframes caption-pop {
+  from {
+    transform: scale(0.72);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1.14);
+    opacity: 1;
+  }
+}
+@keyframes caption-bounce {
+  0% {
+    transform: translateY(35%) scale(0.9);
+  }
+  60% {
+    transform: translateY(-14%) scale(1.1);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes caption-shake {
+  0%,
+  100% {
+    transform: rotate(-3deg) scale(1.06);
+  }
+  50% {
+    transform: rotate(3deg) scale(1.12);
+  }
+}
+@keyframes caption-fade {
+  from {
+    opacity: 0.15;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.caption-anim-pop,
+.caption-anim-bounce,
+.caption-anim-shake,
+.caption-anim-karaoke,
+.caption-anim-fade {
+  display: inline-block;
+}
+.caption-anim-pop {
+  animation: caption-pop 0.16s ease-out forwards;
+}
+.caption-anim-bounce {
+  animation: caption-bounce 0.28s ease-out forwards;
+}
+.caption-anim-shake {
+  animation: caption-shake 0.22s ease-in-out;
+}
+.caption-anim-karaoke {
+  animation: caption-fade 0.12s linear forwards;
+}
+.caption-anim-fade {
+  animation: caption-fade 0.3s ease-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .caption-demo-active {
+  .caption-demo-active,
+  .caption-anim-pop,
+  .caption-anim-bounce,
+  .caption-anim-shake,
+  .caption-anim-karaoke,
+  .caption-anim-fade {
     animation: none;
   }
 }
+
