@@ -43,6 +43,8 @@ type TestResult = {
   ok: boolean | null;
   status: number;
   message: string;
+  action?: "replace_key" | "billing" | "scope" | "wait" | "network" | "check" | null;
+  remediation?: string | null;
   latency_ms?: number;
   at?: string;
 };
@@ -500,6 +502,12 @@ function ProviderCard({
         <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           Formato incompatível: esta chave deveria começar com{" "}
           <code className="font-mono">{provider.prefix}</code>. Substitua por uma credencial válida.
+        </p>
+      ) : null}
+      {last?.remediation ? (
+        <p className="rounded-lg border border-electric/40 bg-electric/10 px-3 py-2 text-xs text-electric">
+          <span className="font-semibold">Como resolver: </span>
+          {last.remediation}
         </p>
       ) : null}
       {provider.format_hint ? (
