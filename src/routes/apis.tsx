@@ -505,7 +505,7 @@ function ProviderCard({
         </p>
       ) : null}
       {last?.remediation ? (
-        <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-foreground">
+        <p className="rounded-lg border border-electric/40 bg-electric/10 px-3 py-2 text-xs text-electric">
           <span className="font-semibold">Como resolver: </span>
           {last.remediation}
         </p>
