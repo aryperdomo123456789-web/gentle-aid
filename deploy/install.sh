@@ -32,6 +32,15 @@ ok  "Domínio:  $DOMAIN"
 ok  "Usuário:  $RUN_USER   API :$API_PORT   Web :$WEB_PORT"
 cd "$APP_DIR"
 
+# Aviso se as portas escolhidas já estiverem ocupadas por outro processo
+for _p in "$API_PORT" "$WEB_PORT"; do
+  if command -v ss >/dev/null 2>&1 && ss -ltnp 2>/dev/null | grep -q ":$_p "; then
+    _owner="$(ss -ltnp 2>/dev/null | grep ":$_p " | head -1)"
+    warn "Porta $_p já está em uso: $_owner"
+    warn "Escolha outra porta: VIRAL_API_PORT=8010 VIRAL_WEB_PORT=3010 bash deploy/install.sh $DOMAIN"
+  fi
+done
+
 [ "$(id -u)" -eq 0 ] || warn "Sem root: systemd/nginx/pacotes podem falhar. Use 'sudo bash deploy/install.sh $DOMAIN'."
 
 # --- 1. Dependências de sistema ---------------------------------------------
@@ -75,7 +84,16 @@ EOF
 else
   ok ".env já existe — preservado"
 fi
+
+# Sincroniza a porta da API no .env com o valor efetivo (evita porta obsoleta)
+if grep -q '^GUNICORN_BIND=' "$APP_DIR/.env"; then
+  sed -i "s|^GUNICORN_BIND=.*|GUNICORN_BIND=127.0.0.1:$API_PORT|" "$APP_DIR/.env"
+else
+  echo "GUNICORN_BIND=127.0.0.1:$API_PORT" >> "$APP_DIR/.env"
+fi
+ok "API bind: 127.0.0.1:$API_PORT"
 chmod 600 "$APP_DIR/.env" || true
+
 
 # --- 3. Python ---------------------------------------------------------------
 log "Ambiente virtual Python"
