@@ -97,11 +97,26 @@ ok "$STORAGE"
 
 # --- 5. Frontend -------------------------------------------------------------
 log "Frontend (Node)"
-if command -v npm >/dev/null 2>&1; then
-  NODE_MAJOR="$(node -v | sed 's/^v\([0-9]*\).*/\1/')"
-  [ "${NODE_MAJOR:-0}" -ge 20 ] || warn "Node $(node -v) — recomendado Node 20+ (aaPanel > App Store > Node.js)."
-  npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-  NITRO_PRESET="${NITRO_PRESET:-node-server}" npm run build
+if command -v npm >/dev/null 2>&1 || command -v bun >/dev/null 2>&1; then
+  if command -v node >/dev/null 2>&1; then
+    NODE_MAJOR="$(node -v | sed 's/^v\([0-9]*\).*/\1/')"
+    [ "${NODE_MAJOR:-0}" -ge 20 ] || warn "Node $(node -v) — recomendado Node 20+ (aaPanel > App Store > Node.js)."
+  fi
+  if [ -f "$APP_DIR/bun.lock" ] || [ -f "$APP_DIR/bun.lockb" ]; then
+    command -v bun >/dev/null 2>&1 || { log "Instalando bun"; curl -fsSL https://bun.sh/install | bash; export BUN_INSTALL="$HOME/.bun"; export PATH="$BUN_INSTALL/bin:$PATH"; }
+  fi
+  if command -v bun >/dev/null 2>&1 && { [ -f "$APP_DIR/bun.lock" ] || [ -f "$APP_DIR/bun.lockb" ]; }; then
+    ok "Lockfile do bun detectado — usando bun"
+    bun install --frozen-lockfile || bun install
+    NITRO_PRESET="${NITRO_PRESET:-node-server}" bun run build
+  elif [ -f "$APP_DIR/package-lock.json" ]; then
+    npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+    NITRO_PRESET="${NITRO_PRESET:-node-server}" npm run build
+  else
+    warn "Sem package-lock.json — usando 'npm install'"
+    npm install --no-audit --no-fund
+    NITRO_PRESET="${NITRO_PRESET:-node-server}" npm run build
+  fi
   WEB_ENTRY=""
   for candidate in "$APP_DIR/.output/server/index.mjs" "$APP_DIR/dist/server/index.mjs" "$APP_DIR/dist/server/server.mjs"; do
     [ -f "$candidate" ] && WEB_ENTRY="$candidate" && break
@@ -111,6 +126,7 @@ if command -v npm >/dev/null 2>&1; then
 else
   die "Node/npm não encontrado — instale pelo aaPanel (App Store > Node.js) e rode de novo."
 fi
+
 
 # --- 6. systemd --------------------------------------------------------------
 log "Serviços systemd"
