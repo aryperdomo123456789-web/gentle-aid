@@ -128,7 +128,9 @@ function VoiceStudio() {
               busy={busy}
               picker={dubPicker}
               dubReady={studio.dubReady}
+              translateReady={studio.dubTranslateReady}
               languages={studio.dubLanguages}
+
             />
           ) : mode === "text" ? (
             <TextToSpeechForm

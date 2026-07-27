@@ -39,7 +39,16 @@ LANGUAGES = {
     "fr": "francês",
     "it": "italiano",
     "de": "alemão",
+    "ja": "japonês",
+    "ko": "coreano",
+    "zh": "chinês mandarim",
+    "ru": "russo",
+    "ar": "árabe",
+    "hi": "híndi",
+    "tr": "turco",
+    "id": "indonésio",
 }
+
 
 
 class DubbingError(RuntimeError):
@@ -83,38 +92,126 @@ def _llm(prompt: str, timeout: int = 120) -> str | None:
     return None
 
 
+# Whisper devolve o idioma ora como código ("pt"), ora por extenso
+# ("portuguese"/"português"). Sem normalizar, o motor traduzia pt→pt à toa.
+_LANG_ALIASES = {
+    "pt": ("pt", "por", "portuguese", "português", "portugues", "pt-br", "pt_pt"),
+    "en": ("en", "eng", "english", "inglês", "ingles"),
+    "es": ("es", "spa", "spanish", "espanhol", "español"),
+    "fr": ("fr", "fra", "french", "francês", "frances", "français"),
+    "it": ("it", "ita", "italian", "italiano"),
+    "de": ("de", "deu", "ger", "german", "alemão", "alemao", "deutsch"),
+    "ja": ("ja", "jpn", "japanese", "japonês", "japones"),
+    "ko": ("ko", "kor", "korean", "coreano"),
+    "zh": ("zh", "chi", "zho", "chinese", "chinês", "chines", "mandarin"),
+    "ru": ("ru", "rus", "russian", "russo"),
+    "ar": ("ar", "ara", "arabic", "árabe", "arabe"),
+    "hi": ("hi", "hin", "hindi", "híndi"),
+    "tr": ("tr", "tur", "turkish", "turco"),
+    "id": ("id", "ind", "indonesian", "indonésio", "indonesio"),
+}
+
+
+def normalize_language(value: str | None) -> str:
+    """Qualquer forma de nomear o idioma → código curto (`pt`, `en`, …)."""
+    raw = (value or "").strip().lower().replace("_", "-")
+    if not raw or raw == "auto":
+        return ""
+    for code, aliases in _LANG_ALIASES.items():
+        if raw in aliases or raw.split("-", 1)[0] == code:
+            return code
+    return raw.split("-", 1)[0]
+
+
+def same_language(detected: str | None, target: str) -> bool:
+    target_code = normalize_language(target)
+    if not target_code:
+        return True  # "auto" = redublar no mesmo idioma
+    source = normalize_language(detected)
+    return bool(source) and source == target_code
+
+
+def llm_available() -> bool:
+    """Há alguma chave de LLM capaz de traduzir o roteiro?"""
+    return any(api_keys.get_key(provider) for provider in _LLM_ROUTES)
+
+
+
+def missing_llm_message(target: str) -> str:
+    label = LANGUAGES.get(target, target)
+    return (
+        f"Para dublar em {label} é preciso traduzir o roteiro: cadastre em /apis a chave de um "
+        "LLM (DeepSeek, Groq, Mistral ou OpenRouter). Sem tradutor, escolha 'mesmo idioma do vídeo'."
+    )
+
+
 def translate(segments: list[Segment], target: str, job_id: str) -> list[Segment]:
-    """Traduz preservando a quantidade e a ordem dos trechos."""
+    """Traduz preservando a quantidade e a ordem dos trechos.
+
+    Falha alto: dublar em outro idioma com o texto original é entregar um
+    trabalho errado silenciosamente.
+    """
     if target in ("", "auto"):
         return segments
+    if not llm_available():
+        raise DubbingError(missing_llm_message(target))
+
     label = LANGUAGES.get(target, target)
     out: list[Segment] = []
     batch = 40
+    failures = 0
     for start in range(0, len(segments), batch):
         window = segments[start : start + batch]
         payload = [{"i": i, "t": seg.text} for i, seg in enumerate(window)]
         prompt = (
             f"Traduza para {label} os trechos de narração abaixo, mantendo o sentido, o tom e "
             "um comprimento parecido (a dublagem precisa caber no mesmo tempo). "
+            "O idioma de origem pode ser qualquer um — detecte automaticamente. "
+            "Não traduza nomes próprios, marcas nem números. "
             "Responda SOMENTE JSON: {\"itens\":[{\"i\":0,\"t\":\"tradução\"}]}.\n\n"
             + json.dumps(payload, ensure_ascii=False)
         )
         raw = _llm(prompt)
-        translated = {}
+        translated: dict[int, str] = {}
         if raw:
             try:
                 chunk = raw[raw.find("{") : raw.rfind("}") + 1]
                 for item in json.loads(chunk).get("itens", []):
-                    translated[int(item["i"])] = str(item["t"]).strip()
+                    text = str(item["t"]).strip()
+                    if text:
+                        translated[int(item["i"])] = text
             except (ValueError, KeyError, TypeError):
                 translated = {}
         if not translated:
-            jobs.log(job_id, "Tradução indisponível — seguindo com o texto original.")
-            return segments
+            failures += 1
+            jobs.log(job_id, f"Bloco {start // batch + 1} não traduzido — mantendo o texto original nele.")
         for index, seg in enumerate(window):
-            out.append(Segment(seg.start, seg.end, translated.get(index, seg.text)))
-    jobs.log(job_id, f"Roteiro traduzido para {label}.")
+            out.append(Segment(seg.start, seg.end, translated.get(index, seg.text), seg.words))
+
+    total_batches = (len(segments) + batch - 1) // batch
+    if failures and failures == total_batches:
+        raise DubbingError(
+            f"Nenhum provedor de LLM conseguiu traduzir para {label}. "
+            "Verifique as chaves em /apis (DeepSeek, Groq, Mistral, OpenRouter)."
+        )
+    jobs.log(job_id, f"Roteiro traduzido para {label} · {len(out)} trecho(s).")
     return out
+
+
+def resolve_voice(engine: str, voice: str, target_lang: str, job_id: str) -> str:
+    """Escolhe o locutor certo para o idioma alvo.
+
+    ElevenLabs usa modelos multilíngues (a mesma voz fala qualquer idioma). Já o
+    Edge TTS é preso ao locale: dublar em inglês com uma voz pt-BR sai com
+    sotaque quebrado, então trocamos para uma voz nativa do mesmo gênero.
+    """
+    if engine == "elevenlabs" or target_lang in ("", "auto"):
+        return voice
+    chosen = edge_tts.voice_for_language(target_lang, prefer=voice)
+    if chosen != voice:
+        jobs.log(job_id, f"Locutor nativo de {LANGUAGES.get(target_lang, target_lang)}: {chosen}")
+    return chosen
+
 
 
 # --------------------------------------------------------------------------- #

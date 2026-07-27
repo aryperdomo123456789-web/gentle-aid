@@ -12,6 +12,9 @@ export type VoiceCatalog = {
   test_script?: string;
   dub_ready?: boolean;
   dub_languages?: Record<string, string>;
+  /** Há chave de LLM para traduzir o roteiro em outro idioma. */
+  dub_translate_ready?: boolean;
+
 };
 
 /** Abas do Estúdio de Voz. */
