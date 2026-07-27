@@ -68,6 +68,16 @@ export async function apiPostForm<T>(path: string, form: FormData): Promise<T> {
   return parse<T>(res);
 }
 
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+  return parse<T>(res);
+}
+
+
+
 export function downloadUrl(path: string): string {
   if (!path) return "#";
   if (/^https?:\/\//.test(path)) return path;
