@@ -57,6 +57,7 @@ export function VoicePicker({
   forgeReady,
   allowLocal = true,
   testScript,
+  onSyncPersonas,
 }: Props) {
   const [query, setQuery] = useState("");
   const [script, setScript] = useState(testScript || TEST_SCRIPT);
