@@ -350,7 +350,7 @@ function SummaryTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Chip({ children }: { children: string }) {
+function Chip({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs text-muted-foreground">
       {children}

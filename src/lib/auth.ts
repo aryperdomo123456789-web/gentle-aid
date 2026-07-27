@@ -9,6 +9,7 @@ export type AuthUser = {
   email: string;
   name: string;
   role: AuthRole;
+  protected?: boolean;
 };
 
 export type AuthSession = {

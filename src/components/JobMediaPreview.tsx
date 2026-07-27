@@ -16,6 +16,7 @@ type SourceCard = {
   duration_label?: string;
   published_label?: string;
   url?: string;
+  embed_url?: string | null;
 };
 
 function getSourceCard(job: Job): SourceCard | null {
