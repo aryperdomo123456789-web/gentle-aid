@@ -102,9 +102,11 @@ def deliver(
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Marca o job como concluído com o arquivo já esterilizado."""
+    jobs.check_cancelled(job_id)
     report.audit_summary = _format_audit_summary(report, dst)
     payload: dict[str, Any] = {
         "status": "done",
+        "stage": "entregue",
         "progress": 100,
         "message": message,
         "download_url": public_url(dst),
@@ -115,10 +117,21 @@ def deliver(
         "sha256_after": report.sha256_after,
         "sterilization": report.as_dict(),
         "audit_summary": report.audit_summary,
+        "finished_at": None,
     }
     if extra:
         payload.update(extra)
-    jobs.update(job_id, **payload)
+    payload.pop("finished_at", None)
+    jobs.register_artifact(job_id, dst, "output")
     for step in report.steps:
-        jobs.log(job_id, f"✔ {step}")
+        jobs.log(job_id, f"✔ {step}", level="audit", stage="esterilizando")
+    jobs.log(
+        job_id,
+        f"Entrega final · {dst.name} · md5 {report.md5_after} · sha256 {report.sha256_after}",
+        level="audit",
+        stage="entregue",
+    )
+    jobs.update(job_id, **payload)
+    jobs.audit("delivered", job_id, detail=f"{dst.name} md5={report.md5_after}")
     return payload
+
