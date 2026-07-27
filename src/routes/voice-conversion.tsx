@@ -8,19 +8,26 @@ import { StatusPanel } from "@/components/StatusPanel";
 import { ToolHistory } from "@/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
 import { VoiceForgePanel, type Persona } from "@/components/VoiceForgePanel";
+import {
+  VoicePicker,
+  TEST_SCRIPT,
+  type LocalVoice,
+  type RealisticVoice,
+  type VoiceSelection,
+} from "@/components/VoicePicker";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { apiGet, apiPostForm, type Job } from "@/lib/api";
 
-type RealisticVoice = { id: string; name: string; labels?: string; preview_url?: string };
 type Catalog = {
   engine_ready: boolean;
   forge_ready: boolean;
   realistic_voices: RealisticVoice[];
+  local_voices?: LocalVoice[];
   personas: Persona[];
   max_tts_chars: number;
+  test_script?: string;
 };
 
-type Engine = "elevenlabs" | "local" | "forge";
 type Mode = "media" | "text" | "forge";
 
 
