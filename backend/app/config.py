@@ -11,6 +11,12 @@ _DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = Path(os.environ.get("VIRAL_ROOT", str(_DEFAULT_ROOT))).resolve()
 
 
+def _recommended_worker_count() -> int:
+    cpu = os.cpu_count() or 4
+    # Mantém margem para o sistema e ainda escala bem em máquinas de 30+ núcleos.
+    return max(2, min(6, max(2, cpu // 5)))
+
+
 @dataclass
 class Config:
     app_root: Path = APP_ROOT
@@ -19,7 +25,7 @@ class Config:
     ffprobe_bin: str = os.environ.get("FFPROBE_BIN", "ffprobe")
     ytdlp_bin: str = os.environ.get("YTDLP_BIN", "yt-dlp")
     max_upload_bytes: int = int(os.environ.get("MAX_UPLOAD_MB", "500")) * 1024 * 1024
-    max_workers: int = int(os.environ.get("VIRAL_WORKERS", "2"))
+    max_workers: int = int(os.environ.get("VIRAL_WORKERS", str(_recommended_worker_count())))
     secret_key: str = os.environ.get("SECRET_KEY", "change-me-in-env")
 
     @classmethod

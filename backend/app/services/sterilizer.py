@@ -21,6 +21,7 @@ O que o motor faz em uma única passada de FFmpeg:
 
 from __future__ import annotations
 
+import re
 import hashlib
 import json
 import random
@@ -320,6 +321,18 @@ def build_command(
         "-loglevel",
         "warning",
         "-nostdin",
+        "-progress",
+        "pipe:1",
+        "-stats_period",
+        "2",
+        "-threads",
+        "0",
+        "-filter_threads",
+        "0",
+        "-filter_complex_threads",
+        "0",
+        "-max_muxing_queue_size",
+        "4096",
         "-i",
         str(src),
     ]
@@ -415,6 +428,26 @@ def build_command(
     return cmd, report
 
 
+def _parse_progress_seconds(line: str) -> float | None:
+    if line.startswith("out_time_ms="):
+        value = line.split("=", 1)[1].strip()
+        try:
+            return max(0.0, float(value) / 1_000_000.0)
+        except ValueError:
+            return None
+    if line.startswith("out_time="):
+        value = line.split("=", 1)[1].strip()
+        match = re.fullmatch(r"(?:(\d+):)?(\d+):(\d+)(?:\.(\d+))?", value)
+        if not match:
+            return None
+        hours = int(match.group(1) or 0)
+        minutes = int(match.group(2))
+        seconds = int(match.group(3))
+        fraction = match.group(4) or "0"
+        return hours * 3600 + minutes * 60 + seconds + float(f"0.{fraction}")
+    return None
+
+
 def sterilize(
     src: Path,
     dst: Path,
@@ -437,6 +470,7 @@ def sterilize(
     info = probe(src)
     before = file_hashes(src)
     seed = random.SystemRandom().randint(0, 2**31)
+    timeout = max(7200, int(info.duration * 2) + 3600) if info.duration > 0 else 4 * 3600
 
     report: SterilizationReport | None = None
     for attempt in range(1, max_attempts + 1):
@@ -453,7 +487,35 @@ def sterilize(
         )
         report.md5_before = before["md5"]
         report.attempts = attempt
-        execute(cmd, job_id=job_id)
+        if job_id:
+            from . import jobs as jobs_service
+
+            jobs_service.update(job_id, progress=min(10, 5 * attempt))
+
+        last_progress = 0
+
+        def on_line(line: str) -> None:
+            nonlocal last_progress
+            if not job_id:
+                return
+            if line.startswith("progress=end"):
+                if last_progress < 95:
+                    from . import jobs as jobs_service
+
+                    jobs_service.update(job_id, progress=95)
+                    last_progress = 95
+                return
+            seconds = _parse_progress_seconds(line)
+            if seconds is None or info.duration <= 0:
+                return
+            percent = int(min(98, max(0.0, seconds / info.duration * 90.0 + 8.0)))
+            if percent > last_progress:
+                from . import jobs as jobs_service
+
+                jobs_service.update(job_id, progress=percent)
+                last_progress = percent
+
+        execute(cmd, job_id=job_id, timeout=timeout, line_callback=on_line)
 
         after = file_hashes(dst)
         report.md5_after = after["md5"]
