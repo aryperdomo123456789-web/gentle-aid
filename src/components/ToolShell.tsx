@@ -20,7 +20,7 @@ export function ToolShell({
   return (
     <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+      <main className="mx-auto w-full max-w-[1600px] px-4 py-8 md:px-8">
         <div className="mb-8">
           {badge ? (
             <span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-foreground">
@@ -43,7 +43,7 @@ export function ToolShell({
         {below ? <div className="mt-6">{below}</div> : null}
       </main>
 
-      <footer className="mx-auto max-w-7xl px-4 pb-10 text-xs text-muted-foreground md:px-8">
+      <footer className="mx-auto w-full max-w-[1600px] px-4 pb-10 text-xs text-muted-foreground md:px-8">
         Jobs gravados em <code className="font-mono">fabrica_clips/</code>
       </footer>
     </div>
