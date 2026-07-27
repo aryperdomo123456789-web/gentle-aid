@@ -98,7 +98,7 @@ export function DiscoveryPanel({
 
       <form
         onSubmit={submit}
-        className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
       >
         <Field label="Busca">
           {(id) => (
@@ -150,7 +150,7 @@ export function DiscoveryPanel({
       ) : null}
 
       {cards.length > 0 ? (
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map((card) => {
             const running = actionBusyUrl === card.url;
             return (
