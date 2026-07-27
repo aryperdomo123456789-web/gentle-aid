@@ -133,3 +133,36 @@ Resultado atual: **43/43 PASS**.
 5. Ao criar um preset novo: escreva as cores em **BBGGRR**, defina `size` como
    fração da altura e rode os testes — eles varrem todos os presets
    automaticamente.
+
+## 11. Beat sync e animações virais (atualização)
+
+### Detecção de ritmo (`backend/app/services/beatsync.py`)
+1. FFmpeg extrai o áudio em PCM mono 22.05 kHz.
+2. Calcula-se a energia por janela (onset strength) e a autocorrelação da curva
+   para achar o período dominante entre 60 e 190 BPM.
+3. `snap_lines()` puxa o início de cada palavra para a batida mais próxima dentro
+   de uma tolerância de 0,22 s — fora disso a palavra fica onde estava (evita
+   destruir a sincronia da fala).
+4. Invariantes garantidas: texto preservado, ordem crescente, duração mínima de
+   0,08 s por palavra e nenhum evento sobreposto.
+
+No laboratório o BPM é informado à mão (não há áudio), o resto da matemática é
+idêntica — `beatsFromBpm()` + `snapLinesToBeats()` em `src/lib/caption-lab.ts`.
+
+### Animações disponíveis (19)
+`auto, pop, karaoke, typewriter, bounce, shake, boxed, none` (originais) mais
+`beat, zoom, slide, blur, wave, glitch, neon, rainbow, stamp, flip`.
+
+Regras aprendidas ao renderizar no libass:
+- toda palavra ativa precisa terminar com `{\r}`, senão o estilo vaza para o resto da linha;
+- `wave` e `rainbow` dependem do índice da palavra (onda alternada / ciclo de 6 cores);
+- `neon` usa `\blur` animado — custa mais CPU, mas roda em tempo real no aaPanel;
+- chaves `{}` desbalanceadas fazem o libass imprimir a tag como texto: há teste para isso.
+
+### Correção crítica
+`WrapStyle: 2` impedia quebra automática e cortava frases longas nas bordas em
+9:16. Trocado para `WrapStyle: 0` (quebra inteligente) no backend e no lab.
+
+### Testes
+`bun scripts/caption-lab-check.ts` — cobre timings, presets, ASS, as 19 animações,
+a grade de batidas e o encaixe no ritmo.
