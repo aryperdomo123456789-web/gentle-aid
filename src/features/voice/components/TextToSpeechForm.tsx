@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
 
-import { Field, SelectInput, SubmitButton, TextArea } from "@/components/form";
+import { Field, SelectInput, TextArea } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
+
 import { MutationSelect } from "@/components/MutationSelect";
 import { AudioFormatField } from "./AudioFormatField";
 import { ScriptDoctorChat } from "./ScriptDoctorChat";
