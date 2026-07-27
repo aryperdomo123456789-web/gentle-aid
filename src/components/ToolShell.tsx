@@ -8,12 +8,14 @@ export function ToolShell({
   badge,
   left,
   right,
+  below,
 }: {
   title: string;
   subtitle: string;
   badge?: string;
   left: ReactNode;
   right: ReactNode;
+  below?: ReactNode;
 }) {
   return (
     <div className="min-h-screen">
@@ -37,7 +39,10 @@ export function ToolShell({
             {right}
           </section>
         </div>
+
+        {below ? <div className="mt-6">{below}</div> : null}
       </main>
+
       <footer className="mx-auto max-w-7xl px-4 pb-10 text-xs text-muted-foreground md:px-8">
         Jobs gravados em <code className="font-mono">fabrica_clips/</code>
       </footer>
