@@ -58,8 +58,18 @@ function VoiceStudio() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [hasFile, setHasFile] = useState(false);
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
-  const [engine, setEngine] = useState<Engine>("elevenlabs");
-  const [ttsEngine, setTtsEngine] = useState<Engine>("elevenlabs");
+  const [mediaVoice, setMediaVoice] = useState<VoiceSelection>({
+    engine: "elevenlabs",
+    voiceId: "",
+    personaId: "",
+    targetVoice: "masc_grave",
+  });
+  const [ttsVoice, setTtsVoice] = useState<VoiceSelection>({
+    engine: "elevenlabs",
+    voiceId: "",
+    personaId: "",
+    targetVoice: "masc_grave",
+  });
   const [personas, setPersonas] = useState<Persona[]>([]);
   const mediaForm = useRef<HTMLFormElement>(null);
 
@@ -70,11 +80,21 @@ function VoiceStudio() {
         if (!alive) return;
         setCatalog(data);
         setPersonas(data.personas ?? []);
-        if (!data.engine_ready) {
-          const fallback: Engine = (data.personas ?? []).length > 0 ? "forge" : "local";
-          setEngine(fallback);
-          setTtsEngine("forge");
-        }
+        const firstVoice = data.realistic_voices?.[0]?.id ?? "";
+        const firstPersona = data.personas?.[0]?.id ?? "";
+        const hasPersona = (data.personas ?? []).length > 0;
+        setMediaVoice((prev) => ({
+          ...prev,
+          engine: data.engine_ready ? "elevenlabs" : hasPersona ? "forge" : "local",
+          voiceId: prev.voiceId || firstVoice,
+          personaId: prev.personaId || firstPersona,
+        }));
+        setTtsVoice((prev) => ({
+          ...prev,
+          engine: data.engine_ready ? "elevenlabs" : "forge",
+          voiceId: prev.voiceId || firstVoice,
+          personaId: prev.personaId || firstPersona,
+        }));
       })
       .catch(() => setCatalog(null));
     return () => {
@@ -85,6 +105,7 @@ function VoiceStudio() {
   const voices = catalog?.realistic_voices ?? [];
   const ready = catalog?.engine_ready ?? false;
   const forgeReady = (catalog?.forge_ready ?? false) && personas.length > 0;
+  const testScript = catalog?.test_script || TEST_SCRIPT;
 
   function processCard(card: DiscoveryCard) {
     const form = mediaForm.current ? new FormData(mediaForm.current) : new FormData();
@@ -102,27 +123,33 @@ function VoiceStudio() {
     };
   }
 
-  const voiceSelect = (id: string) => (
-    <SelectInput id={id} name="voice_id" disabled={!ready}>
-      {voices.map((v) => (
-        <option key={v.id} value={v.id}>
-          {v.name}
-          {v.labels ? ` — ${v.labels}` : ""}
-        </option>
-      ))}
-    </SelectInput>
+  const mediaPicker = (
+    <VoicePicker
+      value={mediaVoice}
+      onChange={setMediaVoice}
+      realisticVoices={voices}
+      personas={personas}
+      localVoices={catalog?.local_voices}
+      elevenReady={ready}
+      forgeReady={forgeReady}
+      allowLocal
+      testScript={testScript}
+    />
   );
 
-  const personaSelect = (id: string) => (
-    <SelectInput id={id} name="persona_id" disabled={personas.length === 0}>
-      {personas.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name}
-        </option>
-      ))}
-      {personas.length === 0 ? <option value="">Crie uma voz na aba “Criar voz”</option> : null}
-    </SelectInput>
+  const ttsPicker = (
+    <VoicePicker
+      value={ttsVoice}
+      onChange={setTtsVoice}
+      realisticVoices={voices}
+      personas={personas}
+      elevenReady={ready}
+      forgeReady={forgeReady}
+      allowLocal={false}
+      testScript={testScript}
+    />
   );
+
 
 
   return (
