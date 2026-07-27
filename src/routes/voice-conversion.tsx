@@ -81,9 +81,12 @@ function VoiceStudio() {
   const [dubLink, setDubLink] = useState("");
   const [dubFile, setDubFile] = useState(false);
   const [mediaLink, setMediaLink] = useState("");
+  const [mediaCard, setMediaCard] = useState<InspectedCard | null>(null);
+  const [dubCard, setDubCard] = useState<InspectedCard | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const mediaForm = useRef<HTMLFormElement>(null);
   const dubForm = useRef<HTMLFormElement>(null);
+
 
   useEffect(() => {
     let alive = true;
