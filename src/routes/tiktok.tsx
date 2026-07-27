@@ -191,7 +191,7 @@ function TikTokDashboard() {
                 </SelectInput>
               )}
             </Field>
-            <SubmitButton busy={busy}>{busy ? "Clonando…" : "Clonar viral"}</SubmitButton>
+            <JobSettingsGuard busy={busy} label="Clonar viral" busyLabel="Clonando…" />
           </form>
         </div>
       }
