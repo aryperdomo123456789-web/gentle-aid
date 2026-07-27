@@ -137,9 +137,13 @@ export function DubForm({
         hint="O vídeo dublado sai virgem: sem metadados herdados e com hash inédito."
       />
 
-      <SubmitButton busy={busy} disabled={!hasFile && link.trim().length < 8}>
-        {busy ? "Dublando com IA…" : "Dublar com a minha voz"}
-      </SubmitButton>
+      <JobSettingsGuard
+        busy={busy}
+        disabled={(!hasFile && link.trim().length < 8) || !dubReady}
+        label="Dublar com a minha voz"
+        busyLabel="Dublando com IA…"
+      />
+
     </form>
   );
 }
