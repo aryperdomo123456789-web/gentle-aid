@@ -101,9 +101,13 @@ if command -v npm >/dev/null 2>&1; then
   NODE_MAJOR="$(node -v | sed 's/^v\([0-9]*\).*/\1/')"
   [ "${NODE_MAJOR:-0}" -ge 20 ] || warn "Node $(node -v) — recomendado Node 20+ (aaPanel > App Store > Node.js)."
   npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-  npm run build
-  [ -f "$APP_DIR/.output/server/index.mjs" ] || die "Build do frontend não gerou .output/server/index.mjs"
-  ok "Build concluído (.output/)"
+  NITRO_PRESET="${NITRO_PRESET:-node-server}" npm run build
+  WEB_ENTRY=""
+  for candidate in "$APP_DIR/.output/server/index.mjs" "$APP_DIR/dist/server/index.mjs" "$APP_DIR/dist/server/server.mjs"; do
+    [ -f "$candidate" ] && WEB_ENTRY="$candidate" && break
+  done
+  [ -n "$WEB_ENTRY" ] || die "Build do frontend não gerou o servidor Node (procurei em .output/server e dist/server)."
+  ok "Build concluído: $WEB_ENTRY"
 else
   die "Node/npm não encontrado — instale pelo aaPanel (App Store > Node.js) e rode de novo."
 fi
@@ -116,7 +120,8 @@ render() {
       -e "s|__USER__|$RUN_USER|g" \
       -e "s|__API_PORT__|$API_PORT|g" \
       -e "s|__WEB_PORT__|$WEB_PORT|g" \
-      -e "s|__STORAGE__|$STORAGE|g" "$1"
+      -e "s|__STORAGE__|$STORAGE|g" \
+      -e "s|__WEB_ENTRY__|${WEB_ENTRY:-$APP_DIR/.output/server/index.mjs}|g" "$1"
 }
 if command -v systemctl >/dev/null 2>&1; then
   render "$SCRIPT_DIR/viral-api.service.template" > /etc/systemd/system/viral-api.service

@@ -16,7 +16,7 @@ printf '\n\033[1;35m==>\033[0m Dependências Python\n'
 
 printf '\n\033[1;35m==>\033[0m Build do frontend\n'
 npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-npm run build
+NITRO_PRESET="${NITRO_PRESET:-node-server}" npm run build
 
 printf '\n\033[1;35m==>\033[0m Reiniciando serviços\n'
 systemctl restart viral-api viral-web
