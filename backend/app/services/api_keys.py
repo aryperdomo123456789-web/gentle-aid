@@ -8,6 +8,7 @@ chaves SEMPRE por `api_keys.get_key("groq")` — nunca com os.environ direto.
 from __future__ import annotations
 
 import json
+import re
 import os
 import ssl
 import threading
@@ -112,7 +113,6 @@ PROVIDERS: list[dict[str, Any]] = [
         "remediation": "Gere um novo token em huggingface.co/settings/tokens com tipo 'Read' e cole aqui — o token atual foi revogado.",
         "test": [
             {"url": "https://huggingface.co/api/whoami-v2", "auth": "bearer"},
-            {"url": "https://huggingface.co/api/models?limit=1", "auth": "bearer"},
         ],
     },
     {
@@ -125,8 +125,22 @@ PROVIDERS: list[dict[str, Any]] = [
         "format_hint": "Chaves de trial da Cohere não têm acesso a /v1/models; o teste usa o endpoint oficial check-api-key.",
         "remediation": "Gere uma nova chave em dashboard.cohere.com → API Keys (Trial serve) e cole aqui.",
         "test": [
-            {"url": "https://api.cohere.com/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
-            {"url": "https://api.cohere.ai/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
+            {
+                "url": "https://api.cohere.com/v1/check-api-key",
+                "auth": "bearer",
+                "method": "POST",
+                "body": {},
+                "expect_json": {"valid": True},
+                "invalid_message": "A Cohere respondeu que esta chave não é válida (valid=false) — ela foi revogada ou pertence a outra conta.",
+            },
+            {
+                "url": "https://api.cohere.ai/v1/check-api-key",
+                "auth": "bearer",
+                "method": "POST",
+                "body": {},
+                "expect_json": {"valid": True},
+                "invalid_message": "A Cohere respondeu que esta chave não é válida (valid=false).",
+            },
             {
                 "url": "https://api.cohere.com/v1/tokenize",
                 "auth": "bearer",
@@ -206,6 +220,10 @@ PROVIDERS: list[dict[str, Any]] = [
         "docs": "https://developers.cloudflare.com/api/operations/user-api-tokens-verify-token",
         "usage": "Endpoints leves, cache e camada pública de webhooks.",
         "format_hint": "Use um API Token (Meu Perfil → API Tokens). A Global API Key antiga só é aceita junto com CLOUDFLARE_EMAIL.",
+        "shape_warn": {
+            "pattern": r"^[0-9a-fA-F]{32,40}$",
+            "message": "Esta credencial tem cara de Global API Key (32-40 caracteres hexadecimais), não de API Token.",
+        },
         "remediation": "Gere um API Token em dash.cloudflare.com → Meu Perfil → API Tokens (template 'Edit Cloudflare Workers') e cole aqui. Se preferir manter a Global API Key, defina também CLOUDFLARE_EMAIL no .env.",
         "test": [
             {"url": "https://api.cloudflare.com/client/v4/user/tokens/verify", "auth": "bearer"},
@@ -247,7 +265,13 @@ PROVIDERS: list[dict[str, Any]] = [
         "usage": "Radar de tendências e metadados de vídeos do TikTok.",
         "remediation": "403 aqui quase sempre é plano expirado ou chave revogada — gere uma nova em tikapi.io → Dashboard → API Key.",
         "test": [
-            {"url": "https://api.tikapi.io/public/check", "auth": "header", "header": "X-API-KEY"},
+            {
+                "url": "https://api.tikapi.io/public/check",
+                "auth": "header",
+                "header": "X-API-KEY",
+                "expect_json": {"status": "success"},
+                "invalid_message": "A TikAPI aceitou a requisição mas não confirmou a chave (assinatura inativa).",
+            },
             {"url": "https://api.tikapi.io/public/check", "auth": "bearer"},
             {
                 "url": "https://api.tikapi.io/public/explore?country=br&count=1",
@@ -474,7 +498,24 @@ def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
     ctx = ssl.create_default_context()
     try:
         with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
-            resp.read(2048)
+            raw = resp.read(8192)
+            # Alguns provedores respondem HTTP 200 com um corpo dizendo que a chave é inválida.
+            checks = spec.get("expect_json") or {}
+            if checks:
+                try:
+                    payload = json.loads(raw.decode("utf-8", "replace"))
+                except Exception:  # noqa: BLE001
+                    payload = None
+                if isinstance(payload, dict):
+                    for field, expected in checks.items():
+                        actual = payload.get(field)
+                        if actual != expected:
+                            return {
+                                "ok": False,
+                                "status": resp.status,
+                                "message": spec.get("invalid_message")
+                                or f"O provedor respondeu 200 mas recusou a chave ({field}={actual!r}).",
+                            }
             return {"ok": True, "status": resp.status, "message": "Chave válida e respondendo."}
     except urllib.error.HTTPError as exc:
         status = exc.code
@@ -540,6 +581,10 @@ def test_provider(provider_id: str) -> dict[str, Any]:
     message = attempt.get("message", "Falha desconhecida.")
     if attempt.get("ok") is False and hint:
         message = f"{message} {hint}"
+
+    shape = provider.get("shape_warn")
+    if attempt.get("ok") is False and shape and re.match(shape["pattern"], key or ""):
+        message = f"{message} {shape['message']}"
 
     action = None
     remediation = None
