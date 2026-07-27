@@ -36,6 +36,7 @@ export function DubForm({
   busy,
   picker,
   dubReady,
+  translateReady = true,
   languages,
 }: Props) {
   return (
@@ -46,6 +47,14 @@ export function DubForm({
           (ou Whisper) em <code>/apis</code> para liberar a transcrição com timestamps.
         </p>
       ) : null}
+
+      {dubReady && !translateReady ? (
+        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          Sem chave de LLM cadastrada só dá para redublar no <strong>mesmo idioma</strong>. Cadastre
+          DeepSeek, Groq, Mistral ou OpenRouter em <code>/apis</code> para traduzir para outro idioma.
+        </p>
+      ) : null}
+
 
       <Field
         label="Link do YouTube ou TikTok"
