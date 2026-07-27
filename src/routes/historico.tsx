@@ -151,7 +151,15 @@ function Historico() {
           </button>
         </div>
 
-        <div className="scroll-x -mx-3 mb-6 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+        <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <StatCard label="Jobs listados" value={String(stats.total)} />
+          <StatCard label="Em andamento" value={String(stats.running)} />
+          <StatCard label="Concluídos" value={String(stats.done)} />
+          <StatCard label="Com erro" value={String(stats.error + stats.cancelled)} />
+          <StatCard label="Volume entregue" value={formatBytes(stats.bytes)} />
+        </div>
+
+        <div className="scroll-x -mx-3 mb-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           {["todos", ...Object.keys(TOOL_LABEL)].map((key) => (
             <button
               key={key}
@@ -163,10 +171,38 @@ function Historico() {
                   : "border-border bg-surface/60 text-muted-foreground hover:text-foreground"
               }`}
             >
-              {key === "todos" ? "Todos" : TOOL_LABEL[key]}
+              {key === "todos" ? "Todas as ferramentas" : TOOL_LABEL[key]}
             </button>
           ))}
         </div>
+
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="scroll-x -mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+            {STATUS_FILTERS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setStatusFilter(item.key)}
+                className={`min-h-9 shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  statusFilter === item.key
+                    ? "border-primary/60 bg-primary/15 text-foreground"
+                    : "border-border bg-surface/60 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por id, arquivo ou origem…"
+            aria-label="Buscar jobs"
+            className="min-h-10 w-full rounded-full border border-border bg-surface/60 px-4 text-xs outline-none focus:border-primary/60 sm:w-72"
+          />
+        </div>
+
 
         {error ? (
           <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
