@@ -53,17 +53,11 @@ function YoutubeBypass() {
   const [intensity, setIntensity] = useState("auto");
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
 
+  /** Nada roda direto: o vídeo escolhido só entra na lista para conferência. */
   function processCard(card: DiscoveryCard) {
     setPickedUrl(card.url);
-    run(() =>
-      apiPostJson<Job>("/api/youtube/bypass", {
-        urls: [card.url],
-        nicho,
-        keyword: keyword.trim() || card.title.slice(0, 60),
-        intensity,
-        source_card: card,
-      }),
-    );
+    setLinks(card.url);
+    if (!keyword.trim()) setKeyword(card.title.slice(0, 60));
   }
 
   const urls = links
@@ -98,6 +92,7 @@ function YoutubeBypass() {
             {(id) => (
               <TextArea
                 id={id}
+                name="urls"
                 value={links}
                 onChange={(e) => setLinks(e.target.value)}
                 placeholder={"https://youtube.com/shorts/xxxx\nhttps://youtu.be/yyyy"}
@@ -109,7 +104,7 @@ function YoutubeBypass() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
             <Field label="Nicho">
               {(id) => (
-                <SelectInput id={id} value={nicho} onChange={(e) => setNicho(e.target.value)}>
+                <SelectInput id={id} name="nicho" value={nicho} onChange={(e) => setNicho(e.target.value)}>
                   {NICHOS.map((n) => (
                     <option key={n} value={n}>
                       {n}
@@ -123,6 +118,7 @@ function YoutubeBypass() {
               {(id) => (
                 <TextInput
                   id={id}
+                  name="keyword"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder="ex.: renda extra"
@@ -137,7 +133,7 @@ function YoutubeBypass() {
             hint="Todo vídeo sai virgem (metadados destruídos + hash inédito). O nível controla a intensidade da mutação estrutural."
           >
             {(id) => (
-              <SelectInput id={id} value={intensity} onChange={(e) => setIntensity(e.target.value)}>
+              <SelectInput id={id} name="intensity" value={intensity} onChange={(e) => setIntensity(e.target.value)}>
                 {MUTATION_LEVELS.map((level) => (
                   <option key={level.value} value={level.value}>
                     {level.label}
@@ -149,6 +145,7 @@ function YoutubeBypass() {
 
           <JobSettingsGuard
             busy={busy}
+            disabled={urls.length === 0}
             label="Disparar bypass em lote"
             busyLabel="Processando lote…"
           />
@@ -169,7 +166,7 @@ function YoutubeBypass() {
         <div className="space-y-6">
           <DiscoveryPanel
             defaultPlatform="youtube"
-            actionLabel="Baixar + esterilizar"
+            actionLabel="Usar este vídeo"
             onAction={processCard}
             actionBusyUrl={busy ? pickedUrl : null}
           />
