@@ -153,8 +153,27 @@ def _extract_mp3(src: Path, dst: Path, *, start: float, duration: float, job_id:
     return dst
 
 
+def _words_from(payload: dict, offset: float) -> list[WordStamp]:
+    out: list[WordStamp] = []
+    for item in payload.get("words") or []:
+        text = str(item.get("word") or item.get("text") or "").strip()
+        if not text:
+            continue
+        try:
+            start = float(item.get("start", 0.0)) + offset
+            end = float(item.get("end", 0.0)) + offset
+        except (TypeError, ValueError):
+            continue
+        if end <= start:
+            end = start + 0.18
+        out.append(WordStamp(start=start, end=end, text=text))
+    out.sort(key=lambda w: w.start)
+    return out
+
+
 def _segments_from(payload: dict, offset: float) -> list[Segment]:
     raw = payload.get("segments") or []
+    all_words = _words_from(payload, offset)
     out: list[Segment] = []
     for item in raw:
         text = (item.get("text") or "").strip()
@@ -167,15 +186,21 @@ def _segments_from(payload: dict, offset: float) -> list[Segment]:
             continue
         if end <= start:
             end = start + 0.4
-        out.append(Segment(start=start, end=end, text=text))
+        inline = _words_from(item, offset)
+        if not inline and all_words:
+            inline = [w for w in all_words if w.start >= start - 0.05 and w.start < end + 0.05]
+        out.append(Segment(start=start, end=end, text=text, words=inline))
     if not out:
         text = (payload.get("text") or "").strip()
         if text:
-            out.append(Segment(start=offset, end=offset + 5.0, text=text))
+            end = all_words[-1].end if all_words else offset + 5.0
+            out.append(Segment(start=offset, end=end, text=text, words=all_words))
     return out
 
 
-def transcribe(src: Path, *, job_id: str, language: str | None = None) -> tuple[list[Segment], str]:
+def transcribe(
+    src: Path, *, job_id: str, language: str | None = None, word_timestamps: bool = False
+) -> tuple[list[Segment], str]:
     """Devolve (segmentos, idioma detectado)."""
     providers = _providers()
     if not providers:
@@ -201,19 +226,27 @@ def transcribe(src: Path, *, job_id: str, language: str | None = None) -> tuple[
             payload: dict | None = None
             for label, url, key in providers:
                 try:
-                    payload = _post(url, key, piece, language)
+                    payload = _post(url, key, piece, language, words=word_timestamps)
                     if index == 0:
                         jobs.log(job_id, f"Transcrição via {label}")
                     break
                 except TranscribeError as exc:
                     last_error = exc
                     jobs.log(job_id, f"{label} falhou: {exc}")
+                    if word_timestamps:
+                        try:
+                            payload = _post(url, key, piece, language, words=False)
+                            jobs.log(job_id, f"{label} sem timestamps por palavra — usando fallback.")
+                            break
+                        except TranscribeError:
+                            pass
             piece.unlink(missing_ok=True)
             if payload is None:
                 raise TranscribeError(str(last_error) if last_error else "Nenhum provedor de transcrição respondeu.")
             detected = detected or (payload.get("language") or "")
             segments.extend(_segments_from(payload, offset))
             jobs.update(job_id, progress=min(45, 12 + int(30 * (index + 1) / blocks)))
+
     finally:
         for leftover in work.glob("*"):
             leftover.unlink(missing_ok=True)
