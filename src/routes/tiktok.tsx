@@ -163,7 +163,26 @@ function TikTokDashboard() {
                 />
               )}
             </Field>
+            <Field
+              label="Nível de esterilização"
+              hint="Aplicado a qualquer clone, inclusive nos disparados pelo radar acima."
+            >
+              {(id) => (
+                <SelectInput
+                  id={id}
+                  value={intensity}
+                  onChange={(e) => setIntensity(e.target.value)}
+                >
+                  {MUTATION_LEVELS.map((level) => (
+                    <option key={level.value} value={level.value}>
+                      {level.label}
+                    </option>
+                  ))}
+                </SelectInput>
+              )}
+            </Field>
             <SubmitButton busy={busy}>{busy ? "Clonando…" : "Clonar viral"}</SubmitButton>
+
           </form>
         </div>
       }
