@@ -16,7 +16,7 @@ import os
 import urllib.error
 import urllib.request
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..config import config
@@ -33,17 +33,34 @@ class TranscribeError(RuntimeError):
 
 
 @dataclass
+class WordStamp:
+    start: float
+    end: float
+    text: str
+
+    def dict(self) -> dict[str, object]:
+        return {"start": round(self.start, 3), "end": round(self.end, 3), "text": self.text}
+
+
+@dataclass
 class Segment:
     start: float
     end: float
     text: str
+    words: list["WordStamp"] = field(default_factory=list)
 
     @property
     def duration(self) -> float:
         return max(0.05, self.end - self.start)
 
     def dict(self) -> dict[str, object]:
-        return {"start": round(self.start, 3), "end": round(self.end, 3), "text": self.text}
+        return {
+            "start": round(self.start, 3),
+            "end": round(self.end, 3),
+            "text": self.text,
+            "words": [w.dict() for w in self.words],
+        }
+
 
 
 # --------------------------------------------------------------------------- #
@@ -76,13 +93,15 @@ def missing_key_message() -> str:
 # --------------------------------------------------------------------------- #
 # HTTP multipart
 # --------------------------------------------------------------------------- #
-def _multipart(fields: dict[str, str], file_path: Path) -> tuple[bytes, str]:
+def _multipart(fields: dict[str, object], file_path: Path) -> tuple[bytes, str]:
     boundary = f"----viraldub{uuid.uuid4().hex}"
     parts: list[bytes] = []
-    for name, value in fields.items():
-        parts.append(
-            f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n".encode()
-        )
+    for name, raw in fields.items():
+        values = raw if isinstance(raw, (list, tuple)) else [raw]
+        for value in values:
+            parts.append(
+                f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n".encode()
+            )
     parts.append(
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
         f"filename=\"{file_path.name}\"\r\nContent-Type: audio/mpeg\r\n\r\n".encode()
@@ -92,15 +111,20 @@ def _multipart(fields: dict[str, str], file_path: Path) -> tuple[bytes, str]:
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
 
-def _post(url: str, key: str, file_path: Path, language: str | None) -> dict:
-    fields = {
+def _post(
+    url: str, key: str, file_path: Path, language: str | None, *, words: bool = False
+) -> dict:
+    fields: dict[str, object] = {
         "model": GROQ_MODEL if "groq" in url else "whisper-1",
         "response_format": "verbose_json",
         "temperature": "0",
     }
+    if words:
+        fields["timestamp_granularities[]"] = ["segment", "word"]
     if language:
         fields["language"] = language
     body, content_type = _multipart(fields, file_path)
+
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Authorization", f"Bearer {key}")
     req.add_header("Content-Type", content_type)
@@ -129,8 +153,27 @@ def _extract_mp3(src: Path, dst: Path, *, start: float, duration: float, job_id:
     return dst
 
 
+def _words_from(payload: dict, offset: float) -> list[WordStamp]:
+    out: list[WordStamp] = []
+    for item in payload.get("words") or []:
+        text = str(item.get("word") or item.get("text") or "").strip()
+        if not text:
+            continue
+        try:
+            start = float(item.get("start", 0.0)) + offset
+            end = float(item.get("end", 0.0)) + offset
+        except (TypeError, ValueError):
+            continue
+        if end <= start:
+            end = start + 0.18
+        out.append(WordStamp(start=start, end=end, text=text))
+    out.sort(key=lambda w: w.start)
+    return out
+
+
 def _segments_from(payload: dict, offset: float) -> list[Segment]:
     raw = payload.get("segments") or []
+    all_words = _words_from(payload, offset)
     out: list[Segment] = []
     for item in raw:
         text = (item.get("text") or "").strip()
@@ -143,15 +186,21 @@ def _segments_from(payload: dict, offset: float) -> list[Segment]:
             continue
         if end <= start:
             end = start + 0.4
-        out.append(Segment(start=start, end=end, text=text))
+        inline = _words_from(item, offset)
+        if not inline and all_words:
+            inline = [w for w in all_words if w.start >= start - 0.05 and w.start < end + 0.05]
+        out.append(Segment(start=start, end=end, text=text, words=inline))
     if not out:
         text = (payload.get("text") or "").strip()
         if text:
-            out.append(Segment(start=offset, end=offset + 5.0, text=text))
+            end = all_words[-1].end if all_words else offset + 5.0
+            out.append(Segment(start=offset, end=end, text=text, words=all_words))
     return out
 
 
-def transcribe(src: Path, *, job_id: str, language: str | None = None) -> tuple[list[Segment], str]:
+def transcribe(
+    src: Path, *, job_id: str, language: str | None = None, word_timestamps: bool = False
+) -> tuple[list[Segment], str]:
     """Devolve (segmentos, idioma detectado)."""
     providers = _providers()
     if not providers:
@@ -177,19 +226,27 @@ def transcribe(src: Path, *, job_id: str, language: str | None = None) -> tuple[
             payload: dict | None = None
             for label, url, key in providers:
                 try:
-                    payload = _post(url, key, piece, language)
+                    payload = _post(url, key, piece, language, words=word_timestamps)
                     if index == 0:
                         jobs.log(job_id, f"Transcrição via {label}")
                     break
                 except TranscribeError as exc:
                     last_error = exc
                     jobs.log(job_id, f"{label} falhou: {exc}")
+                    if word_timestamps:
+                        try:
+                            payload = _post(url, key, piece, language, words=False)
+                            jobs.log(job_id, f"{label} sem timestamps por palavra — usando fallback.")
+                            break
+                        except TranscribeError:
+                            pass
             piece.unlink(missing_ok=True)
             if payload is None:
                 raise TranscribeError(str(last_error) if last_error else "Nenhum provedor de transcrição respondeu.")
             detected = detected or (payload.get("language") or "")
             segments.extend(_segments_from(payload, offset))
             jobs.update(job_id, progress=min(45, 12 + int(30 * (index + 1) / blocks)))
+
     finally:
         for leftover in work.glob("*"):
             leftover.unlink(missing_ok=True)

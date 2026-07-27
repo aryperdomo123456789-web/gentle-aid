@@ -31,6 +31,8 @@ __all__ = [
     "DEFAULT_LEVEL",
     "LEVELS",
     "SterilizationReport",
+    "ass_filter",
+    "burn_ass",
     "burn_subtitles",
     "file_hashes",
     "md5",
@@ -144,12 +146,20 @@ SUBTITLE_STYLES = {
 SUBTITLE_ALIGNMENT = {"bottom": 2, "center": 5, "top": 8}
 
 
+def _escape_filter_path(path: Path) -> str:
+    return str(path).replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
+
+
 def subtitle_filter(srt: Path, *, style: str, position: str) -> str:
     """Monta o filtro `subtitles` já escapado para uso dentro do -vf."""
     alignment = SUBTITLE_ALIGNMENT.get(position, 2)
     force_style = f"{SUBTITLE_STYLES.get(style, SUBTITLE_STYLES['viral'])},Alignment={alignment}"
-    escaped = str(srt).replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
-    return f"subtitles='{escaped}':force_style='{force_style}'"
+    return f"subtitles='{_escape_filter_path(srt)}':force_style='{force_style}'"
+
+
+def ass_filter(ass: Path) -> str:
+    """Filtro `ass` — mantém todas as tags de animação do estúdio de legendas."""
+    return f"ass='{_escape_filter_path(ass)}'"
 
 
 def burn_subtitles(
@@ -170,3 +180,22 @@ def burn_subtitles(
         level=mutation,
         extra_video_filters=[subtitle_filter(srt, style=style, position=position)],
     )
+
+
+def burn_ass(
+    src: Path,
+    ass: Path,
+    dst: Path,
+    *,
+    job_id: str,
+    mutation: str = DEFAULT_LEVEL,
+) -> SterilizationReport:
+    """Queima um ASS animado e esteriliza na mesma passada."""
+    return sterilize(
+        src,
+        dst,
+        job_id=job_id,
+        level=mutation,
+        extra_video_filters=[ass_filter(ass)],
+    )
+

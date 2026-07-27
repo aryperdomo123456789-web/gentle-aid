@@ -1,4 +1,4 @@
-"""Ferramenta 3 — Legendagem dinâmica com esterilização na mesma passada."""
+"""Ferramenta 3 — Estúdio de Legendas Virais (ASS animado + esterilização)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from ..services import ingest, jobs, media
+from ..services import captions, ingest, jobs, media, transcribe
 from ..services.delivery import deliver
 from ..services.sterilizer import normalize_level
 from ..services.validation import (
@@ -20,41 +20,79 @@ from ..services.validation import (
 
 bp = Blueprint("legendar", __name__, url_prefix="/api/legendar")
 
-STYLES = set(media.SUBTITLE_STYLES)
-POSITIONS = set(media.SUBTITLE_ALIGNMENT)
+POSITIONS = set(captions.POSITIONS)
+
+
+@bp.get("/presets")
+def list_presets():
+    return jsonify(
+        presets=captions.preset_catalog(),
+        animations=list(captions.ANIMATIONS),
+        positions=list(captions.POSITIONS),
+        transcription=transcribe.available(),
+    )
+
+
+def _float(name: str, default: float, low: float, high: float) -> float:
+    try:
+        value = float(request.form.get(name, default))
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, value))
 
 
 @bp.post("/run")
 def run_job():
-    style = request.form.get("style", "viral")
-    position = request.form.get("position", "center")
+    preset = captions.resolve_preset(request.form.get("preset") or request.form.get("style"))
+    position = request.form.get("position", "bottom")
+    animation = (request.form.get("animation") or "auto").strip().lower()
     raw_mutation = request.form.get("mutation")
     mutation = normalize_level(raw_mutation)
 
-    if style not in STYLES or position not in POSITIONS:
-        return jsonify(error="Estilo ou posição inválidos."), 400
+    if position not in POSITIONS:
+        return jsonify(error="Posição inválida."), 400
+    if animation not in captions.ANIMATIONS:
+        return jsonify(error="Animação inválida."), 400
     if raw_mutation not in (None, "") and mutation is None:
         return jsonify(error="Nível de mutação inválido."), 400
     if mutation is None:
         mutation = "media"
 
     try:
-        srt_text = clean_text(request.form.get("srt"), max_length=20000, field="srt")
+        srt_text = clean_text(request.form.get("srt"), max_length=200000, field="srt")
         source_card = parse_json_object(request.form.get("source_card"), field="source_card")
     except ValidationError as exc:
         return jsonify(error=str(exc)), 400
+
+    style_opts = {
+        "preset": preset["id"],
+        "position": position,
+        "animation": animation,
+        "uppercase": request.form.get("uppercase") in ("1", "true", "on"),
+        "uppercase_set": request.form.get("uppercase") is not None,
+        "font_scale": _float("font_scale", 1.0, 0.6, 1.8),
+        "margin_ratio": _float("margin_ratio", 0.14, 0.02, 0.45),
+        "words_per_line": int(_float("words_per_line", preset["words_per_line"], 1, 10)),
+        "accent": (request.form.get("accent") or "").strip(),
+        "primary": (request.form.get("primary") or "").strip(),
+        "emoji": request.form.get("emoji") in ("1", "true", "on"),
+        "language": (request.form.get("language") or "").strip() or None,
+    }
 
     source_url = (request.form.get("url") or "").strip()
     job = jobs.create_job(
         "legendar",
         meta={
-            "style": style,
+            "preset": preset["id"],
+            "preset_label": preset["label"],
             "position": position,
+            "animation": animation if animation != "auto" else preset["animation"],
             "mutation": mutation,
             "url": source_url,
             **({"source_card": source_card} if source_card else {}),
         },
     )
+
     src: Path | None = None
     if request.files.get("video"):
         try:
@@ -63,12 +101,13 @@ def run_job():
             jobs.fail(job["job_id"], str(exc))
             return jsonify(error=str(exc)), 400
     elif not ingest.is_supported_url(source_url):
-        jobs.fail(job["job_id"], "Envie um arquivo ou selecione um vídeo na pesquisa.")
-        return jsonify(error="Envie um arquivo ou selecione um vídeo na pesquisa."), 400
+        msg = "Envie um arquivo ou selecione um vídeo na pesquisa."
+        jobs.fail(job["job_id"], msg)
+        return jsonify(error=msg), 400
 
     jobs.submit(
         job["job_id"],
-        lambda jid: _work(jid, src, srt_text, style, position, mutation, source_url),
+        lambda jid: _work(jid, src, srt_text, style_opts, mutation, source_url),
     )
     return jsonify(job), 202
 
@@ -77,47 +116,92 @@ def _work(
     job_id: str,
     src: Path | None,
     srt_text: str,
-    style: str,
-    position: str,
+    opts: dict,
     mutation: str,
     source_url: str = "",
 ) -> None:
     src = ingest.resolve_source(src, source_url, job_id)
-    jobs.stage(job_id, "preparando", "Origem resolvida — montando faixa de legendas.", progress=20)
+    jobs.stage(job_id, "preparando", "Origem resolvida — analisando o vídeo.", progress=15)
+
+    info = media.probe(src)
+    width = info.width or 1080
+    height = info.height or 1920
+    max_words = int(opts["words_per_line"])
+
+    lines: list[captions.Line] = []
+    if srt_text.strip():
+        if "-->" in srt_text:
+            jobs.stage(job_id, "transcrevendo", "Usando o SRT enviado — redistribuindo por palavra.", progress=25)
+            srt_lines = captions.parse_srt(srt_text)
+            words = [w for line in srt_lines for w in line.words]
+            lines = captions.group_words(words, max_words=max_words)
+        else:
+            jobs.stage(job_id, "transcrevendo", "Texto simples recebido — sincronizando com a duração.", progress=25)
+            duration = max(1.0, info.duration or media.probe_duration(src))
+            words = captions.spread_words(srt_text.strip(), 0.0, duration)
+            lines = captions.group_words(words, max_words=max_words)
+    else:
+        jobs.stage(
+            job_id,
+            "transcrevendo",
+            "Escutando o áudio para gerar legendas palavra a palavra.",
+            progress=25,
+        )
+        segments, detected = transcribe.transcribe(
+            src, job_id=job_id, language=opts["language"], word_timestamps=True
+        )
+        jobs.update(job_id, detected_language=detected)
+        lines = captions.lines_from_segments(segments, max_words=max_words)
+
+    if not lines:
+        raise RuntimeError("Não foi possível montar as legendas — nenhum trecho de fala detectado.")
+
+    ass_content = captions.build_ass(
+        lines,
+        preset_id=opts["preset"],
+        video_width=width,
+        video_height=height,
+        position=opts["position"],
+        animation=opts["animation"],
+        uppercase=opts["uppercase"] if opts["uppercase_set"] else None,
+        font_scale=opts["font_scale"],
+        accent_hex=opts["accent"],
+        primary_hex=opts["primary"],
+        margin_ratio=opts["margin_ratio"],
+        emoji=opts["emoji"],
+    )
+    ass_path = output_path("legendar", job_id, ".ass")
+    ass_path.write_text(ass_content, encoding="utf-8")
+    jobs.register_artifact(job_id, ass_path, "captions")
 
     srt_path = output_path("legendar", job_id, ".srt")
-    duration = media.probe_duration(src)
-    if srt_text.strip():
-        content = srt_text if "-->" in srt_text else _plain_to_srt(srt_text, duration)
-    else:
-        jobs.log(job_id, "Nenhuma transcrição enviada — gerando cartela padrão.")
-        content = _plain_to_srt("Legenda automática", duration)
-    srt_path.write_text(content, encoding="utf-8")
+    srt_path.write_text(_lines_to_srt(lines), encoding="utf-8")
+    jobs.register_artifact(job_id, srt_path, "captions")
 
+    jobs.update(job_id, caption_lines=len(lines))
     dst = output_path("legendar", job_id, "_legendado.mp4")
-    jobs.stage(job_id, "esterilizando", f"Queimando legendas (estilo {style}, posição {position}) + esterilização '{mutation}'.", progress=45)
-    report = media.burn_subtitles(
-        src, srt_path, dst, job_id=job_id, style=style, position=position, mutation=mutation
+    jobs.stage(
+        job_id,
+        "esterilizando",
+        f"Queimando {len(lines)} bloco(s) no preset '{opts['preset']}' + esterilização '{mutation}'.",
+        progress=55,
     )
+    report = media.burn_ass(src, ass_path, dst, job_id=job_id, mutation=mutation)
     src.unlink(missing_ok=True)
 
     deliver(job_id, dst, report, message="Vídeo legendado e entregue virgem, sem rastro de origem.")
 
 
-def _plain_to_srt(text: str, duration: float) -> str:
-    words = text.split() or ["Legenda"]
-    chunks = [" ".join(words[i : i + 6]) for i in range(0, len(words), 6)]
-    total = duration or len(chunks) * 2.0
-    step = total / len(chunks)
+def _stamp(seconds: float) -> str:
+    ms = int(max(0.0, seconds) * 1000)
+    h, ms = divmod(ms, 3600000)
+    m, ms = divmod(ms, 60000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
-    def stamp(seconds: float) -> str:
-        ms = int(seconds * 1000)
-        h, ms = divmod(ms, 3600000)
-        m, ms = divmod(ms, 60000)
-        s, ms = divmod(ms, 1000)
-        return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
-    lines: list[str] = []
-    for i, chunk in enumerate(chunks):
-        lines += [str(i + 1), f"{stamp(i * step)} --> {stamp((i + 1) * step)}", chunk, ""]
-    return "\n".join(lines)
+def _lines_to_srt(lines: list[captions.Line]) -> str:
+    out: list[str] = []
+    for index, line in enumerate(lines, start=1):
+        out += [str(index), f"{_stamp(line.start)} --> {_stamp(line.end)}", line.text, ""]
+    return "\n".join(out)

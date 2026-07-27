@@ -207,3 +207,25 @@
   background-clip: text;
   color: transparent;
 }
+
+/* Galeria de presets do Estúdio de Legendas — pulso da palavra ativa */
+@keyframes caption-demo-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.16);
+  }
+}
+
+.caption-demo-active {
+  display: inline-block;
+  animation: caption-demo-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caption-demo-active {
+    animation: none;
+  }
+}
