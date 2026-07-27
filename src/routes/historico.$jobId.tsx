@@ -82,6 +82,7 @@ function JobDetail() {
   const meta = Object.entries(job?.meta ?? {});
   const sourceCard = getSourceCard(job);
   const sourceSummary = getSourceSummary(job);
+  const auditSummary = job?.audit_summary ?? job?.sterilization?.audit_summary ?? null;
 
   return (
     <div className="min-h-screen">
@@ -163,6 +164,20 @@ function JobDetail() {
             />
           </section>
         </div>
+
+        {auditSummary ? (
+          <section className="panel mt-6 p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Auditoria estrutural entregue</h2>
+              <span className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                relatório persistido
+              </span>
+            </div>
+            <pre className="whitespace-pre-wrap break-words rounded-2xl border border-border bg-background/60 p-4 text-xs leading-5 text-muted-foreground">
+              {auditSummary}
+            </pre>
+          </section>
+        ) : null}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
           <section className="panel p-5">

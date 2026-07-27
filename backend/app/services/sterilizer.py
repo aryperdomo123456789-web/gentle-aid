@@ -76,6 +76,8 @@ class Probe:
     height: int = 0
     fps: float = 30.0
     duration: float = 0.0
+    bit_rate: int = 0
+    video_codec: str = ""
     has_audio: bool = False
     has_video: bool = False
     orientation: str = "unknown"
@@ -101,6 +103,15 @@ class SterilizationReport:
     source_height: int = 0
     source_orientation: str = "unknown"
     source_aspect_ratio: float = 0.0
+    source_duration: float = 0.0
+    source_bitrate: int = 0
+    source_size_bytes: int = 0
+    source_video_codec: str = ""
+    output_duration: float = 0.0
+    output_bitrate: int = 0
+    output_size_bytes: int = 0
+    output_video_codec: str = ""
+    audit_summary: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -120,6 +131,15 @@ class SterilizationReport:
             "source_height": self.source_height,
             "source_orientation": self.source_orientation,
             "source_aspect_ratio": self.source_aspect_ratio,
+            "source_duration": self.source_duration,
+            "source_bitrate": self.source_bitrate,
+            "source_size_bytes": self.source_size_bytes,
+            "source_video_codec": self.source_video_codec,
+            "output_duration": self.output_duration,
+            "output_bitrate": self.output_bitrate,
+            "output_size_bytes": self.output_size_bytes,
+            "output_video_codec": self.output_video_codec,
+            "audit_summary": self.audit_summary,
         }
 
 
@@ -134,7 +154,7 @@ def probe(path: Path) -> Probe:
                 "-v",
                 "error",
                 "-show_entries",
-                "format=duration:stream=codec_type,width,height,avg_frame_rate",
+                "format=duration,bit_rate:stream=codec_type,codec_name,width,height,avg_frame_rate",
                 "-of",
                 "json",
                 str(path),
@@ -153,11 +173,16 @@ def probe(path: Path) -> Probe:
         info.duration = float(data.get("format", {}).get("duration") or 0.0)
     except (TypeError, ValueError):
         info.duration = 0.0
+    try:
+        info.bit_rate = int(float(data.get("format", {}).get("bit_rate") or 0))
+    except (TypeError, ValueError):
+        info.bit_rate = 0
 
     for stream in data.get("streams", []):
         kind = stream.get("codec_type")
         if kind == "video" and not info.has_video:
             info.has_video = True
+            info.video_codec = str(stream.get("codec_name") or "")
             info.width = int(stream.get("width") or 0)
             info.height = int(stream.get("height") or 0)
             rate = str(stream.get("avg_frame_rate") or "30/1")
@@ -440,6 +465,10 @@ def build_command(
         source_height=info.height,
         source_orientation=info.orientation,
         source_aspect_ratio=info.aspect_ratio,
+        source_duration=info.duration,
+        source_bitrate=info.bit_rate,
+        source_size_bytes=src.stat().st_size if src.exists() else 0,
+        source_video_codec=info.video_codec,
     )
     return cmd, report
 
@@ -535,8 +564,13 @@ def sterilize(
         execute(cmd, job_id=job_id, timeout=timeout, line_callback=on_line)
 
         after = file_hashes(dst)
+        out_info = probe(dst)
         report.md5_after = after["md5"]
         report.sha256_after = after["sha256"]
+        report.output_duration = out_info.duration
+        report.output_bitrate = out_info.bit_rate
+        report.output_size_bytes = dst.stat().st_size if dst.exists() else 0
+        report.output_video_codec = out_info.video_codec
         report.steps = [
             "Metadados de origem destruídos (container, streams, capítulos)",
             f"Identidade forjada: {report.identity['encoder']} @ {report.identity['creation_time']}",

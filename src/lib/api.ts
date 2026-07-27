@@ -126,6 +126,15 @@ export type SterilizationReport = {
   source_height?: number;
   source_orientation?: "portrait" | "landscape" | "square" | "unknown";
   source_aspect_ratio?: number;
+  source_duration?: number;
+  source_bitrate?: number;
+  source_size_bytes?: number;
+  source_video_codec?: string;
+  output_duration?: number;
+  output_bitrate?: number;
+  output_size_bytes?: number;
+  output_video_codec?: string;
+  audit_summary?: string;
 };
 
 export type JobOutput = {
@@ -150,6 +159,7 @@ export type Job = {
   md5_before?: string | null;
   md5_after?: string | null;
   sha256_after?: string | null;
+  audit_summary?: string | null;
   sterilization?: SterilizationReport | null;
   outputs?: JobOutput[];
   artifacts?: { path: string; kind: string }[];

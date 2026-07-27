@@ -24,6 +24,7 @@ export function StatusPanel({
 }) {
   const status = error ? "error" : busy ? "running" : (job?.status ?? "idle");
   const lines = job?.log ?? [];
+  const auditSummary = job?.audit_summary ?? job?.sterilization?.audit_summary ?? null;
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -46,6 +47,20 @@ export function StatusPanel({
         <p className="rounded-xl border border-border bg-background/50 p-3 text-sm text-muted-foreground">
           {job.message}
         </p>
+      ) : null}
+
+      {auditSummary ? (
+        <section className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+          <header className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-foreground">Resultado da auditoria</h3>
+            <span className="rounded-full border border-border bg-background/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              entregue no servidor
+            </span>
+          </header>
+          <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
+            {auditSummary}
+          </pre>
+        </section>
       ) : null}
 
       <div className="min-h-40 flex-1 overflow-auto rounded-xl border border-border bg-background/70 p-3">
