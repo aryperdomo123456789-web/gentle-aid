@@ -1,0 +1,17 @@
+[Unit]
+Description=Ecossistema Viral - API Flask (Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=www
+WorkingDirectory=/www/wwwroot/viralpro.vr766.com/backend
+Environment="VIRAL_ROOT=/www/wwwroot/viralpro.vr766.com"
+Environment="PATH=/www/wwwroot/viralpro.vr766.com/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=-/www/wwwroot/viralpro.vr766.com/.env
+ExecStart=/www/wwwroot/viralpro.vr766.com/.venv/bin/gunicorn -c gunicorn.conf.py wsgi:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
