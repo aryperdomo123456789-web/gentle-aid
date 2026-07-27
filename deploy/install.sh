@@ -32,6 +32,15 @@ ok  "Domínio:  $DOMAIN"
 ok  "Usuário:  $RUN_USER   API :$API_PORT   Web :$WEB_PORT"
 cd "$APP_DIR"
 
+# Aviso se as portas escolhidas já estiverem ocupadas por outro processo
+for _p in "$API_PORT" "$WEB_PORT"; do
+  if command -v ss >/dev/null 2>&1 && ss -ltnp 2>/dev/null | grep -q ":$_p "; then
+    _owner="$(ss -ltnp 2>/dev/null | grep ":$_p " | head -1)"
+    warn "Porta $_p já está em uso: $_owner"
+    warn "Escolha outra porta: VIRAL_API_PORT=8010 VIRAL_WEB_PORT=3010 bash deploy/install.sh $DOMAIN"
+  fi
+done
+
 [ "$(id -u)" -eq 0 ] || warn "Sem root: systemd/nginx/pacotes podem falhar. Use 'sudo bash deploy/install.sh $DOMAIN'."
 
 # --- 1. Dependências de sistema ---------------------------------------------
