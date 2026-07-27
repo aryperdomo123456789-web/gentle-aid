@@ -403,14 +403,108 @@ export type CaptionEvent = {
   ass: string;
 };
 
-function activeTag(anim: Animation, accent: string): string {
+/** Ciclo de cores do rainbow (BBGGRR, igual ao backend). */
+export const RAINBOW = ["&H0000FF&", "&H00A5FF&", "&H00FFFF&", "&H00FF00&", "&HFFFF00&", "&HFF00FF&"];
+
+function activeTag(anim: Animation, accent: string, index = 0): string {
   const color = `\\c${accent}`;
   if (anim === "pop") return `{${color}\\fscx118\\fscy118\\t(0,110,\\fscx100\\fscy100)}`;
   if (anim === "bounce") return `{${color}\\fscy132\\fscx108\\t(0,90,\\fscy96\\fscx104)\\t(90,180,\\fscy100\\fscx100)}`;
   if (anim === "shake")
     return `{${color}\\frz-4\\t(0,80,\\frz4)\\t(80,160,\\frz0)\\fscx112\\fscy112\\t(0,140,\\fscx100\\fscy100)}`;
   if (anim === "boxed") return `{\\c&H00FFFFFF&\\3c${accent}\\bord14\\shad0}`;
+  if (anim === "beat")
+    return `{${color}\\fscx142\\fscy142\\t(0,70,\\fscx96\\fscy96)\\t(70,150,\\fscx100\\fscy100)}`;
+  if (anim === "zoom")
+    return `{${color}\\fscx165\\fscy165\\alpha&H40&\\t(0,120,\\fscx100\\fscy100\\alpha&H00&)}`;
+  if (anim === "slide") return `{${color}\\fay-0.12\\t(0,130,\\fay0)\\alpha&HB0&\\t(0,130,\\alpha&H00&)}`;
+  if (anim === "blur")
+    return `{${color}\\blur9\\t(0,160,\\blur0)\\fscx108\\fscy108\\t(0,160,\\fscx100\\fscy100)}`;
+  if (anim === "wave") {
+    const shift = index % 2 === 0 ? "-0.10" : "0.10";
+    return `{${color}\\fay${shift}\\t(0,180,\\fay0)\\fscy118\\t(0,180,\\fscy100)}`;
+  }
+  if (anim === "glitch")
+    return `{${color}\\3c&H00FFFF&\\bord6\\xshad-5\\yshad0\\4c&HFF0000&\\t(0,60,\\xshad5)\\t(60,130,\\xshad0)\\fscx112\\t(0,130,\\fscx100)}`;
+  if (anim === "neon")
+    return `{${color}\\3c${accent}\\bord2\\blur6\\t(0,140,\\bord9\\blur14)\\t(140,300,\\bord4\\blur7)}`;
+  if (anim === "rainbow")
+    return `{\\c${RAINBOW[index % RAINBOW.length]}\\fscx114\\fscy114\\t(0,140,\\fscx100\\fscy100)}`;
+  if (anim === "stamp")
+    return `{${color}\\frz-12\\fscx170\\fscy170\\alpha&H60&\\t(0,110,\\frz0\\fscx100\\fscy100\\alpha&H00&)}`;
+  if (anim === "flip") return `{${color}\\fry88\\t(0,150,\\fry0)\\fscx105\\t(0,150,\\fscx100)}`;
   return `{${color}}`;
+}
+
+/** Como o preview do laboratório desenha a palavra ativa (espelha o tag ASS). */
+export function previewStyle(anim: Animation, index = 0): { transform?: string; filter?: string; color?: string } {
+  switch (anim) {
+    case "pop": return { transform: "scale(1.14)" };
+    case "beat": return { transform: "scale(1.32)" };
+    case "zoom": return { transform: "scale(1.45)" };
+    case "bounce": return { transform: "scale(1.10) translateY(-6%)" };
+    case "shake": return { transform: "rotate(-3deg) scale(1.08)" };
+    case "wave": return { transform: `translateY(${index % 2 === 0 ? "-10%" : "10%"}) scale(1.1)` };
+    case "slide": return { transform: "translateY(-12%)" };
+    case "blur": return { filter: "blur(3px)", transform: "scale(1.06)" };
+    case "glitch": return { transform: "translateX(-2px) scale(1.08)", filter: "drop-shadow(3px 0 #ff0044)" };
+    case "neon": return { filter: "drop-shadow(0 0 10px currentColor)" };
+    case "stamp": return { transform: "rotate(-8deg) scale(1.35)" };
+    case "flip": return { transform: "perspective(400px) rotateY(35deg)" };
+    default: return {};
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Beat sync — mesma matemática do backend (services/beatsync.py)      */
+/* ------------------------------------------------------------------ */
+export function beatsFromBpm(bpm: number, duration: number, offset = 0): number[] {
+  if (bpm <= 0 || duration <= 0) return [];
+  const period = 60 / bpm;
+  const out: number[] = [];
+  for (let t = offset % period; t <= duration + 1e-6; t += period) out.push(Number(t.toFixed(4)));
+  return out;
+}
+
+function nearestBeat(beats: number[], value: number): number {
+  if (!beats.length) return value;
+  let lo = 0, hi = beats.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (beats[mid] < value) lo = mid + 1;
+    else hi = mid;
+  }
+  const best = beats[lo];
+  return lo > 0 && Math.abs(beats[lo - 1] - value) <= Math.abs(best - value) ? beats[lo - 1] : best;
+}
+
+/** Puxa cada palavra para a batida mais próxima, sem inverter a ordem. */
+export function snapLinesToBeats(lines: Line[], beats: number[], tolerance = 0.22): Line[] {
+  if (!beats.length) return lines;
+  const minLen = 0.08;
+  const out: Line[] = [];
+  for (const line of lines) {
+    const words: Word[] = [];
+    let floor = 0;
+    line.words.forEach((word, index) => {
+      const target = nearestBeat(beats, word.start);
+      let start = Math.abs(target - word.start) <= tolerance ? target : word.start;
+      start = Math.max(start, floor);
+      const next = line.words[index + 1]?.start;
+      let end = Math.max(word.end, start + minLen);
+      if (next !== undefined) end = Math.min(end, Math.max(next, start + minLen));
+      words.push({ start: Number(start.toFixed(4)), end: Number(end.toFixed(4)), text: word.text });
+      floor = start + minLen;
+    });
+    for (let i = 0; i < words.length - 1; i += 1) {
+      if (words[i].end > words[i + 1].start) words[i].end = Math.max(words[i].start + minLen, words[i + 1].start);
+    }
+    if (words.length) out.push({ start: words[0].start, end: Math.max(words[words.length - 1].end, words[0].start + 0.2), words });
+  }
+  for (let i = 0; i < out.length - 1; i += 1) {
+    if (out[i].end > out[i + 1].start) out[i].end = Math.max(out[i].start + 0.2, out[i + 1].start);
+  }
+  return out;
 }
 
 export function buildEvents(
@@ -476,7 +570,7 @@ export function buildEvents(
     words.forEach((word, index) => {
       const parts = words.map((other, otherIndex) => {
         const token = render(other.text);
-        return otherIndex === index ? `${activeTag(animation, accent)}${token}{\\r}` : token;
+        return otherIndex === index ? `${activeTag(animation, accent, index)}${token}{\\r}` : token;
       });
       const stop = index + 1 < words.length ? words[index + 1].start : line.end;
       const end = Math.max(word.start + 0.08, stop);
