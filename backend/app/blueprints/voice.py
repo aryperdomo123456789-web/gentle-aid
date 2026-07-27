@@ -76,12 +76,16 @@ def _settings_from_form() -> Settings:
 def catalog():
     return jsonify(
         engine_ready=voice_engine.available(),
+        forge_ready=edge_tts.available(),
         engines=list(ENGINES),
         voices=[
             {"id": vid, "semitones": semi, "formant": formant}
             for vid, (semi, formant) in VOICES.items()
         ],
         realistic_voices=voice_engine.list_voices(),
+        base_voices=edge_tts.list_voices(),
+        personas=voice_forge.list_personas(),
+        persona_bounds=voice_forge.BOUNDS,
         formats=list(FORMATS),
         timings=list(TIMINGS),
         levels=list(LEVELS),
@@ -92,6 +96,81 @@ def catalog():
 @bp.get("/voices")
 def voices():
     return jsonify(engine_ready=voice_engine.available(), voices=voice_engine.list_voices())
+
+
+# --------------------------------------------------------------------------- #
+# Voice Forge — vozes próprias (motor gratuito + assinatura acústica)
+# --------------------------------------------------------------------------- #
+@bp.get("/personas")
+def personas_list():
+    return jsonify(
+        forge_ready=edge_tts.available(),
+        personas=voice_forge.list_personas(),
+        base_voices=edge_tts.list_voices(),
+        bounds=voice_forge.BOUNDS,
+    )
+
+
+@bp.post("/personas")
+def personas_save():
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    if not isinstance(payload, dict) or not payload:
+        return jsonify(error="Envie os parâmetros da voz."), 400
+    try:
+        persona = voice_forge.save(payload)
+    except (ValueError, TypeError) as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(persona=persona.dict()), 201
+
+
+@bp.delete("/personas/<persona_id>")
+def personas_delete(persona_id: str):
+    if not voice_forge.delete(persona_id):
+        return jsonify(error="Voz não encontrada."), 404
+    return jsonify(ok=True)
+
+
+@bp.post("/personas/preview")
+def personas_preview():
+    """Gera uma amostra curta (síncrona) da voz própria para escuta imediata."""
+    if not edge_tts.available():
+        return jsonify(
+            error="Motor gratuito indisponível: instale `edge-tts` no servidor e reinicie o viral-api."
+        ), 400
+
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    if not isinstance(payload, dict) or not payload:
+        return jsonify(error="Envie os parâmetros da voz."), 400
+    payload = dict(payload)
+    payload.setdefault("id", "forge_preview")
+    payload.setdefault("name", "Prévia")
+    try:
+        persona = voice_forge._from_dict(payload)
+    except (TypeError, ValueError) as exc:
+        return jsonify(error=f"Parâmetros inválidos: {exc}"), 400
+
+    text = str(payload.get("text") or PREVIEW_TEXT)[:400]
+    job_id = f"preview-{persona.id}-{int(time.time())}"
+    raw = output_path("voice", job_id, ".raw.wav")
+    dst = output_path("voice", job_id, ".mp3")
+    try:
+        edge_tts.synthesize(text, raw, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate)
+        media.run(
+            [
+                config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(raw), "-af", ",".join(voice_forge.filter_chain(persona, preserve_duration=False)),
+                "-c:a", "libmp3lame", "-b:a", "192k", str(dst),
+            ],
+            job_id=None,
+        )
+    except (EdgeTTSError, RuntimeError) as exc:
+        raw.unlink(missing_ok=True)
+        return jsonify(error=str(exc)), 400
+    finally:
+        raw.unlink(missing_ok=True)
+
+    return jsonify(url=public_url(dst), persona=persona.dict())
+
 
 
 def _common_params() -> tuple[str, str, str]:
