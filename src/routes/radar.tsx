@@ -14,7 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Field, SelectInput, TextInput } from "@/components/form";
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
-import { StatusPanel } from "@/components/StatusPanel";
+import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
 import { apiGet, apiPostJson, friendlyError, type Job } from "@/lib/api";
 import { useJobRunner } from "@/hooks/use-job-runner";

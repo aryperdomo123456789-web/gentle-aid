@@ -3,9 +3,9 @@ import { ArrowLeft, Download, StopCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
-import { JobMediaPreview } from "@/components/JobMediaPreview";
-import { JobTrace } from "@/components/JobTrace";
-import { StatusPanel } from "@/components/StatusPanel";
+import { JobMediaPreview } from "@/features/jobs/components/JobMediaPreview";
+import { JobTrace } from "@/features/jobs/components/JobTrace";
+import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
 import { formatDurationMs, stageLabel, toolLabel } from "@/features/jobs/job-utils";
 import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError, type Job } from "@/lib/api";

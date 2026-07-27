@@ -5,8 +5,8 @@ import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel"
 import { Field, FileDrop, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { LinkInspector, type InspectedCard } from "@/components/LinkInspector";
 import { MutationSelect } from "@/components/MutationSelect";
-import { StatusPanel } from "@/components/StatusPanel";
-import { ToolHistory } from "@/components/ToolHistory";
+import { StatusPanel } from "@/features/jobs/components/StatusPanel";
+import { ToolHistory } from "@/features/jobs/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
 import { VoiceForgePanel, type Persona } from "@/components/VoiceForgePanel";
 import {
