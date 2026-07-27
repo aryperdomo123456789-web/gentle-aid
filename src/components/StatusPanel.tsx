@@ -1,6 +1,6 @@
-import { CheckCircle2, CircleAlert, Download, Loader2, Terminal } from "lucide-react";
+import { CheckCircle2, CircleAlert, Download, Loader2, ShieldCheck, Terminal } from "lucide-react";
 
-import { downloadUrl, type Job } from "@/lib/api";
+import { downloadUrl, type Job, type SterilizationReport } from "@/lib/api";
 
 const STATUS_LABEL: Record<string, string> = {
   idle: "Aguardando",
@@ -120,5 +120,31 @@ export function StatusPill({ status }: { status: string }) {
       ) : null}
       {STATUS_LABEL[status] ?? status}
     </span>
+  );
+}
+
+function SterilizationBadge({ report }: { report: SterilizationReport }) {
+  return (
+    <section className="rounded-xl border border-success/40 bg-success/10 p-3">
+      <header className="flex items-center gap-2 text-sm font-semibold">
+        <ShieldCheck className="size-4 text-success" aria-hidden="true" />
+        {report.unique ? "Arquivo virgem e inrastreável" : "Esterilização aplicada"}
+        <span className="ml-auto rounded-full border border-border bg-background/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+          nível {report.level}
+        </span>
+      </header>
+      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+        {report.steps.map((step) => (
+          <li key={step} className="flex gap-2">
+            <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-success" aria-hidden="true" />
+            <span className="break-words">{step}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        {report.video_filters.length} filtro(s) de vídeo · {report.audio_filters.length} de áudio ·
+        bitrate {report.bitrate} · {report.attempts} tentativa(s)
+      </p>
+    </section>
   );
 }
