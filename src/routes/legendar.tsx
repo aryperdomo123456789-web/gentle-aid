@@ -72,7 +72,7 @@ function Legendar() {
             )}
           </Field>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
             <Field label="Estilo">
               {(id) => (
                 <SelectInput id={id} name="style" defaultValue="viral">

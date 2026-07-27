@@ -210,7 +210,7 @@ function VoiceStudio() {
               {mediaPicker}
 
 
-              <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                 <Field label="Saída quando for vídeo">
                   {(id) => (
                     <SelectInput id={id} name="keep_video" defaultValue="1">
@@ -269,7 +269,7 @@ function VoiceStudio() {
 
 
 
-              <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                 <Field label="Velocidade">
                   {(id) => (
                     <SelectInput id={id} name="speed" defaultValue="1">
