@@ -15,8 +15,17 @@ printf '\n\033[1;35m==>\033[0m Dependências Python\n'
 "$APP_DIR/.venv/bin/pip" install -q -r backend/requirements.txt
 
 printf '\n\033[1;35m==>\033[0m Build do frontend\n'
-npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-NITRO_PRESET="${NITRO_PRESET:-node-server}" npm run build
+if command -v bun >/dev/null 2>&1 && { [ -f "$APP_DIR/bun.lock" ] || [ -f "$APP_DIR/bun.lockb" ]; }; then
+  printf '\033[1;32m  ✔\033[0m Usando bun (bun.lock detectado)\n'
+  bun install --frozen-lockfile || bun install
+  NITRO_PRESET="${NITRO_PRESET:-node-server}" bun run build
+elif [ -f "$APP_DIR/package-lock.json" ]; then
+  npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+  NITRO_PRESET="${NITRO_PRESET:-node-server}" npm run build
+else
+  npm install --no-audit --no-fund
+  NITRO_PRESET="${NITRO_PRESET:-node-server}" npm run build
+fi
 
 printf '\n\033[1;35m==>\033[0m Reiniciando serviços\n'
 systemctl restart viral-api viral-web
