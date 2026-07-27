@@ -60,10 +60,10 @@ def run_job():
         try:
             src = save_upload(request.files.get("video"), job["job_id"], VIDEO_EXT)
         except ValidationError as exc:
-            jobs.update(job["job_id"], status="error", message=str(exc))
+            jobs.fail(job["job_id"], str(exc))
             return jsonify(error=str(exc)), 400
     elif not ingest.is_supported_url(source_url):
-        jobs.update(job["job_id"], status="error", message="Envie um arquivo ou selecione um vídeo na pesquisa.")
+        jobs.fail(job["job_id"], "Envie um arquivo ou selecione um vídeo na pesquisa.")
         return jsonify(error="Envie um arquivo ou selecione um vídeo na pesquisa."), 400
 
     jobs.submit(
@@ -83,7 +83,7 @@ def _work(
     source_url: str = "",
 ) -> None:
     src = ingest.resolve_source(src, source_url, job_id)
-    jobs.update(job_id, progress=20)
+    jobs.stage(job_id, "preparando", "Origem resolvida — montando faixa de legendas.", progress=20)
 
     srt_path = output_path("legendar", job_id, ".srt")
     duration = media.probe_duration(src)
@@ -95,7 +95,7 @@ def _work(
     srt_path.write_text(content, encoding="utf-8")
 
     dst = output_path("legendar", job_id, "_legendado.mp4")
-    jobs.log(job_id, f"Queimando legendas (estilo {style}, posição {position}) + esterilização '{mutation}'")
+    jobs.stage(job_id, "esterilizando", f"Queimando legendas (estilo {style}, posição {position}) + esterilização '{mutation}'.", progress=45)
     report = media.burn_subtitles(
         src, srt_path, dst, job_id=job_id, style=style, position=position, mutation=mutation
     )

@@ -72,15 +72,14 @@ def clone():
 
 def _work(job_id: str, url: str, level: str) -> None:
     raw = config.uploads_dir / f"{job_id}_src.mp4"
-    jobs.log(job_id, f"Extraindo mídia de {url}")
+    jobs.stage(job_id, "baixando", f"Extraindo mídia de {url}.", progress=10)
     media.run(
         [config.ytdlp_bin, "-f", "b[ext=mp4]/b", "--no-playlist", "-o", str(raw), url],
         job_id=job_id,
     )
 
-    jobs.update(job_id, progress=50)
     dst = output_path("tiktok", job_id, "_clone.mp4")
-    jobs.log(job_id, f"Clonando 1:1 e esterilizando (nível {level})")
+    jobs.stage(job_id, "esterilizando", f"Clonando 1:1 e esterilizando (nível {level}).", progress=50)
     report = media.sterilize(raw, dst, job_id=job_id, level=level)
     raw.unlink(missing_ok=True)
 

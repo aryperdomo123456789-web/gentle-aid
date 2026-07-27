@@ -71,7 +71,8 @@ def _work(job_id: str, urls: list[str], intensity: str) -> None:
     last_dst: Path | None = None
 
     for index, url in enumerate(urls, start=1):
-        jobs.log(job_id, f"[{index}/{total}] Baixando {url}")
+        jobs.check_cancelled(job_id)
+        jobs.stage(job_id, "baixando", f"[{index}/{total}] Baixando {url}.", progress=int((index - 1) / total * 100))
         raw = config.uploads_dir / f"{job_id}_{index}.mp4"
         media.run(
             [
@@ -89,7 +90,7 @@ def _work(job_id: str, urls: list[str], intensity: str) -> None:
         )
 
         dst = output_path("youtube", job_id, f"_{index}_bypass.mp4")
-        jobs.log(job_id, f"[{index}/{total}] Esterilizando com mutação '{intensity}'")
+        jobs.stage(job_id, "esterilizando", f"[{index}/{total}] Esterilizando com mutação '{intensity}'.")
         report = media.sterilize(raw, dst, job_id=job_id, level=intensity)
         raw.unlink(missing_ok=True)
 
