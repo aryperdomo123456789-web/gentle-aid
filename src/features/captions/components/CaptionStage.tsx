@@ -5,8 +5,11 @@ import { cn } from "@/lib/utils";
 
 import type { CaptionPreset } from "../api";
 import {
+  ASPECT_RATIO,
+  detectAspect,
   POSITION_LABEL,
   positionFromY,
+  type CaptionAspect,
   type CaptionStyle,
 } from "../style";
 import {
