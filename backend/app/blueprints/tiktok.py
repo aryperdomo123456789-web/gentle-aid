@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
-
 from flask import Blueprint, jsonify, request
 
 from ..config import config
-from ..services import jobs, media
+from ..services import jobs, media, trends as trends_service
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS
 from ..services.validation import (
@@ -22,39 +20,17 @@ bp = Blueprint("tiktok", __name__, url_prefix="/api/tiktok")
 
 @bp.get("/trends")
 def trends():
+    """Virais reais do nicho (TikTok via yt-dlp, com fallback para busca)."""
     try:
         nicho = clean_text(request.args.get("nicho"), max_length=60, field="nicho")
     except ValidationError as exc:
         return jsonify(error=str(exc)), 400
     region = (request.args.get("region") or "BR").upper()[:2]
 
-    query = f"{nicho} {region}".strip()
-    found: list[dict] = []
-
     try:
-        out = media.run(
-            [
-                config.ytdlp_bin,
-                "--flat-playlist",
-                "--dump-single-json",
-                "--playlist-end",
-                "12",
-                f"ytsearch12:tiktok {query}",
-            ],
-            timeout=120,
-        )
-        data = json.loads(out[out.index("{") :]) if "{" in out else {}
-        for entry in data.get("entries", [])[:12]:
-            found.append(
-                {
-                    "id": entry.get("id", ""),
-                    "title": entry.get("title", "Sem título"),
-                    "author": entry.get("uploader", "desconhecido"),
-                    "views": int(entry.get("view_count") or 0),
-                    "likes": int(entry.get("like_count") or 0),
-                    "url": entry.get("url") or entry.get("webpage_url") or "",
-                }
-            )
+        found = trends_service.tiktok_niche(nicho or "viral", region, 12)
+        if not found:
+            found = trends_service.youtube_trending(region, 12)
     except Exception as exc:  # noqa: BLE001
         return jsonify(error=f"Radar indisponível: {exc}"), 502
 

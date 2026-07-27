@@ -11,6 +11,7 @@ from .blueprints.apis import bp as apis_bp
 from .blueprints.canva_cleaner import bp as canva_bp
 from .blueprints.jobs import bp as jobs_bp
 from .blueprints.legendar import bp as legendar_bp
+from .blueprints.radar import bp as radar_bp
 from .blueprints.tiktok import bp as tiktok_bp
 from .blueprints.voice import bp as voice_bp
 from .blueprints.youtube import bp as youtube_bp
@@ -29,7 +30,7 @@ def create_app(config: Config | None = None) -> Flask:
 
     cfg.ensure_dirs()
 
-    for bp in (youtube_bp, tiktok_bp, legendar_bp, voice_bp, canva_bp, jobs_bp, apis_bp):
+    for bp in (youtube_bp, tiktok_bp, legendar_bp, voice_bp, canva_bp, jobs_bp, apis_bp, radar_bp):
         app.register_blueprint(bp)
 
     @app.get("/api/health")
