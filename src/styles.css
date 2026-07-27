@@ -162,8 +162,37 @@
   h4 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+  }
+
+  /* Mídia sempre fluida, nunca distorcida */
+  img,
+  video,
+  canvas,
+  svg,
+  iframe {
+    max-width: 100%;
+  }
+
+  img,
+  video {
+    height: auto;
+  }
+
+  /* Código e URLs longas nunca estouram o container */
+  pre,
+  code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Rolagem horizontal suave em trilhos de pílulas/tabelas no mobile */
+  .scroll-x {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
 }
+
 
 @utility panel {
   background-color: color-mix(in oklab, var(--surface) 88%, transparent);
