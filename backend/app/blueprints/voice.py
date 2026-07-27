@@ -20,7 +20,17 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from ..config import config
-from ..services import dubbing, edge_tts, ingest, jobs, media, transcribe, voice_engine, voice_forge
+from ..services import (
+    dubbing,
+    edge_tts,
+    ingest,
+    jobs,
+    media,
+    script_doctor,
+    transcribe,
+    voice_engine,
+    voice_forge,
+)
 
 from ..services.delivery import deliver
 from ..services.sterilizer import LEVELS, normalize_level
@@ -117,6 +127,9 @@ def catalog():
         dub_ready=transcribe.available(),
         dub_languages=dubbing.LANGUAGES,
         test_script=TEST_SCRIPT,
+        script_styles=script_doctor.list_styles(),
+        script_actions=script_doctor.ACTIONS,
+        script_ai_ready=script_doctor.llm_available(),
         local_voices=[
             {"id": "masc_grave", "name": "Masculino grave"},
             {"id": "masc_jovem", "name": "Masculino jovem"},
@@ -200,6 +213,70 @@ def preview():
 
 
 
+
+
+# --------------------------------------------------------------------------- #
+# Doutor de Roteiro — corrige/reescreve o texto antes de virar áudio
+# --------------------------------------------------------------------------- #
+@bp.get("/script/styles")
+def script_styles():
+    """Catálogo de estilos narrativos + ações do chat."""
+    return jsonify(
+        styles=script_doctor.list_styles(),
+        actions=script_doctor.ACTIONS,
+        ai_ready=script_doctor.llm_available(),
+        words_per_second=script_doctor.WORDS_PER_SECOND,
+    )
+
+
+@bp.post("/script/analyze")
+def script_analyze():
+    """Diagnóstico local do roteiro (roda sem nenhuma chave de API)."""
+    raw = request.get_json(silent=True) or request.form.to_dict()
+    payload = dict(raw) if isinstance(raw, dict) else {}
+    try:
+        text = clean_text(payload.get("text"), max_length=MAX_TTS_CHARS, field="text")
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(analysis=script_doctor.analyze(text))
+
+
+@bp.post("/script/fix")
+def script_fix():
+    """Correção/reescrita do roteiro no estilo escolhido."""
+    raw = request.get_json(silent=True) or request.form.to_dict()
+    payload = dict(raw) if isinstance(raw, dict) else {}
+    try:
+        text = clean_text(payload.get("text"), max_length=MAX_TTS_CHARS, field="text")
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+    if len(text) < 10:
+        return jsonify(error="Escreva pelo menos uma frase para a IA trabalhar."), 400
+
+    style_id = str(payload.get("style") or "neutro")
+    if style_id not in script_doctor.STYLE_IDS:
+        return jsonify(error="Estilo narrativo inválido."), 400
+    action = str(payload.get("action") or "corrigir")
+    if action not in script_doctor.ACTION_IDS:
+        return jsonify(error="Ação inválida."), 400
+
+    seconds_raw = payload.get("seconds")
+    try:
+        seconds = max(5, min(900, int(seconds_raw))) if seconds_raw else None
+    except (TypeError, ValueError):
+        seconds = None
+
+    started = time.time()
+    result = script_doctor.rewrite(
+        text,
+        style_id=style_id,
+        action=action,
+        instruction=str(payload.get("instruction") or "")[:600],
+        seconds=seconds,
+    )
+    result["elapsed"] = round(time.time() - started, 2)
+    result["before"] = script_doctor.analyze(text)
+    return jsonify(result)
 
 
 @bp.get("/voices")
@@ -516,6 +593,21 @@ def build_timbre_chain(target: str, timing: str) -> list[str]:
 # --------------------------------------------------------------------------- #
 # Workers
 # --------------------------------------------------------------------------- #
+def _sweep(*paths: "Path | None") -> None:
+    """Apaga arquivos intermediários mesmo quando o job falha no meio.
+
+    Auditoria: sem isso, cada job que estourava (chave inválida, vídeo sem
+    áudio, provedor fora do ar) deixava o WAV bruto no disco do aaPanel.
+    """
+    for path in paths:
+        if path is None:
+            continue
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:  # noqa: PERF203 — limpeza nunca pode derrubar o job
+            continue
+
+
 def _work_convert(
     job_id: str,
     src: Path | None,
@@ -577,12 +669,14 @@ def _work_convert(
 
     work_dir = output_path("voice", job_id, ".tmp").parent
     converted = work_dir / f"{job_id}_voice.wav"
+    muxed: Path | None = None
     try:
         voice_engine.speech_to_speech(
             src, converted,
             voice_id=voice_id, job_id=job_id, settings=settings, keep_timing=(timing == "strict"),
         )
     except VoiceEngineError as exc:
+        _sweep(converted, src)
         raise RuntimeError(str(exc)) from exc
 
     jobs.stage(job_id, "mixando", "Montando a trilha dublada com a mídia final.", progress=88)
@@ -591,22 +685,25 @@ def _work_convert(
     # realista, o que também descaracteriza o timbre original do provedor.
     finish = voice_forge.filter_chain(persona, preserve_duration=True) if persona else None
 
-    if keep_video and info.has_video:
-        muxed = work_dir / f"{job_id}_muxed.mp4"
-        voice_engine.swap_video_audio(src, converted, muxed, job_id)
-        dst = output_path("voice", job_id, ".mp4")
-        report = media.sterilize(muxed, dst, job_id=job_id, level=mutation, extra_audio_filters=finish)
-        muxed.unlink(missing_ok=True)
-        message = "Narrador trocado, vídeo remuxado e arquivo esterilizado."
-    else:
-        dst = output_path("voice", job_id, FORMATS[fmt])
-        report = media.sterilize(
-            converted, dst, job_id=job_id, level=mutation, extra_audio_filters=finish, audio_only=True
-        )
-        message = "Narrador trocado com narrativa e timing preservados."
+    try:
+        if keep_video and info.has_video:
+            muxed = work_dir / f"{job_id}_muxed.mp4"
+            voice_engine.swap_video_audio(src, converted, muxed, job_id)
+            dst = output_path("voice", job_id, ".mp4")
+            report = media.sterilize(
+                muxed, dst, job_id=job_id, level=mutation, extra_audio_filters=finish
+            )
+            message = "Narrador trocado, vídeo remuxado e arquivo esterilizado."
+        else:
+            dst = output_path("voice", job_id, FORMATS[fmt])
+            report = media.sterilize(
+                converted, dst, job_id=job_id, level=mutation, extra_audio_filters=finish,
+                audio_only=True,
+            )
+            message = "Narrador trocado com narrativa e timing preservados."
+    finally:
+        _sweep(muxed, converted, src)
 
-    converted.unlink(missing_ok=True)
-    src.unlink(missing_ok=True)
     deliver(job_id, dst, report, message=message)
 
 
@@ -634,6 +731,7 @@ def _work_tts(
                 text, narrated, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate
             )
         except EdgeTTSError as exc:
+            _sweep(narrated)
             raise RuntimeError(str(exc)) from exc
         source_label = f"voz própria '{persona.name}'"
     else:
@@ -642,16 +740,19 @@ def _work_tts(
                 text, narrated, voice_id=voice_id, job_id=job_id, settings=settings, speed=speed
             )
         except VoiceEngineError as exc:
+            _sweep(narrated)
             raise RuntimeError(str(exc)) from exc
         source_label = "voz realista"
 
     jobs.stage(job_id, "esterilizando", "Aplicando assinatura acústica e removendo rastro.", progress=90)
     chain = voice_forge.filter_chain(persona, preserve_duration=False) if persona else None
     dst = output_path("voice", job_id, FORMATS[fmt])
-    report = media.sterilize(
-        narrated, dst, job_id=job_id, level=mutation, extra_audio_filters=chain, audio_only=True
-    )
-    narrated.unlink(missing_ok=True)
+    try:
+        report = media.sterilize(
+            narrated, dst, job_id=job_id, level=mutation, extra_audio_filters=chain, audio_only=True
+        )
+    finally:
+        _sweep(narrated)
     duration = media.probe_duration(dst)
     deliver(
         job_id, dst, report,
@@ -780,6 +881,9 @@ def _work_dub(
 
     work_dir = output_path("voice", job_id, ".tmp").parent
     track = work_dir / f"{job_id}_dubtrack.wav"
+    raw_track = track
+    signed: Path | None = None
+    muxed: Path | None = None
     base_voice = persona.base_voice if (engine == "forge" and persona) else voice_id
     try:
         dubbing.build_track(
@@ -787,28 +891,29 @@ def _work_dub(
             engine=engine, voice=base_voice, job_id=job_id, total_duration=info.duration,
         )
     except (EdgeTTSError, VoiceEngineError, dubbing.DubbingError) as exc:
+        _sweep(raw_track, src)
         raise RuntimeError(str(exc)) from exc
 
-    if persona is not None:
-        signed = work_dir / f"{job_id}_dubvoice.wav"
-        track = dubbing.apply_persona(track, signed, persona, job_id)
+    try:
+        if persona is not None:
+            signed = work_dir / f"{job_id}_dubvoice.wav"
+            track = dubbing.apply_persona(track, signed, persona, job_id)
 
-    jobs.stage(job_id, "mixando", "Montando a trilha dublada com a mídia final.", progress=88)
-    voice_label = persona.name if persona else voice_id
+        jobs.stage(job_id, "mixando", "Montando a trilha dublada com a mídia final.", progress=88)
+        voice_label = persona.name if persona else voice_id
 
-    if keep_video and info.has_video:
-        muxed = work_dir / f"{job_id}_dubmux.mp4"
-        dubbing.mix_with_background(src, track, muxed, keep_ambience=keep_ambience, job_id=job_id)
-        dst = output_path("voice", job_id, ".mp4")
-        report = media.sterilize(muxed, dst, job_id=job_id, level=mutation)
-        muxed.unlink(missing_ok=True)
-        message = f"Vídeo dublado com a voz '{voice_label}', sincronizado e esterilizado."
-    else:
-        dst = output_path("voice", job_id, FORMATS[fmt])
-        report = media.sterilize(track, dst, job_id=job_id, level=mutation, audio_only=True)
-        message = f"Narração dublada com a voz '{voice_label}' e áudio sem rastro."
-
-    track.unlink(missing_ok=True)
-    src.unlink(missing_ok=True)
+        if keep_video and info.has_video:
+            muxed = work_dir / f"{job_id}_dubmux.mp4"
+            dubbing.mix_with_background(src, track, muxed, keep_ambience=keep_ambience, job_id=job_id)
+            dst = output_path("voice", job_id, ".mp4")
+            report = media.sterilize(muxed, dst, job_id=job_id, level=mutation)
+            message = f"Vídeo dublado com a voz '{voice_label}', sincronizado e esterilizado."
+        else:
+            dst = output_path("voice", job_id, FORMATS[fmt])
+            report = media.sterilize(track, dst, job_id=job_id, level=mutation, audio_only=True)
+            message = f"Narração dublada com a voz '{voice_label}' e áudio sem rastro."
+    finally:
+        # Limpa trilha bruta, trilha assinada, mux e a origem — mesmo em falha.
+        _sweep(muxed, signed, raw_track, track, src)
     jobs.update(job_id, transcript=[s.dict() for s in segments][:400])
     deliver(job_id, dst, report, message=message)
