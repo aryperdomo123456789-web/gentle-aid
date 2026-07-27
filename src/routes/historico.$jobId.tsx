@@ -313,7 +313,7 @@ function Row({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-border bg-background/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="truncate font-mono">{value}</dd>
+      <dd className="min-w-0 break-words font-mono sm:truncate sm:text-right">{value}</dd>
     </div>
   );
 }
