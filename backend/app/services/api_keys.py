@@ -987,6 +987,21 @@ def autofill(force: bool = False) -> dict[str, Any]:
                 # "AQ." caindo no slot do Gemini, que exige "AIza")
                 continue
 
+            # Quando o legado tem mais de uma chave para o mesmo provedor (ex.: Lamatok
+            # com uma chave sem saldo e outra ativa), testa de verdade e importa a que passa.
+            pool = [(value, origin)] + [
+                (alt, src)
+                for alt, src in _ALT_CANDIDATES.get(pid, [])
+                if alt != value and (not prefix or alt.startswith(prefix))
+            ]
+            if len(pool) > 1:
+                for candidate_key, candidate_origin in pool:
+                    if _probe_key(provider, candidate_key):
+                        value, origin = candidate_key, candidate_origin
+                        break
+
+
+
 
             entry = data.get(pid, {})
             entry.update({
