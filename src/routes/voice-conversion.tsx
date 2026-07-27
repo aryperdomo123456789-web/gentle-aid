@@ -57,7 +57,7 @@ function VoiceConversion() {
     <ToolShell
       badge="Ferramenta 4 · /api/voice/convert"
       title="Conversão de Voz V2V"
-      subtitle="Upload de áudio local e conversão de timbre mantendo integralmente o timing da fala — sem re-sincronizar o vídeo."
+      subtitle="Envio de áudio local e conversão de timbre mantendo integralmente o timing da fala - sem re-sincronizar o vídeo."
       left={
         <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
           <Field label="Áudio de origem" hint="WAV, MP3 ou M4A — até 100 MB.">

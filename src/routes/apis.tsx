@@ -21,13 +21,13 @@ import { apiGet, friendlyError, API_BASE } from "@/lib/api";
 export const Route = createFileRoute("/apis")({
   head: () => ({
     meta: [
-      { title: "Central de APIs — chaves e integrações do Ecossistema Viral" },
+      { title: "Central de APIs - chaves e integrações do Ecossistema Viral" },
       {
         name: "description",
         content:
           "Gerencie, substitua e teste todas as chaves de API usadas no pipeline: LLMs, pesquisa web, extração, transcrição e TikTok.",
       },
-      { property: "og:title", content: "Central de APIs — Ecossistema Viral" },
+      { property: "og:title", content: "Central de APIs - Ecossistema Viral" },
       {
         property: "og:description",
         content: "Troca e teste de chaves de API em um painel único e organizado.",
@@ -224,7 +224,7 @@ function ApisPage() {
               type="button"
               onClick={() => void importKeys(false)}
               disabled={importing}
-              title="Varre .env, o app antigo e configs legadas do servidor e preenche as chaves sozinho"
+              title="Varre .env, o app antigo e configurações legadas do servidor e preenche as chaves sozinho"
               className="inline-flex items-center gap-2 rounded-xl border border-accent/50 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-accent disabled:opacity-60"
             >
               {importing ? (
@@ -617,7 +617,7 @@ function ProviderCard({
             rel="noreferrer noopener"
             className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
-            Docs
+            Documentação
             <ExternalLink className="size-3.5" aria-hidden="true" />
           </a>
         </div>

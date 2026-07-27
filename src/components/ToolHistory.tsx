@@ -26,7 +26,7 @@ function formatDate(iso?: string): string {
 }
 
 function sourceLabel(job: Job): string | null {
-  if (job.source_kind === "upload") return `Upload · ${job.source_label ?? "arquivo local"}`;
+  if (job.source_kind === "upload") return `Envio local · ${job.source_label ?? "arquivo local"}`;
   if (job.source_kind === "download")
     return `URL · ${job.source_label ?? job.source_url ?? "remota"}`;
   const rawCard = job.meta?.source_card;

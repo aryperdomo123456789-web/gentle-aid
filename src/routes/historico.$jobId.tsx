@@ -113,7 +113,7 @@ function JobDetail() {
                   <Row label="Descrição" value={sourceCard.desc} />
                   <Row label="Plataforma" value={sourceCard.platform} />
                   <Row label="Autor" value={sourceCard.author ?? sourceCard.nickname} />
-                  <Row label="Views" value={sourceCard.views_label} />
+                  <Row label="Visualizações" value={sourceCard.views_label} />
                   <Row label="Curtidas" value={sourceCard.likes_label} />
                   <Row label="Comentários" value={sourceCard.comments_label} />
                   <Row label="Compartilhamentos" value={sourceCard.shares_label} />
@@ -136,7 +136,7 @@ function JobDetail() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
           <section className="panel p-5">
-            <h2 className="mb-3 text-lg font-semibold">Dados do job</h2>
+            <h2 className="mb-3 text-lg font-semibold">Dados do processamento</h2>
             <dl className="grid gap-2 text-xs">
               <Row label="Status" value={job?.status} />
               <Row label="Arquivo" value={job?.filename} />
@@ -216,7 +216,7 @@ function getSourceCard(job: Job | null) {
 function getSourceSummary(job: Job | null) {
   if (!job) return null;
   if (job.source_kind === "upload")
-    return `Upload local${job.source_label ? ` · ${job.source_label}` : ""}`;
+    return `Envio local${job.source_label ? ` · ${job.source_label}` : ""}`;
   if (job.source_kind === "download")
     return `Baixado por URL${job.source_label ? ` · ${job.source_label}` : ""}`;
   const raw = job.meta?.source_card;

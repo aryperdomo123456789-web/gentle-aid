@@ -57,7 +57,7 @@ function Legendar() {
     <ToolShell
       badge="Ferramenta 3 · /api/legendar/run"
       title="Legendar Vídeos"
-      subtitle="Aplique legendas dinâmicas e estilizadas nos vídeos gerados pelo ecossistema. As legendas são queimadas no stream de vídeo via filtro subtitles do FFmpeg."
+      subtitle="Aplique legendas dinâmicas e estilizadas nos vídeos gerados pelo ecossistema. As legendas são queimadas no fluxo de vídeo via filtro subtitles do FFmpeg."
       left={
         <form ref={formRef} onSubmit={onSubmit} className="space-y-5">
           <Field label="Vídeo de entrada" hint="MP4, MOV ou MKV — até 500 MB.">

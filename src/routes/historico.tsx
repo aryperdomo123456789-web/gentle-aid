@@ -152,7 +152,7 @@ function Historico() {
                       download={job.filename ?? undefined}
                       className="rounded-full bg-success px-4 py-1.5 text-xs font-semibold text-success-foreground"
                     >
-                      Download
+                      Baixar
                     </a>
                   ) : null}
                 </div>
