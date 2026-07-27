@@ -123,9 +123,17 @@ PROVIDERS: list[dict[str, Any]] = [
         "format_hint": "Chaves de trial da Cohere não têm acesso a /v1/models; o teste usa o endpoint oficial check-api-key.",
         "test": [
             {"url": "https://api.cohere.com/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
+            {"url": "https://api.cohere.ai/v1/check-api-key", "auth": "bearer", "method": "POST", "body": {}},
+            {
+                "url": "https://api.cohere.com/v1/tokenize",
+                "auth": "bearer",
+                "method": "POST",
+                "body": {"text": "ping", "model": "command-r"},
+            },
             {"url": "https://api.cohere.com/v1/models", "auth": "bearer"},
         ],
     },
+
 
     {
         "id": "tavily",
