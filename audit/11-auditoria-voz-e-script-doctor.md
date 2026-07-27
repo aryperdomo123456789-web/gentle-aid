@@ -44,6 +44,18 @@ Em servidor de produção isso enche o disco em poucos dias de teste.
 Regra a preservar: **nunca** trocar essas mensagens por texto genérico; é por elas que
 se descobre chave vencida vs. cota estourada.
 
+### 2.2b Sincronia perdida em fontes 44,1 kHz (crítico) — CORRIGIDO
+`build_timbre_chain` (motor local) e `voice_forge.filter_chain` começavam com
+`asetrate=48000*ratio`, que **assume** que a faixa já está em 48 kHz. Com um MP3/WAV
+em 44,1 kHz (a maioria dos downloads do TikTok/YouTube), o `asetrate` aplicava um fator
+extra de 44100/48000 e o `atempo` compensava errado: saída ~8% mais curta.
+
+Medido antes da correção: origem 6,000 s → saída 5,50 s no modo "timing estrito".
+Ou seja, o modo que promete duração idêntica dessincronizava a voz do vídeo.
+
+**Correção:** `aresample=48000` **antes** do `asetrate` nas duas cadeias.
+Medido depois: 6,001 s (erro 0,02%). Fonte 48 kHz segue exata (4,003 s de 4,000 s).
+
 ### 2.3 Validação de entrada — OK, sem mudança
 - `speed` limitado a 0.7–1.2 (fora disso o `atempo` distorce).
 - `keep_ambience` limitado a 0.0–0.6 (acima disso o áudio original abafa a dublagem).
@@ -97,7 +109,35 @@ campo de roteiro em `TextToSpeechForm.tsx`, com undo do texto anterior antes de 
 
 ---
 
-## 5. Checklist de regressão no aaPanel
+## 5. Bateria de testes executada (backend real, FFmpeg real)
+
+Rodada com o Flask em `test_client`, mídia sintética gerada por FFmpeg
+(MP4 320x568 24fps + WAV 48 kHz + WAV 44,1 kHz) e jobs acompanhados até o status final.
+
+| Teste | Resultado |
+|---|---|
+| `convert` motor local → MP3 (48 kHz) | ✅ done — 4,003 s de 4,000 s |
+| `convert` motor local → WAV (44,1 kHz, timing estrito) | ✅ done — 6,001 s de 6,000 s |
+| `convert` Voice Forge → MP4 com vídeo preservado | ✅ done — h264 + aac, 4,000 s |
+| `convert` Voice Forge → AAC só áudio | ✅ done |
+| `tts` Voice Forge (Edge TTS real, áudio sintetizado) | ✅ done — MP3 válido gerado |
+| `dub` vídeo → MP4 dublado (transcrição mockada, TTS+mix+esterilização reais) | ✅ done — 4,000 s sincronizado |
+| `dub` áudio → MP3 dublado | ✅ done |
+| `script/styles` | ✅ 14 estilos, `ai_ready=false` sem chave |
+| `script/analyze` | ✅ detectou muleta "tipo assim", 4,2 s estimados |
+| `script/fix` estilo Terror sem chave de IA | ✅ fallback local, gancho reescrito, 0 problemas |
+| Validação de timbre/timing/mutação inválidos | ✅ rejeitado com 400 e mensagem clara |
+| Arquivos temporários órfãos após 8 jobs | ✅ **zero** |
+
+**Não testável fora do aaPanel** (dependem de chave cadastrada em `/apis`):
+`convert`/`tts`/`dub` no motor **ElevenLabs** e a **transcrição Whisper/Groq** real.
+Ambos foram exercitados até a validação de entrada, que rejeita com a mensagem correta
+apontando `/apis`. O caminho posterior (TTS → mix → esterilização → entrega) foi validado
+com a transcrição mockada, então só falta a chamada HTTP ao provedor.
+
+---
+
+## 6. Checklist de regressão no aaPanel
 
 1. `/voice-conversion` → aba Texto → escolher estilo Terror → "Corrigir" → texto volta reescrito e a velocidade muda para 0.9x.
 2. Sem chave de LLM: o chat responde com "Correção local" e não quebra.

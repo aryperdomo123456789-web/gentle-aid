@@ -582,6 +582,9 @@ def build_timbre_chain(target: str, timing: str) -> list[str]:
     ratio = 2 ** (semitones / 12)
     tempo = (1 / ratio) if timing == "strict" else (1 / ratio) * 0.98
     return [
+        # Normaliza a taxa antes do `asetrate`: fontes em 44,1 kHz saíam ~8%
+        # mais curtas, quebrando o modo "timing estrito".
+        f"aresample={SAMPLE_RATE}",
         f"asetrate={int(SAMPLE_RATE * ratio)}",
         f"aresample={SAMPLE_RATE}",
         f"atempo={tempo:.6f}",

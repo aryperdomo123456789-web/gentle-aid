@@ -401,6 +401,10 @@ def filter_chain(persona: Persona, *, preserve_duration: bool = True) -> list[st
 
     ratio = 2 ** (pitch / 12)
     chain: list[str] = [
+        # `asetrate` assume que a faixa já está em SAMPLE_RATE. Sem este
+        # reamostragem inicial, um arquivo em 44,1 kHz sai com duração errada
+        # (~8% mais curto) e perde a sincronia com o vídeo.
+        f"aresample={SAMPLE_RATE}",
         f"asetrate={int(SAMPLE_RATE * ratio)}",
         f"aresample={SAMPLE_RATE}",
     ]
