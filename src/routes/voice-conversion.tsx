@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
 import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
-import { Field, FileDrop, SelectInput, SubmitButton, TextArea } from "@/components/form";
+import { Field, FileDrop, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
 import { ToolHistory } from "@/components/ToolHistory";
@@ -26,9 +26,11 @@ type Catalog = {
   personas: Persona[];
   max_tts_chars: number;
   test_script?: string;
+  dub_ready?: boolean;
+  dub_languages?: Record<string, string>;
 };
 
-type Mode = "media" | "text" | "forge";
+type Mode = "media" | "dub" | "text" | "forge";
 
 
 export const Route = createFileRoute("/voice-conversion")({
@@ -70,8 +72,18 @@ function VoiceStudio() {
     personaId: "",
     targetVoice: "masc_grave",
   });
+  const [dubVoice, setDubVoice] = useState<VoiceSelection>({
+    engine: "forge",
+    voiceId: "",
+    personaId: "",
+    targetVoice: "masc_grave",
+  });
+  const [dubLink, setDubLink] = useState("");
+  const [dubFile, setDubFile] = useState(false);
+  const [mediaLink, setMediaLink] = useState("");
   const [personas, setPersonas] = useState<Persona[]>([]);
   const mediaForm = useRef<HTMLFormElement>(null);
+  const dubForm = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -95,6 +107,12 @@ function VoiceStudio() {
           voiceId: prev.voiceId || firstVoice,
           personaId: prev.personaId || firstPersona,
         }));
+        setDubVoice((prev) => ({
+          ...prev,
+          engine: hasPersona ? "forge" : data.engine_ready ? "elevenlabs" : "forge",
+          voiceId: prev.voiceId || firstVoice,
+          personaId: prev.personaId || firstPersona,
+        }));
       })
       .catch(() => setCatalog(null));
     return () => {
@@ -108,12 +126,14 @@ function VoiceStudio() {
   const testScript = catalog?.test_script || TEST_SCRIPT;
 
   function processCard(card: DiscoveryCard) {
-    const form = mediaForm.current ? new FormData(mediaForm.current) : new FormData();
+    const isDub = mode === "dub";
+    const ref = isDub ? dubForm.current : mediaForm.current;
+    const form = ref ? new FormData(ref) : new FormData();
     form.delete("media");
     form.set("url", card.url);
     form.set("source_card", JSON.stringify(card));
     setPickedUrl(card.url);
-    run(() => apiPostForm<Job>("/api/voice/convert", form));
+    run(() => apiPostForm<Job>(isDub ? "/api/voice/dub" : "/api/voice/convert", form));
   }
 
   function submit(path: string) {
@@ -137,6 +157,19 @@ function VoiceStudio() {
     />
   );
 
+  const dubPicker = (
+    <VoicePicker
+      value={dubVoice}
+      onChange={setDubVoice}
+      realisticVoices={voices}
+      personas={personas}
+      elevenReady={ready}
+      forgeReady={forgeReady}
+      allowLocal={false}
+      testScript={testScript}
+    />
+  );
+
   const ttsPicker = (
     <VoicePicker
       value={ttsVoice}
@@ -156,13 +189,14 @@ function VoiceStudio() {
     <ToolShell
       badge="Ferramenta 4 · Estúdio de Voz"
       title="Troca de narrador e narração realista"
-      subtitle="Vídeo ou áudio de 10 segundos a 3 horas: o narrador muda, a narrativa e o timing continuam idênticos. Ou escreva o roteiro e receba a narração pronta."
+      subtitle="Link do YouTube/TikTok, upload ou roteiro: a IA escuta a narração original e dubla com a sua voz, no mesmo timing, de 10 segundos a 3 horas."
       left={
         <div className="space-y-5">
           <div className="flex gap-2 rounded-xl border border-border bg-background/40 p-1">
             {(
               [
-                ["media", "Vídeo / Áudio → nova voz"],
+                ["media", "Trocar timbre"],
+                ["dub", "Dublagem IA"],
                 ["text", "Texto → narração"],
                 ["forge", "Criar voz"],
               ] as const
@@ -207,6 +241,22 @@ function VoiceStudio() {
                 )}
               </Field>
 
+              <Field
+                label="Ou cole o link do YouTube / TikTok"
+                hint="O vídeo é baixado no servidor e processado direto — sem precisar do arquivo."
+              >
+                {(id) => (
+                  <TextInput
+                    id={id}
+                    name="url"
+                    inputMode="url"
+                    placeholder="https://www.youtube.com/watch?v=… ou https://www.tiktok.com/@perfil/video/…"
+                    value={mediaLink}
+                    onChange={(e) => setMediaLink(e.target.value)}
+                  />
+                )}
+              </Field>
+
               {mediaPicker}
 
 
@@ -245,11 +295,105 @@ function VoiceStudio() {
                 hint="Remove metadados/ID3 herdados e entrega um arquivo de hash inédito."
               />
 
-              <SubmitButton busy={busy} disabled={!hasFile}>
+              <SubmitButton busy={busy} disabled={!hasFile && mediaLink.trim().length < 8}>
                 {busy ? "Trocando o narrador…" : "Trocar a voz do narrador"}
               </SubmitButton>
             </form>
-          ) : (
+          ) : mode === "dub" ? (
+            <form ref={dubForm} onSubmit={submit("/api/voice/dub")} className="space-y-5">
+              {catalog && catalog.dub_ready === false ? (
+                <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                  A dublagem precisa <strong>ouvir</strong> o vídeo. Cadastre a chave <strong>Groq</strong> (ou
+                  Whisper) em <code>/apis</code> para liberar a transcrição com timestamps.
+                </p>
+              ) : null}
+
+              <Field
+                label="Link do YouTube ou TikTok"
+                hint="O servidor baixa o vídeo, escuta a narração e refaz o áudio com a sua voz — sincronizado no mesmo timing."
+              >
+                {(id) => (
+                  <TextInput
+                    id={id}
+                    name="url"
+                    inputMode="url"
+                    placeholder="https://www.youtube.com/watch?v=… ou https://www.tiktok.com/@perfil/video/…"
+                    value={dubLink}
+                    onChange={(e) => setDubLink(e.target.value)}
+                  />
+                )}
+              </Field>
+
+              <Field label="Ou envie o arquivo" hint="MP4 / MOV / MKV / WAV / MP3 / M4A — de 10 segundos a 3 horas.">
+                {(id) => (
+                  <FileDrop
+                    id={id}
+                    name="media"
+                    accept="video/mp4,video/quicktime,video/x-matroska,video/webm,audio/wav,audio/mpeg,audio/mp4,audio/x-m4a"
+                    hint="MP4 / MOV / MKV / WAV / MP3 / M4A"
+                    onSelect={(f) => setDubFile(Boolean(f))}
+                  />
+                )}
+              </Field>
+
+              {dubPicker}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                <Field label="Idioma da dublagem">
+                  {(id) => (
+                    <SelectInput id={id} name="target_lang" defaultValue="auto">
+                      {Object.entries(catalog?.dub_languages ?? { auto: "mesmo idioma do vídeo" }).map(
+                        ([code, label]) => (
+                          <option key={code} value={code}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </SelectInput>
+                  )}
+                </Field>
+                <Field label="Áudio original ao fundo">
+                  {(id) => (
+                    <SelectInput id={id} name="keep_ambience" defaultValue="0.12">
+                      <option value="0">Remover — só a nova narração</option>
+                      <option value="0.12">Leve — música e ambiência discretas</option>
+                      <option value="0.3">Médio — mantém a trilha audível</option>
+                    </SelectInput>
+                  )}
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                <Field label="Saída">
+                  {(id) => (
+                    <SelectInput id={id} name="keep_video" defaultValue="1">
+                      <option value="1">Vídeo dublado</option>
+                      <option value="0">Somente o áudio dublado</option>
+                    </SelectInput>
+                  )}
+                </Field>
+                <Field label="Formato do áudio">
+                  {(id) => (
+                    <SelectInput id={id} name="format" defaultValue="mp3">
+                      <option value="mp3">MP3 320 kbps</option>
+                      <option value="wav">WAV 48 kHz</option>
+                      <option value="aac">AAC 192 kbps</option>
+                    </SelectInput>
+                  )}
+                </Field>
+              </div>
+
+              <MutationSelect
+                defaultValue="auto"
+                label="Esterilização"
+                hint="O vídeo dublado sai virgem: sem metadados herdados e com hash inédito."
+              />
+
+              <SubmitButton busy={busy} disabled={!dubFile && dubLink.trim().length < 8}>
+                {busy ? "Dublando com IA…" : "Dublar com a minha voz"}
+              </SubmitButton>
+            </form>
+          ) : mode === "text" ? (
             <form onSubmit={submit("/api/voice/tts")} className="space-y-5">
               <Field
                 label="Roteiro"
@@ -306,7 +450,7 @@ function VoiceStudio() {
                 {busy ? "Narrando…" : "Gerar narração"}
               </SubmitButton>
             </form>
-          )}
+          ) : null}
         </div>
       }
       right={
@@ -314,14 +458,14 @@ function VoiceStudio() {
           job={job}
           error={error}
           busy={busy}
-          emptyHint="Envie um vídeo/áudio ou escreva um roteiro para começar."
+          emptyHint="Cole o link do YouTube/TikTok, envie um arquivo ou escreva um roteiro para começar."
         />
       }
       below={
         <div className="space-y-6">
           <DiscoveryPanel
             defaultPlatform="auto"
-            actionLabel="Trocar a voz deste vídeo"
+            actionLabel={mode === "dub" ? "Dublar este vídeo" : "Trocar a voz deste vídeo"}
             onAction={processCard}
             actionBusyUrl={busy ? pickedUrl : null}
           />
