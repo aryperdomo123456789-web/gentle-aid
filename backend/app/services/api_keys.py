@@ -254,6 +254,7 @@ def set_key(provider_id: str, key: str, note: str = "") -> dict[str, Any]:
         entry.pop("last_test", None)
         data[provider_id] = entry
         _save(data)
+        sync_env(data)
     return describe(provider_id)
 
 
@@ -262,6 +263,8 @@ def delete_key(provider_id: str) -> dict[str, Any]:
         data = _load()
         data.pop(provider_id, None)
         _save(data)
+        sync_env(data)
+
     return describe(provider_id)
 
 
