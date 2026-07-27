@@ -82,9 +82,13 @@ export function TextToSpeechForm({ onSubmit, maxChars, busy, disabled, picker }:
         hint="Áudio final sem rastro de origem."
       />
 
-      <SubmitButton busy={busy} disabled={disabled || text.trim().length < 2}>
-        {busy ? "Narrando…" : "Gerar narração"}
-      </SubmitButton>
+      <JobSettingsGuard
+        busy={busy}
+        disabled={disabled || text.trim().length < 2}
+        label="Gerar narração"
+        busyLabel="Narrando…"
+      />
+
     </form>
   );
 }
