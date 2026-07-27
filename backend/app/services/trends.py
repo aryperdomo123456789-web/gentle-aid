@@ -11,6 +11,7 @@ Fontes (todas opcionais e independentes — se uma cair, as outras seguem):
 from __future__ import annotations
 
 import json
+import math
 import re
 import threading
 import time
@@ -24,7 +25,7 @@ from . import api_keys, media
 
 _CACHE: dict[str, tuple[float, Any]] = {}
 _CACHE_LOCK = threading.Lock()
-DEFAULT_TTL = 600  # 10 min
+DEFAULT_TTL = 120  # 2 min, para o radar ficar mais vivo
 
 
 # --------------------------------------------------------------------------- #
@@ -70,6 +71,97 @@ def _compact(value: int) -> str:
         if value >= limit:
             return f"{value / limit:.1f}".rstrip("0").rstrip(".") + suffix
     return str(value)
+
+
+_STOPWORDS = {
+    "a",
+    "ao",
+    "aos",
+    "as",
+    "com",
+    "da",
+    "das",
+    "de",
+    "do",
+    "dos",
+    "e",
+    "em",
+    "no",
+    "nos",
+    "na",
+    "nas",
+    "para",
+    "por",
+    "que",
+    "um",
+    "uma",
+    "the",
+    "of",
+    "and",
+    "to",
+    "for",
+    "with",
+    "on",
+    "in",
+    "at",
+}
+
+
+def _normalize_topic(text: str, max_words: int = 6) -> str:
+    words = [w.lower() for w in re.findall(r"[0-9A-Za-zÀ-ÿ]+", text or "")]
+    filtered = [w for w in words if w not in _STOPWORDS and len(w) > 1]
+    if not filtered:
+        filtered = words
+    return " ".join(filtered[:max_words]).strip()
+
+
+def _topic_words(text: str) -> set[str]:
+    return set(_normalize_topic(text).split())
+
+
+def _traffic_value(value: str | int | None) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, int):
+        return max(value, 0)
+    digits = re.sub(r"[^0-9]", "", str(value))
+    if not digits:
+        return 0
+    try:
+        return int(digits)
+    except ValueError:
+        return 0
+
+
+def _title_case(text: str) -> str:
+    chunks = re.split(r"(\s+)", (text or "").strip())
+    out: list[str] = []
+    for chunk in chunks:
+        if not chunk or chunk.isspace():
+            out.append(chunk)
+            continue
+        if chunk.isupper() or chunk.isdigit():
+            out.append(chunk)
+        else:
+            out.append(chunk[:1].upper() + chunk[1:])
+    return "".join(out).strip()
+
+
+def _score_topic_match(topic: str, text: str) -> int:
+    topic_words = _topic_words(topic)
+    text_words = _topic_words(text)
+    if not topic_words or not text_words:
+        return 0
+    overlap = len(topic_words & text_words)
+    if overlap:
+        return overlap * 3
+    topic_norm = _normalize_topic(topic)
+    text_norm = _normalize_topic(text)
+    if topic_norm and topic_norm in text_norm:
+        return max(1, len(topic_norm.split()))
+    if text_norm and text_norm in topic_norm:
+        return max(1, len(text_norm.split()))
+    return 0
 
 
 # --------------------------------------------------------------------------- #
@@ -214,11 +306,20 @@ def youtube_niche(nicho: str, limit: int = 15, *, shorts_only: bool = False) -> 
     try:
         entries = _ytdlp_json(target, limit * 2)
     except Exception:  # noqa: BLE001
-        return []
+        entries = []
     videos = [_video_from_entry(e, "youtube-search") for e in entries]
     if shorts_only:
         videos = [v for v in videos if v["is_short"] or "short" in v["title"].lower()] or videos
-    return sorted(videos, key=lambda v: v["views"], reverse=True)[:limit]
+    videos = sorted(videos, key=lambda v: v["views"], reverse=True)[:limit]
+    if videos:
+        return videos
+
+    fallback = _youtube_search(f"{nicho} {query}".strip(), limit, origin="youtube-search-fallback")
+    if shorts_only:
+        filtered = [v for v in fallback if v["is_short"] or "short" in v["title"].lower()]
+        if filtered:
+            fallback = filtered
+    return fallback[:limit]
 
 
 def tiktok_niche(nicho: str, region: str = "BR", limit: int = 12) -> list[dict[str, Any]]:
@@ -302,6 +403,176 @@ def web_signals(nicho: str, region: str = "BR", limit: int = 6) -> dict[str, Any
     return {"query": query, "results": results[: limit * 2], "providers": providers, "chosen": chosen}
 
 
+def _evidence_bucket(*parts: str) -> str:
+    text = " ".join(p for p in parts if p)
+    return _normalize_topic(text)
+
+
+def _build_viral_intelligence(
+    nicho: str,
+    region: str,
+    trends: list[dict[str, Any]],
+    youtube_trending_videos: list[dict[str, Any]],
+    niche_videos: list[dict[str, Any]],
+    tiktok_videos: list[dict[str, Any]],
+    web: dict[str, Any],
+    limit: int = 12,
+) -> list[dict[str, Any]]:
+    candidates: dict[str, dict[str, Any]] = {}
+
+    def add_candidate(
+        label: str,
+        *,
+        source: str,
+        score: float,
+        evidence: str,
+        url: str | None = None,
+        format_hint: str | None = None,
+        horizon: str | None = None,
+    ) -> None:
+        key = _evidence_bucket(label)
+        if not key:
+            return
+        item = candidates.setdefault(
+            key,
+            {
+                "topic": _title_case(label or key),
+                "score": 0.0,
+                "sources": set(),
+                "evidence": [],
+                "urls": set(),
+                "formats": set(),
+                "horizons": set(),
+            },
+        )
+        item["score"] += float(score)
+        item["sources"].add(source)
+        if evidence and evidence not in item["evidence"]:
+            item["evidence"].append(evidence)
+        if url:
+            item["urls"].add(url)
+        if format_hint:
+            item["formats"].add(format_hint)
+        if horizon:
+            item["horizons"].add(horizon)
+
+    if nicho:
+        niche_score = 18 + len(_topic_words(nicho)) * 4
+        add_candidate(
+            nicho,
+            source="nicho-base",
+            score=niche_score,
+            evidence=f"Nicho pesquisado pelo operador: {nicho}.",
+            horizon="30 dias",
+        )
+
+    for idx, trend in enumerate(trends[:12]):
+        traffic = _traffic_value(trend.get("traffic"))
+        trend_score = 22 + math.log10(traffic + 10) * 13 + max(0, 10 - idx) * 1.2
+        add_candidate(
+            trend.get("term", ""),
+            source="google-trends",
+            score=trend_score,
+            evidence=f"Google Trends: {trend.get('traffic', '—')}{' · ' + trend['context'] if trend.get('context') else ''}",
+            url=trend.get("search_url"),
+            horizon="7 dias" if traffic >= 100000 else "30 dias",
+        )
+
+    def add_video_candidates(videos: list[dict[str, Any]], source: str) -> None:
+        for idx, video in enumerate(videos[:12]):
+            views = int(video.get("views") or 0)
+            base = 10 + math.log10(views + 10) * 5.5
+            if video.get("is_short"):
+                base += 4
+            base += max(0, 10 - idx) * 0.8
+            if source == "youtube-em-alta" and not nicho:
+                base *= 0.75
+            topic_seed = _normalize_topic(str(video.get("title") or ""), 5)
+            if topic_seed:
+                add_candidate(
+                    topic_seed,
+                    source=source,
+                    score=base,
+                    evidence=f"{video.get('title', 'Sem título')} · {video.get('views_human', '—')} views",
+                    url=str(video.get("url") or ""),
+                    format_hint="Short 15-30s" if video.get("is_short") else "Vídeo 30-90s",
+                    horizon="7 dias" if video.get("is_short") else "30 dias",
+                )
+            if nicho:
+                niche_score = _score_topic_match(nicho, str(video.get("title") or ""))
+                if niche_score:
+                    add_candidate(
+                        nicho,
+                        source=source,
+                        score=(base * 0.55) + niche_score * 8,
+                        evidence=f"Vídeo relacionado ao nicho: {video.get('title', 'Sem título')} · {video.get('views_human', '—')} views",
+                        url=str(video.get("url") or ""),
+                        format_hint="Short 15-30s" if video.get("is_short") else "Vídeo 30-90s",
+                        horizon="30 dias",
+                    )
+
+    add_video_candidates(youtube_trending_videos, "youtube-em-alta")
+    add_video_candidates(niche_videos, "youtube-nicho")
+    add_video_candidates(tiktok_videos, "tiktok")
+
+    for idx, result in enumerate(web["results"][:12]):
+        title = str(result.get("title") or "").strip()
+        if not title:
+            continue
+        score = 18 + float(result.get("score") or 0) * 18 + max(0, 8 - idx) * 1.2
+        add_candidate(
+            _normalize_topic(title, 6),
+            source=str(result.get("provider") or "web"),
+            score=score,
+            evidence=f"{result.get('provider', 'web')}: {title}",
+            url=str(result.get("url") or ""),
+            format_hint="Pesquisa / contexto",
+            horizon="60 dias",
+        )
+
+    ranked: list[dict[str, Any]] = []
+    for item in candidates.values():
+        sources = sorted(item["sources"])
+        source_count = len(sources)
+        raw_score = float(item["score"]) + max(0, source_count - 1) * 16
+        norm_score = int(round(min(99.0, max(18.0, raw_score))))
+        evidence = item["evidence"][:3]
+        if source_count >= 3:
+            why = f"Convergência em {source_count} fontes com sinais fortes: {', '.join(evidence[:2])}."
+        elif source_count == 2:
+            why = f"Aponta em duas fontes com boa coerência: {', '.join(evidence[:2])}."
+        else:
+            why = f"Sinal forte isolado, mas promissor: {evidence[0] if evidence else 'sem evidência detalhada'}."
+
+        formats = sorted(item["formats"]) or ["Short 15-30s", "Reels 30-45s"]
+        horizon = sorted(item["horizons"])[0] if item["horizons"] else "30 dias"
+        ranked.append(
+            {
+                "topic": item["topic"],
+                "score": norm_score,
+                "confidence": norm_score,
+                "horizon": horizon,
+                "because": why,
+                "signals": evidence,
+                "sources": sources,
+                "formats": formats,
+                "search_url": "https://www.google.com/search?q="
+                + urllib.parse.quote(item["topic"]),
+                "region": region,
+            }
+        )
+
+    ranked.sort(
+        key=lambda row: (
+            row["score"],
+            len(row["sources"]),
+            row["topic"].lower(),
+        ),
+        reverse=True,
+    )
+    return ranked[:limit]
+
+
 # --------------------------------------------------------------------------- #
 # 4. Previsão de nichos (LLM com fallback heurístico)
 # --------------------------------------------------------------------------- #
@@ -324,6 +595,9 @@ VÍDEOS COM TRAÇÃO REAL:
 
 NOTÍCIAS / PESQUISA WEB:
 {web}
+
+INTELIGÊNCIA DE MERCADO (ranking interno):
+{intelligence}
 
 Responda SOMENTE JSON válido no formato:
 {{"forecast":[{{"nicho":"...","horizonte":"30 dias|60 dias|90 dias","confianca":0-100,
@@ -402,7 +676,19 @@ def _heuristic_forecast(nicho: str, trends: list[dict], videos: list[dict]) -> l
 def forecast(nicho: str, region: str = "BR") -> dict[str, Any]:
     trends = google_trends(region, 12)
     videos = youtube_niche(nicho, 10) if nicho else youtube_trending(region, 10)
+    trending = youtube_trending(region, 10)
+    tiktok = tiktok_niche(nicho, region, 8) if nicho else []
     web = web_signals(nicho or "conteúdo viral", region)
+    intelligence = _build_viral_intelligence(
+        nicho or "conteúdo viral",
+        region,
+        trends,
+        trending,
+        videos,
+        tiktok,
+        web,
+        limit=8,
+    )
 
     prompt = _PROMPT.format(
         now=_now_iso(),
@@ -412,12 +698,32 @@ def forecast(nicho: str, region: str = "BR") -> dict[str, Any]:
         videos="\n".join(f"- {v['title']} — {v['views_human']} views (@{v['author']})" for v in videos[:10])
         or "- sem dados",
         web="\n".join(f"- {r['title']}: {r['snippet'][:180]}" for r in web["results"][:6]) or "- sem dados",
+        intelligence="\n".join(
+            f"- {item['topic']} [{item['score']}]: {item['because']}" for item in intelligence[:6]
+        )
+        or "- sem dados",
     )
 
     data, provider = _llm_json(prompt)
     items = (data or {}).get("forecast") if isinstance(data, dict) else None
     if not items:
-        items = _heuristic_forecast(nicho or "conteúdo viral", trends, videos)
+        items = [
+            {
+                "nicho": item["topic"],
+                "horizonte": item["horizon"],
+                "confianca": item["confidence"],
+                "porque": item["because"],
+                "angulos": [
+                    f"Abrir com o gancho: {item['topic']}",
+                    "Mostrar prova rápida e exemplo prático",
+                    "Fechar com CTA para salvar e compartilhar",
+                ],
+                "hashtags": ["#" + re.sub(r"[^0-9a-zA-Z]+", "", item["topic"].lower())[:24] or "#viral", "#fyp"],
+                "formato": item["formats"][0] if item.get("formats") else "Short 15-30s",
+                "fonte": "motor inteligente",
+            }
+            for item in intelligence[:6]
+        ] or _heuristic_forecast(nicho or "conteúdo viral", trends, videos)
         provider = None
 
     return {
@@ -426,7 +732,7 @@ def forecast(nicho: str, region: str = "BR") -> dict[str, Any]:
         "generated_at": _now_iso(),
         "engine": provider or "heurística local",
         "forecast": items,
-        "signals": {"trends": trends[:12], "videos": videos[:10], "web": web},
+        "signals": {"trends": trends[:12], "videos": videos[:10], "web": web, "intelligence": intelligence},
     }
 
 
@@ -445,6 +751,16 @@ def radar(nicho: str = "", region: str = "BR", *, refresh: bool = False) -> dict
         niche_videos = youtube_niche(nicho, 12) if nicho else []
         tiktok = tiktok_niche(nicho, region, 10) if nicho else []
         web = web_signals(nicho or "conteúdo viral", region)
+        intelligence = _build_viral_intelligence(
+            nicho or "conteúdo viral",
+            region,
+            trends,
+            trending,
+            niche_videos,
+            tiktok,
+            web,
+            limit=12,
+        )
         return {
             "region": region,
             "nicho": nicho,
@@ -454,6 +770,7 @@ def radar(nicho: str = "", region: str = "BR", *, refresh: bool = False) -> dict
             "niche_videos": niche_videos,
             "tiktok": tiktok,
             "web": web,
+            "intelligence": intelligence,
             "sources": [
                 {"name": "Google Trends", "ok": bool(trends), "items": len(trends)},
                 {"name": "YouTube Em Alta", "ok": bool(trending), "items": len(trending)},

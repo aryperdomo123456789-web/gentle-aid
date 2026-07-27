@@ -63,7 +63,21 @@ type RadarData = {
   niche_videos: Video[];
   tiktok: Video[];
   web: { results: WebResult[]; chosen?: string | null; providers: Source[] };
+  intelligence: IntelligenceItem[];
   sources: Source[];
+};
+
+type IntelligenceItem = {
+  topic: string;
+  score: number;
+  confidence: number;
+  horizon: string;
+  because: string;
+  signals: string[];
+  sources: string[];
+  formats: string[];
+  search_url: string;
+  region: string;
 };
 
 type ForecastItem = {
@@ -87,6 +101,7 @@ function RadarGlobal() {
   const [loading, setLoading] = useState(false);
   const [forecasting, setForecasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveMode, setLiveMode] = useState(true);
   const [cloneLevel, setCloneLevel] = useState("media");
   const [cloneTarget, setCloneTarget] = useState<Video | null>(null);
   const cloner = useJobRunner();
@@ -123,6 +138,14 @@ function RadarGlobal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!liveMode) return undefined;
+    const timer = window.setInterval(() => {
+      void load(true);
+    }, 90_000);
+    return () => window.clearInterval(timer);
+  }, [liveMode, load]);
+
   async function runForecast() {
     setForecasting(true);
     setError(null);
@@ -151,6 +174,23 @@ function RadarGlobal() {
             Sinais reais em tempo real - buscas em alta, vídeos com tração e pesquisa na web
             (Tavily/Exa) - além da previsão de nichos mais promissores.
           </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full border border-border bg-surface/60 px-3 py-1">
+              {liveMode ? "Atualização ao vivo: ligada" : "Atualização ao vivo: pausada"}
+            </span>
+            {data?.generated_at ? (
+              <span className="rounded-full border border-border bg-surface/60 px-3 py-1">
+                Última coleta: {new Date(data.generated_at).toLocaleString("pt-BR")}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setLiveMode((value) => !value)}
+              className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 font-medium text-foreground transition hover:border-primary/60"
+            >
+              {liveMode ? "Pausar ao vivo" : "Retomar ao vivo"}
+            </button>
+          </div>
         </header>
 
         <form
@@ -208,6 +248,86 @@ function RadarGlobal() {
           <p className="mb-6 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
             {error}
           </p>
+        ) : null}
+
+        {data?.intelligence?.length ? (
+          <section className="panel mb-6 p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <Sparkles className="size-4 text-primary" aria-hidden="true" /> Inteligência de
+                  Virais
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Ranking cruzado entre Google Trends, YouTube, TikTok e pesquisa web.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void load(true)}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface/70 px-4 py-2 text-sm font-medium disabled:opacity-60"
+              >
+                <RefreshCw
+                  className={`size-4 ${loading ? "animate-spin" : ""}`}
+                  aria-hidden="true"
+                />
+                Atualizar inteligência
+              </button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {data.intelligence.slice(0, 6).map((item) => (
+                <article
+                  key={item.topic}
+                  className="rounded-2xl border border-border bg-background/50 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">{item.topic}</h3>
+                      <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                        {item.horizon} · {item.sources.length} fonte(s)
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                      {item.score}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">{item.because}</p>
+                  {item.signals?.length ? (
+                    <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                      {item.signals.map((signal) => (
+                        <li key={signal} className="flex gap-2">
+                          <Flame
+                            className="mt-0.5 size-3 shrink-0 text-electric"
+                            aria-hidden="true"
+                          />
+                          <span>{signal}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {item.formats.slice(0, 2).map((format) => (
+                      <span
+                        key={format}
+                        className="rounded-full border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-muted-foreground"
+                      >
+                        {format}
+                      </span>
+                    ))}
+                  </div>
+                  <a
+                    href={item.search_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex text-xs font-medium text-primary hover:underline"
+                  >
+                    Pesquisar este tema
+                  </a>
+                </article>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         {data ? (
