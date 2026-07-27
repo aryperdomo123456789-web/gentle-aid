@@ -140,14 +140,14 @@ function ApisPage() {
     try {
       const data = await apiSend<{
         providers: Provider[];
-        report: { imported: string[]; skipped: string[]; scanned: string[] };
+        report: { imported: string[]; skipped: string[]; scanned: number; roots?: string[] };
       }>("/api/apis/import", "POST", { force });
       setProviders(data.providers ?? []);
       const n = data.report?.imported?.length ?? 0;
       setImportReport(
         n > 0
           ? `${n} chave(s) importada(s) automaticamente: ${data.report.imported.join(", ")}.`
-          : "Nenhuma chave nova encontrada no servidor (.env, app antigo e configs legadas já foram varridos).",
+          : `Nenhuma chave encontrada. Foram lidos ${data.report?.scanned ?? 0} arquivo(s) em: ${(data.report?.roots ?? []).join(", ")}. Use "Diagnóstico" para ver os detalhes.`,
       );
     } catch (err) {
       setError(friendlyError(err));
@@ -155,6 +155,21 @@ function ApisPage() {
       setImporting(false);
     }
   }
+
+  async function runScan() {
+    setScanning(true);
+    setError(null);
+    try {
+      const data = await apiGet<{ report: ScanReport }>("/api/apis/scan");
+      setScan(data.report);
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setScanning(false);
+    }
+  }
+
+
 
 
   return (
