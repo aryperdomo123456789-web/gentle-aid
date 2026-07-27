@@ -104,9 +104,13 @@ export function MediaConvertForm({
         hint="Remove metadados/ID3 herdados e entrega um arquivo de hash inédito."
       />
 
-      <SubmitButton busy={busy} disabled={!hasFile && link.trim().length < 8}>
-        {busy ? "Trocando o narrador…" : "Trocar a voz do narrador"}
-      </SubmitButton>
+      <JobSettingsGuard
+        busy={busy}
+        disabled={!hasFile && link.trim().length < 8}
+        label="Trocar a voz do narrador"
+        busyLabel="Trocando o narrador…"
+      />
+
     </form>
   );
 }
