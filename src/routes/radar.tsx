@@ -103,7 +103,6 @@ function RadarGlobal() {
   const [loading, setLoading] = useState(false);
   const [forecasting, setForecasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [liveMode, setLiveMode] = useState(true);
   const [cloneLevel, setCloneLevel] = useState("media");
   const [cloneTarget, setCloneTarget] = useState<Video | null>(null);
   const [watchTarget, setWatchTarget] = useState<Video | null>(null);
@@ -141,14 +140,6 @@ function RadarGlobal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!liveMode) return undefined;
-    const timer = window.setInterval(() => {
-      void load(true);
-    }, 90_000);
-    return () => window.clearInterval(timer);
-  }, [liveMode, load]);
-
   async function runForecast() {
     setForecasting(true);
     setError(null);
@@ -174,25 +165,18 @@ function RadarGlobal() {
           </span>
           <h1 className="mt-3 text-3xl font-bold md:text-4xl">Radar Global de Tendências</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Sinais reais em tempo real - buscas em alta, vídeos com tração e pesquisa na web
-            (Tavily/Exa) - além da previsão de nichos mais promissores.
+            Radar congelado na última rodada. Use "Varrer radar" para buscar dados novos e
+            atualizados sob demanda.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="rounded-full border border-border bg-surface/60 px-3 py-1">
-              {liveMode ? "Atualização ao vivo: ligada" : "Atualização ao vivo: pausada"}
+              Modo congelado
             </span>
             {data?.generated_at ? (
               <span className="rounded-full border border-border bg-surface/60 px-3 py-1">
                 Última coleta: {new Date(data.generated_at).toLocaleString("pt-BR")}
               </span>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setLiveMode((value) => !value)}
-              className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 font-medium text-foreground transition hover:border-primary/60"
-            >
-              {liveMode ? "Pausar ao vivo" : "Retomar ao vivo"}
-            </button>
           </div>
         </header>
 
