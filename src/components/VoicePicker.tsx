@@ -43,6 +43,8 @@ type Props = {
   /** Mostra o motor local (só faz sentido em troca de narrador de mídia). */
   allowLocal?: boolean;
   testScript?: string;
+  /** Dispara a recriação das vozes de fábrica no backend. */
+  onSyncPersonas?: () => Promise<void>;
 };
 
 export function VoicePicker({
