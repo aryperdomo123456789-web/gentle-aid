@@ -106,7 +106,7 @@ def available() -> bool:
     return _module() is not None
 
 
-def list_voices(locale_prefixes: tuple[str, ...] = ("pt", "en", "es")) -> list[dict[str, str]]:
+def list_voices(locale_prefixes: tuple[str, ...] = LOCALE_PREFIXES) -> list[dict[str, str]]:
     module = _module()
     if module is None:
         return list(FALLBACK_VOICES)
