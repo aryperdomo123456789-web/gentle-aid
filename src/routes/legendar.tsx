@@ -347,8 +347,10 @@ function Legendar() {
           })}
         </nav>
 
+        <div className="relative flex min-h-0 flex-1 md:contents">
         {/* ===== Painel contextual ===== */}
         {panel ? (
+
           <aside
             aria-label="Painel de edição"
             className="absolute inset-0 z-30 w-full overflow-y-auto overscroll-contain border-border bg-card p-3 shadow-xl md:static md:inset-auto md:z-auto md:w-[300px] md:border-r md:shadow-none lg:w-[340px] xl:w-[360px]"
