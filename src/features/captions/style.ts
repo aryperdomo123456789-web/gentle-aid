@@ -4,6 +4,31 @@ import type { CaptionAnimation } from "./api";
  * Estado de estilo do editor de legendas — espelha exatamente os campos
  * aceitos por `POST /api/legendar/run` no backend Flask do aaPanel.
  */
+/** Formato do palco: automático (lê o vídeo), retrato 9:16 ou paisagem 16:9. */
+export type CaptionAspect = "auto" | "9:16" | "16:9" | "1:1";
+
+export const ASPECT_LABEL: Record<CaptionAspect, string> = {
+  auto: "Auto — detecta pelo vídeo",
+  "9:16": "Retrato 9:16 (Reels/TikTok/Shorts)",
+  "16:9": "Paisagem 16:9 (YouTube/TV)",
+  "1:1": "Quadrado 1:1 (Feed)",
+};
+
+export const ASPECT_RATIO: Record<Exclude<CaptionAspect, "auto">, number> = {
+  "9:16": 9 / 16,
+  "16:9": 16 / 9,
+  "1:1": 1,
+};
+
+/** Escolhe o formato mais próximo a partir das dimensões reais do vídeo. */
+export function detectAspect(width: number, height: number): Exclude<CaptionAspect, "auto"> {
+  if (!width || !height) return "9:16";
+  const ratio = width / height;
+  if (ratio > 1.15) return "16:9";
+  if (ratio < 0.85) return "9:16";
+  return "1:1";
+}
+
 export type CaptionStyle = {
   preset: string;
   animation: CaptionAnimation;
@@ -15,6 +40,8 @@ export type CaptionStyle = {
   primary: string;
   /** Posição vertical do bloco de legenda no palco, 0 (topo) → 100 (base). */
   yPct: number;
+  /** Formato do palco escolhido pelo usuário. */
+  aspect: CaptionAspect;
 };
 
 export const DEFAULT_STYLE: CaptionStyle = {
@@ -27,6 +54,7 @@ export const DEFAULT_STYLE: CaptionStyle = {
   accent: "",
   primary: "",
   yPct: 82,
+  aspect: "auto",
 };
 
 export type CaptionPosition = "top" | "center" | "bottom";
