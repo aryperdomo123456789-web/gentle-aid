@@ -1,6 +1,8 @@
 import { Loader2, UploadCloud } from "lucide-react";
 import { useId, useRef, useState, type ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
+
 export function Field({
   label,
   hint,
