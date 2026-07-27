@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Field, FileDrop, SelectInput, SubmitButton } from "@/components/form";
+import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";
@@ -88,6 +89,14 @@ function VoiceConversion() {
               )}
             </Field>
           </div>
+
+          <MutationSelect
+            defaultValue="leve"
+            label="Esterilização do áudio"
+            hint="Remove metadados/ID3 herdados, reescreve o timbre e entrega um arquivo de hash inédito."
+          />
+
+
 
           <SubmitButton busy={busy} disabled={!hasFile}>
             {busy ? "Convertendo timbre…" : "Converter voz"}

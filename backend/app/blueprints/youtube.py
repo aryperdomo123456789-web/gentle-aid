@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
 from ..config import config
 from ..services import jobs, media
+from ..services.delivery import deliver
+from ..services.sterilizer import LEVELS
 from ..services.validation import (
     YOUTUBE_RE,
     ValidationError,
@@ -40,7 +41,7 @@ def bypass():
         return jsonify(error=str(exc)), 400
 
     intensity = payload.get("intensity", "media")
-    if intensity not in {"leve", "media", "agressiva"}:
+    if intensity not in LEVELS:
         return jsonify(error="Intensidade inválida."), 400
 
     job = jobs.create_job(
@@ -52,8 +53,10 @@ def bypass():
 
 
 def _work(job_id: str, urls: list[str], intensity: str) -> None:
-    outputs: list[str] = []
+    outputs: list[dict] = []
     total = len(urls)
+    last_report = None
+    last_dst: Path | None = None
 
     for index, url in enumerate(urls, start=1):
         jobs.log(job_id, f"[{index}/{total}] Baixando {url}")
@@ -73,24 +76,28 @@ def _work(job_id: str, urls: list[str], intensity: str) -> None:
             job_id=job_id,
         )
 
-        jobs.update(job_id, md5_before=media.md5(raw))
         dst = output_path("youtube", job_id, f"_{index}_bypass.mp4")
-        jobs.log(job_id, f"[{index}/{total}] Aplicando mutação '{intensity}'")
-        media.sanitize_video(raw, dst, job_id=job_id, mutation=intensity)
+        jobs.log(job_id, f"[{index}/{total}] Esterilizando com mutação '{intensity}'")
+        report = media.sterilize(raw, dst, job_id=job_id, level=intensity)
         raw.unlink(missing_ok=True)
 
-        outputs.append(public_url(dst))
-        jobs.update(
-            job_id,
-            progress=int(index / total * 100),
-            download_url=outputs[-1],
-            filename=dst.name,
-            md5_after=media.md5(dst),
+        outputs.append(
+            {
+                "url": url,
+                "download_url": public_url(dst),
+                "filename": dst.name,
+                "md5_before": report.md5_before,
+                "md5_after": report.md5_after,
+            }
         )
+        last_report, last_dst = report, dst
+        jobs.update(job_id, progress=int(index / total * 100), outputs=outputs)
 
-    jobs.update(
-        job_id,
-        status="done",
-        message=f"{total} vídeo(s) processado(s) com bypass '{intensity}'.",
-        meta={"outputs": outputs},
-    )
+    if last_report and last_dst:
+        deliver(
+            job_id,
+            last_dst,
+            last_report,
+            message=f"{total} vídeo(s) entregues virgens com bypass '{intensity}'.",
+            extra={"outputs": outputs},
+        )

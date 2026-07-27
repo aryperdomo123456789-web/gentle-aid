@@ -37,8 +37,13 @@ def create_job(tool: str, meta: dict[str, Any] | None = None) -> dict[str, Any]:
         "finished_at": None,
         "download_url": None,
         "filename": None,
+        "size_bytes": 0,
         "md5_before": None,
         "md5_after": None,
+        "sha256_after": None,
+        "sterilization": None,
+        "outputs": [],
+
         "log": [],
         "meta": meta or {},
     }

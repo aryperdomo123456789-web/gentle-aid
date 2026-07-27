@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Field, SelectInput, SubmitButton, TextInput } from "@/components/form";
+import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";
@@ -45,6 +46,7 @@ function TikTokDashboard() {
   const [radarBusy, setRadarBusy] = useState(false);
   const [radarError, setRadarError] = useState<string | null>(null);
   const [cloneUrl, setCloneUrl] = useState("");
+  const [intensity, setIntensity] = useState("media");
 
   async function loadRadar(e: React.FormEvent) {
     e.preventDefault();
@@ -65,8 +67,9 @@ function TikTokDashboard() {
 
   function clone(url: string) {
     setCloneUrl(url);
-    run(() => apiPostJson<Job>("/api/tiktok/clone", { url, nicho }));
+    run(() => apiPostJson<Job>("/api/tiktok/clone", { url, nicho, intensity }));
   }
+
 
   return (
     <ToolShell
@@ -160,7 +163,26 @@ function TikTokDashboard() {
                 />
               )}
             </Field>
+            <Field
+              label="Nível de esterilização"
+              hint="Aplicado a qualquer clone, inclusive nos disparados pelo radar acima."
+            >
+              {(id) => (
+                <SelectInput
+                  id={id}
+                  value={intensity}
+                  onChange={(e) => setIntensity(e.target.value)}
+                >
+                  {MUTATION_LEVELS.map((level) => (
+                    <option key={level.value} value={level.value}>
+                      {level.label}
+                    </option>
+                  ))}
+                </SelectInput>
+              )}
+            </Field>
             <SubmitButton busy={busy}>{busy ? "Clonando…" : "Clonar viral"}</SubmitButton>
+
           </form>
         </div>
       }

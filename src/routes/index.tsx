@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Field, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
+import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";
@@ -112,15 +113,21 @@ function YoutubeBypass() {
             </Field>
           </div>
 
-          <Field label="Intensidade da mutação" hint="Afeta bitrate, crop, speed e ruído temporal aplicados pelo FFmpeg.">
+          <Field
+            label="Nível de esterilização"
+            hint="Todo vídeo sai virgem (metadados destruídos + hash inédito). O nível controla a intensidade da mutação estrutural."
+          >
             {(id) => (
               <SelectInput id={id} value={intensity} onChange={(e) => setIntensity(e.target.value)}>
-                <option value="leve">Leve — só metadados e re-encode</option>
-                <option value="media">Média — bitrate + micro-crop + speed 1.01x</option>
-                <option value="agressiva">Agressiva — mutação estrutural completa</option>
+                {MUTATION_LEVELS.map((level) => (
+                  <option key={level.value} value={level.value}>
+                    {level.label}
+                  </option>
+                ))}
               </SelectInput>
             )}
           </Field>
+
 
           <SubmitButton busy={busy}>
             {busy ? "Processando lote…" : "Disparar bypass em lote"}
