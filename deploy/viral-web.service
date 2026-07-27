@@ -1,0 +1,17 @@
+[Unit]
+Description=Ecossistema Viral - Frontend (TanStack Start / Node)
+After=network.target
+
+[Service]
+Type=simple
+User=www
+WorkingDirectory=/www/wwwroot/viralpro.vr766.com
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+Environment="HOST=127.0.0.1"
+ExecStart=/usr/bin/node .output/server/index.mjs
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
