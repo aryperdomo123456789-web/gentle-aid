@@ -31,6 +31,8 @@ __all__ = [
     "DEFAULT_LEVEL",
     "LEVELS",
     "SterilizationReport",
+    "ass_filter",
+    "burn_ass",
     "burn_subtitles",
     "file_hashes",
     "md5",
