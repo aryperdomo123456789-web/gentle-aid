@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Field, FileDrop, SelectInput, SubmitButton, TextArea } from "@/components/form";
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
+import { ToolHistory } from "@/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { apiPostForm, type Job } from "@/lib/api";
@@ -104,6 +105,7 @@ function Legendar() {
           emptyHint="Envie um vídeo para acompanhar a renderização das legendas."
         />
       }
+      below={<ToolHistory tool="legendar" title="Histórico · Legendas" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
     />
   );
 }

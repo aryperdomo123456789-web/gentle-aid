@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Field, FileDrop, SelectInput, SubmitButton } from "@/components/form";
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
+import { ToolHistory } from "@/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { apiPostForm, type Job } from "@/lib/api";
@@ -91,6 +92,7 @@ function CanvaCleaner() {
           emptyHint="Envie um vídeo para acompanhar a limpeza, o re-encode e os hashes MD5 antes/depois."
         />
       }
+      below={<ToolHistory tool="canva" title="Histórico · Canva Cleaner" refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`} />}
     />
   );
 }
