@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
 import { Field, SelectInput, SubmitButton, TextArea, TextInput } from "@/components/form";
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
 import { StatusPanel } from "@/components/StatusPanel";
@@ -48,6 +49,19 @@ function YoutubeBypass() {
   const [nicho, setNicho] = useState(NICHOS[0]);
   const [keyword, setKeyword] = useState("");
   const [intensity, setIntensity] = useState("media");
+  const [pickedUrl, setPickedUrl] = useState<string | null>(null);
+
+  function processCard(card: DiscoveryCard) {
+    setPickedUrl(card.url);
+    run(() =>
+      apiPostJson<Job>("/api/youtube/bypass", {
+        urls: [card.url],
+        nicho,
+        keyword: keyword.trim() || card.title.slice(0, 60),
+        intensity,
+      }),
+    );
+  }
 
   const urls = links
     .split(/\s|,|;/)
@@ -144,11 +158,19 @@ function YoutubeBypass() {
         />
       }
       below={
-        <ToolHistory
-          tool="youtube"
-          title="Histórico · YouTube Bypass"
-          refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
-        />
+        <div className="space-y-6">
+          <DiscoveryPanel
+            defaultPlatform="youtube"
+            actionLabel="Baixar + esterilizar"
+            onAction={processCard}
+            actionBusyUrl={busy ? pickedUrl : null}
+          />
+          <ToolHistory
+            tool="youtube"
+            title="Histórico · YouTube Bypass"
+            refreshKey={`${job?.job_id ?? ""}-${job?.status ?? ""}`}
+          />
+        </div>
       }
     />
   );
