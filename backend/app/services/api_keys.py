@@ -412,32 +412,72 @@ _KV = None  # regex compilada sob demanda
 _autofill_done = False
 
 
-def _scan_paths() -> list:
-    """Arquivos onde as chaves podem estar (env, app antigo, configs legadas)."""
+
+_SCAN_EXT = {".env", ".json", ".py", ".txt", ".ini", ".cfg", ".conf", ".yaml", ".yml", ".sh", ".md"}
+_SKIP_DIRS = {
+    "node_modules", ".git", ".venv", "venv", "__pycache__", "dist", "build",
+    ".next", ".cache", "site-packages", "fabrica_clips", "_canva_jobs", ".bun",
+}
+_MAX_DEPTH = 4
+_MAX_FILE_BYTES = 2_000_000
+
+
+def _scan_roots() -> list:
+    """Diretórios onde as chaves podem estar (app atual, app legado, extras)."""
     from pathlib import Path
 
     extra = os.environ.get("VIRAL_KEY_SCAN_PATHS", "")
-    roots = [config.app_root, config.storage_dir / "_config"]
-    roots += [Path("/www/wwwroot/viral.vr766.com"), Path("/www/wwwroot/viral.vr766.com.bak")]
-    roots += [Path(p) for p in extra.split(":") if p.strip()]
-
-    names = [
-        ".env", ".env.local", ".env.production", "env", "config.env",
-        "api_keys.env", "keys.env", "chaves.txt", "apis.txt",
-        "api_keys.json", "config.json", "keys.json", "secrets.json",
-        "config.py", "settings.py", "webapp.py",
+    roots = [
+        config.app_root,
+        config.storage_dir / "_config",
+        Path("/www/wwwroot/viral.vr766.com"),
+        Path("/www/wwwroot/viral.vr766.com.bak"),
+        Path("/www/wwwroot/viral"),
+        Path("/root"),
     ]
-    found = []
+    roots += [Path(p) for p in extra.split(":") if p.strip()]
+    seen, out = set(), []
     for root in roots:
+        key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
         try:
-            if not root.exists():
-                continue
+            if root.exists():
+                out.append(root)
         except OSError:
             continue
-        for name in names:
-            f = root / name
-            if f.is_file() and f.stat().st_size < 2_000_000:
-                found.append(f)
+    return out
+
+
+def _scan_paths() -> list:
+    """Varredura recursiva (profundidade limitada) por arquivos de configuração."""
+    from pathlib import Path
+
+    found: list[Path] = []
+    for root in _scan_roots():
+        base_depth = len(root.parts)
+        try:
+            for dirpath, dirnames, filenames in os.walk(root):
+                current = Path(dirpath)
+                if len(current.parts) - base_depth >= _MAX_DEPTH:
+                    dirnames[:] = []
+                dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".git")]
+                for name in filenames:
+                    lowered = name.lower()
+                    if not (lowered.startswith(".env") or lowered.startswith("env")
+                            or Path(lowered).suffix in _SCAN_EXT):
+                        continue
+                    f = current / name
+                    try:
+                        if f.is_file() and f.stat().st_size < _MAX_FILE_BYTES:
+                            found.append(f)
+                    except OSError:
+                        continue
+                if len(found) > 4000:
+                    return found
+        except OSError:
+            continue
     return found
 
 
@@ -460,8 +500,51 @@ def _harvest(text: str) -> dict[str, str]:
     return out
 
 
-def autofill(force: bool = False) -> dict[str, Any]:
-    """Preenche o cofre com chaves encontradas no ambiente e em arquivos legados."""
+def _harvest_signatures(text: str) -> dict[str, str]:
+    """Captura chaves pelo formato do valor, mesmo sem nome de variável."""
+    import re
+
+    out: dict[str, str] = {}
+    for prefix, owner in _PREFIX_OWNER.items():
+        pattern = re.escape(prefix) + r"[A-Za-z0-9_\-]{16,200}"
+        match = re.search(pattern, text)
+        if match:
+            out.setdefault(owner, match.group(0))
+    # Gemini/Google: AIza...
+    match = re.search(r"AIza[A-Za-z0-9_\-]{30,60}", text)
+    if match:
+        out.setdefault("gemini", match.group(0))
+    return out
+
+
+def scan_report() -> dict[str, Any]:
+    """Diagnóstico: o que a varredura enxerga hoje (sem expor as chaves)."""
+    harvested, sources = _collect()
+    hits = []
+    for provider in PROVIDERS:
+        pid = provider["id"]
+        candidates = [provider["env"]] + ALIASES.get(pid, [])
+        name = next((c.upper() for c in candidates if harvested.get(c.upper())), None)
+        if not name and harvested.get(f"__SIG__{pid}"):
+            name = "assinatura do valor"
+        hits.append({
+            "id": pid,
+            "name": provider["name"],
+            "found": bool(name),
+            "var": name,
+            "origin": sources.get(name or "", "") if name else "",
+        })
+    files = [str(p) for p in _scan_paths()]
+    return {
+        "roots": [str(r) for r in _scan_roots()],
+        "files_scanned": len(files),
+        "files": files[:120],
+        "env_vars_seen": len([k for k, v in os.environ.items() if v and len(v) >= 12]),
+        "hits": hits,
+    }
+
+
+def _collect() -> tuple[dict[str, str], dict[str, str]]:
     harvested: dict[str, str] = {}
     sources: dict[str, str] = {}
 
@@ -479,6 +562,18 @@ def autofill(force: bool = False) -> dict[str, Any]:
             if name not in harvested:
                 harvested[name] = value
                 sources[name] = str(path)
+        for pid, value in _harvest_signatures(text).items():
+            marker = f"__SIG__{pid}"
+            if marker not in harvested:
+                harvested[marker] = value
+                sources[marker] = str(path)
+
+    return harvested, sources
+
+
+def autofill(force: bool = False) -> dict[str, Any]:
+    """Preenche o cofre com chaves encontradas no ambiente e em arquivos legados."""
+    harvested, sources = _collect()
 
     with _lock:
         data = _load()
@@ -496,12 +591,9 @@ def autofill(force: bool = False) -> dict[str, Any]:
             origin = next((sources[c.upper()] for c in candidates if harvested.get(c.upper())), "")
 
             if not value:
-                # fallback: procura por assinatura de prefixo
-                prefixes = [p for p, owner in _PREFIX_OWNER.items() if owner == pid]
-                for name, val in harvested.items():
-                    if any(val.startswith(p) for p in prefixes):
-                        value, origin = val, sources.get(name, "")
-                        break
+                marker = f"__SIG__{pid}"
+                if harvested.get(marker):
+                    value, origin = harvested[marker], sources.get(marker, "")
 
             if not value:
                 continue
@@ -525,7 +617,8 @@ def autofill(force: bool = False) -> dict[str, Any]:
     return {
         "imported": imported,
         "skipped": skipped,
-        "scanned": [str(p) for p in _scan_paths()],
+        "scanned": len(_scan_paths()),
+        "roots": [str(r) for r in _scan_roots()],
         "total_configured": sum(1 for p in list_all() if p["configured"]),
     }
 

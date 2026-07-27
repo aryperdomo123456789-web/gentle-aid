@@ -76,6 +76,14 @@ async function apiSend<T>(path: string, method: string, body?: unknown): Promise
   return data as T;
 }
 
+type ScanReport = {
+  roots: string[];
+  files_scanned: number;
+  files: string[];
+  env_vars_seen: number;
+  hits: { id: string; name: string; found: boolean; var?: string | null; origin?: string }[];
+};
+
 function ApisPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +92,10 @@ function ApisPage() {
   const [importing, setImporting] = useState(false);
   const [importReport, setImportReport] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("todas");
+  const [scanning, setScanning] = useState(false);
+  const [scan, setScan] = useState<ScanReport | null>(null);
+
+
 
 
   const load = useCallback(async () => {
@@ -140,14 +152,14 @@ function ApisPage() {
     try {
       const data = await apiSend<{
         providers: Provider[];
-        report: { imported: string[]; skipped: string[]; scanned: string[] };
+        report: { imported: string[]; skipped: string[]; scanned: number; roots?: string[] };
       }>("/api/apis/import", "POST", { force });
       setProviders(data.providers ?? []);
       const n = data.report?.imported?.length ?? 0;
       setImportReport(
         n > 0
           ? `${n} chave(s) importada(s) automaticamente: ${data.report.imported.join(", ")}.`
-          : "Nenhuma chave nova encontrada no servidor (.env, app antigo e configs legadas já foram varridos).",
+          : `Nenhuma chave encontrada. Foram lidos ${data.report?.scanned ?? 0} arquivo(s) em: ${(data.report?.roots ?? []).join(", ")}. Use "Diagnóstico" para ver os detalhes.`,
       );
     } catch (err) {
       setError(friendlyError(err));
@@ -155,6 +167,21 @@ function ApisPage() {
       setImporting(false);
     }
   }
+
+  async function runScan() {
+    setScanning(true);
+    setError(null);
+    try {
+      const data = await apiGet<{ report: ScanReport }>("/api/apis/scan");
+      setScan(data.report);
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setScanning(false);
+    }
+  }
+
+
 
 
   return (
@@ -199,6 +226,22 @@ function ApisPage() {
             </button>
             <button
               type="button"
+              onClick={() => void runScan()}
+              disabled={scanning}
+              title="Mostra onde o servidor procurou as chaves e o que encontrou"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface/70 px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/50 disabled:opacity-60"
+            >
+              {scanning ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Activity className="size-4" aria-hidden="true" />
+              )}
+              Diagnóstico
+            </button>
+
+
+            <button
+              type="button"
               onClick={() => void testAll()}
               disabled={testingAll}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
@@ -218,6 +261,52 @@ function ApisPage() {
             {importReport}
           </p>
         ) : null}
+
+        {scan ? (
+          <section className="panel mb-6 p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="font-display text-base font-semibold">Diagnóstico da varredura</h2>
+              <button
+                type="button"
+                onClick={() => setScan(null)}
+                className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs"
+              >
+                Fechar
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {scan.files_scanned} arquivo(s) lidos · {scan.env_vars_seen} variáveis de ambiente ·
+              diretórios: <span className="font-mono">{scan.roots.join(", ")}</span>
+            </p>
+            <ul className="mt-3 grid gap-1 text-xs sm:grid-cols-2">
+              {scan.hits.map((hit) => (
+                <li
+                  key={hit.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background/40 px-3 py-1.5"
+                >
+                  <span>{hit.name}</span>
+                  <span className={hit.found ? "text-success" : "text-muted-foreground"}>
+                    {hit.found ? `achou · ${hit.var}` : "não encontrada"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {scan.files.length ? (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-muted-foreground">
+                  Ver arquivos varridos ({scan.files.length})
+                </summary>
+                <ul className="mt-2 max-h-56 space-y-0.5 overflow-auto font-mono text-[11px] text-muted-foreground">
+                  {scan.files.map((f) => (
+                    <li key={f}>{f}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </section>
+        ) : null}
+
+
 
 
         <dl className="mb-6 grid gap-3 sm:grid-cols-3">
