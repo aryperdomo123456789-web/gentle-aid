@@ -6,6 +6,7 @@ import {
   AudioLines,
   Sparkles,
   History,
+  KeyRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -18,6 +19,7 @@ export const TOOLS: Tool[] = [
   { to: "/voice-conversion", label: "Voz V2V", icon: AudioLines },
   { to: "/canva-cleaner", label: "Canva Cleaner", icon: Sparkles },
   { to: "/historico", label: "Histórico", icon: History },
+  { to: "/apis", label: "Central de APIs", icon: KeyRound },
 ];
 
 export function TopNav() {
