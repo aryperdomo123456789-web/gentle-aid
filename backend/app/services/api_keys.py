@@ -601,7 +601,11 @@ def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
         token = base64.b64encode(f"{user}:{key}".encode()).decode()
         headers["Authorization"] = f"Basic {token}"
 
-    if spec.get("body") is not None:
+    if spec.get("audio_probe"):
+        fields = {"response_format": "json", **dict(spec["audio_probe"])}
+        body, content_type = _audio_multipart({k: str(v) for k, v in fields.items()})
+        headers["Content-Type"] = content_type
+    elif spec.get("body") is not None:
         body = json.dumps(spec["body"]).encode()
         headers["Content-Type"] = "application/json"
 
