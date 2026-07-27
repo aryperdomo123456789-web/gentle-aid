@@ -550,7 +550,21 @@ def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
         return {"ok": False, "status": 0, "message": f"Erro inesperado: {exc}"}
 
 
+def _probe_key(provider: dict[str, Any], key: str) -> bool:
+    """Testa uma chave candidata sem gravar nada no cofre."""
+    spec = provider.get("test")
+    specs = [s for s in (spec if isinstance(spec, list) else [spec]) if s]
+    for candidate in specs:
+        try:
+            if _run_probe(candidate, key).get("ok"):
+                return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
+
+
 def test_provider(provider_id: str) -> dict[str, Any]:
+
     provider = PROVIDER_BY_ID[provider_id]
     spec = provider.get("test")
     specs = [s for s in (spec if isinstance(spec, list) else [spec]) if s]
