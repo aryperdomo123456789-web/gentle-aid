@@ -100,8 +100,25 @@ function readForm(form: HTMLFormElement): Entry[] {
     out.push({ name, label: labelFor(form, field, name), value });
   }
 
-  return out;
+  // Limpeza semântica: mostra só o campo de voz do motor escolhido e troca
+  // ids técnicos por rótulos legíveis.
+  const engine = out.find((e) => e.name === "engine")?.value ?? "";
+  const relevantVoice = VOICE_FIELD_OF_ENGINE[engine];
+  const voiceFields = new Set(Object.values(VOICE_FIELD_OF_ENGINE));
+
+  return out
+    .filter((entry) => !(voiceFields.has(entry.name) && entry.name !== relevantVoice))
+    .map((entry) => {
+      if (entry.name === "engine") {
+        return { ...entry, label: "Motor de voz", value: ENGINE_LABEL[entry.value] ?? entry.value };
+      }
+      if (voiceFields.has(entry.name)) {
+        return { ...entry, label: "Voz escolhida", value: humanize(entry.value) };
+      }
+      return entry;
+    });
 }
+
 
 type Props = {
   busy: boolean;
