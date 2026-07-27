@@ -185,16 +185,46 @@ def _from_dict(raw: dict) -> Persona:
 
 
 def bootstrap() -> None:
-    """Garante que as personas de fábrica existam no cofre local."""
+    """Garante que as personas de fábrica existam e estejam atualizadas no cofre local."""
     with _LOCK:
         data = _load_raw()
         changed = False
         for preset in PRESETS:
-            if preset["id"] not in data:
-                data[str(preset["id"])] = _from_dict(dict(preset)).dict()
+            pid = str(preset["id"])
+            existing = data.get(pid)
+            fresh = _from_dict(dict(preset)).dict()
+            if existing is None:
+                data[pid] = fresh
                 changed = True
+            else:
+                # Atualiza presets de fábrica se os parâmetros melhoraram,
+                # preservando created_at original para não reordenar a lista.
+                preserved_created_at = float(existing.get("created_at") or fresh["created_at"])
+                fresh["created_at"] = preserved_created_at
+                if existing.get("name") != fresh["name"] or existing.get("base_voice") != fresh["base_voice"]:
+                    data[pid] = fresh
+                    changed = True
+                else:
+                    # Mescla campos numéricos: se o preset evoluiu, aplica novos valores.
+                    numeric = {"pitch", "formant", "warmth", "brightness", "breath", "body", "room", "tempo", "rate"}
+                    for key in numeric:
+                        if float(existing.get(key) or 0) != float(fresh.get(key) or 0):
+                            existing[key] = fresh[key]
+                            changed = True
+                    if existing.get("notes") != fresh.get("notes"):
+                        existing["notes"] = fresh["notes"]
+                        changed = True
         if changed:
             _save_raw(data)
+
+
+def reset_factory_presets() -> None:
+    """Recria as personas de fábrica do zero, descartando versões antigas."""
+    with _LOCK:
+        data = _load_raw()
+        for preset in PRESETS:
+            data[str(preset["id"])] = _from_dict(dict(preset)).dict()
+        _save_raw(data)
 
 
 def list_personas() -> list[dict[str, object]]:

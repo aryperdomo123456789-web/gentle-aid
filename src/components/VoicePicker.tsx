@@ -43,6 +43,8 @@ type Props = {
   /** Mostra o motor local (só faz sentido em troca de narrador de mídia). */
   allowLocal?: boolean;
   testScript?: string;
+  /** Dispara a recriação das vozes de fábrica no backend. */
+  onSyncPersonas?: () => Promise<void>;
 };
 
 export function VoicePicker({
@@ -55,6 +57,7 @@ export function VoicePicker({
   forgeReady,
   allowLocal = true,
   testScript,
+  onSyncPersonas,
 }: Props) {
   const [query, setQuery] = useState("");
   const [script, setScript] = useState(testScript || TEST_SCRIPT);
@@ -62,6 +65,7 @@ export function VoicePicker({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openScript, setOpenScript] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const engines = useMemo(
     () =>
@@ -134,6 +138,19 @@ export function VoicePicker({
     }
   }
 
+  async function sync() {
+    if (!onSyncPersonas) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      await onSyncPersonas();
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
       <input type="hidden" name="engine" value={value.engine} />
@@ -141,12 +158,25 @@ export function VoicePicker({
       <input type="hidden" name="persona_id" value={value.personaId} />
       <input type="hidden" name="target_voice" value={value.targetVoice} />
 
-      <header className="mb-3">
-        <h3 className="text-sm font-semibold text-foreground">Escolha a voz do narrador</h3>
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Selecione, ouça o roteiro de teste e siga. A voz escolhida aqui é a que será usada no
-          processamento abaixo.
-        </p>
+      <header className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Escolha a voz do narrador</h3>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Selecione, ouça o roteiro de teste e siga. A voz escolhida aqui é a que será usada no
+            processamento abaixo.
+          </p>
+        </div>
+        {value.engine === "forge" && onSyncPersonas ? (
+          <button
+            type="button"
+            onClick={() => void sync()}
+            disabled={syncing}
+            title="Sincronizar vozes de fábrica"
+            className="shrink-0 rounded-lg border border-primary/40 bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+          >
+            {syncing ? "Sincronizando…" : "Sincronizar"}
+          </button>
+        ) : null}
       </header>
 
       <div className="scroll-x flex gap-2 overflow-x-auto rounded-xl border border-border bg-background/50 p-1 sm:flex-wrap sm:overflow-visible">

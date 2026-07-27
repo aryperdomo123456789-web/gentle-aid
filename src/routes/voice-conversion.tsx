@@ -50,6 +50,7 @@ function VoiceStudio() {
       forgeReady={forgeReady}
       allowLocal
       testScript={testScript}
+      onSyncPersonas={studio.syncPersonas}
     />
   );
 
@@ -63,6 +64,7 @@ function VoiceStudio() {
       forgeReady={forgeReady}
       allowLocal={false}
       testScript={testScript}
+      onSyncPersonas={studio.syncPersonas}
     />
   );
 
@@ -76,6 +78,7 @@ function VoiceStudio() {
       forgeReady={forgeReady}
       allowLocal={false}
       testScript={testScript}
+      onSyncPersonas={studio.syncPersonas}
     />
   );
 

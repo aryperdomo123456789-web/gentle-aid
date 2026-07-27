@@ -5,7 +5,7 @@ import type { InspectedCard } from "@/components/LinkInspector";
 import type { Persona } from "@/components/VoiceForgePanel";
 import { TEST_SCRIPT, type VoiceSelection } from "@/components/VoicePicker";
 import { useJobRunner } from "@/hooks/use-job-runner";
-import { fetchVoiceCatalog, submitVoiceJob, VOICE_ENDPOINT } from "./api";
+import { fetchVoiceCatalog, resetVoicePersonas, submitVoiceJob, VOICE_ENDPOINT } from "./api";
 import type { VoiceCatalog, VoiceMode } from "./types";
 
 const DEFAULT_SELECTION: VoiceSelection = {
@@ -101,6 +101,12 @@ export function useVoiceStudio() {
   const elevenReady = catalog?.engine_ready ?? false;
   const forgeReady = (catalog?.forge_ready ?? false) && personas.length > 0;
 
+  async function syncPersonas() {
+    const data = await resetVoicePersonas();
+    setCatalog(data);
+    setPersonas(data.personas ?? []);
+  }
+
   return {
     ...runner,
     busy,
@@ -112,6 +118,7 @@ export function useVoiceStudio() {
     voices,
     elevenReady,
     forgeReady,
+    syncPersonas,
     testScript: catalog?.test_script || TEST_SCRIPT,
     maxChars: catalog?.max_tts_chars ?? 40000,
     dubReady: catalog ? catalog.dub_ready !== false : true,
