@@ -13,6 +13,7 @@ import {
 
   Save,
   Trash2,
+  Wrench,
 } from "lucide-react";
 
 import { TopNav } from "@/components/TopNav";
@@ -150,7 +151,7 @@ function ApisPage() {
     }
   }
 
-  async function importKeys(force: boolean) {
+  async function importKeys(force: boolean, repair = false) {
     setImporting(true);
     setError(null);
     setImportReport(null);
@@ -164,7 +165,7 @@ function ApisPage() {
           roots?: string[];
           env_file?: string | null;
         };
-      }>("/api/apis/import", "POST", { force });
+      }>("/api/apis/import", "POST", { force, repair });
       setProviders(data.providers ?? []);
       const n = data.report?.imported?.length ?? 0;
       const envInfo = data.report?.env_file ? ` Espelhadas com permissão 600 em ${data.report.env_file}.` : "";
@@ -236,6 +237,20 @@ function ApisPage() {
                 <DownloadCloud className="size-4" aria-hidden="true" />
               )}
               Preencher automaticamente
+            </button>
+            <button
+              type="button"
+              onClick={() => void importKeys(false, true)}
+              disabled={importing}
+              title="Só nas integrações que falharam: procura outra chave do mesmo provedor no legado, testa de verdade e troca apenas se a nova funcionar"
+              className="inline-flex items-center gap-2 rounded-xl border border-success/50 bg-success/10 px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-success disabled:opacity-60"
+            >
+              {importing ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Wrench className="size-4" aria-hidden="true" />
+              )}
+              Reparar as que falharam
             </button>
             <button
               type="button"
