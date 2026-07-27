@@ -85,17 +85,19 @@ export function FileDrop({
 
 export function SubmitButton({
   busy,
+  disabled,
   children,
   variant = "primary",
 }: {
   busy: boolean;
+  disabled?: boolean;
   children: ReactNode;
   variant?: "primary" | "electric";
 }) {
   return (
     <button
       type="submit"
-      disabled={busy}
+      disabled={busy || disabled}
       className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60 ${
         variant === "electric"
           ? "bg-electric text-electric-foreground hover:opacity-90"

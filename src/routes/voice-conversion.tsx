@@ -89,7 +89,7 @@ function VoiceConversion() {
             </Field>
           </div>
 
-          <SubmitButton busy={busy || !hasFile}>
+          <SubmitButton busy={busy} disabled={!hasFile}>
             {busy ? "Convertendo timbre…" : "Converter voz"}
           </SubmitButton>
         </form>

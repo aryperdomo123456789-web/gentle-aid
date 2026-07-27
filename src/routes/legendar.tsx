@@ -86,7 +86,7 @@ function Legendar() {
             {(id) => <TextArea id={id} name="srt" placeholder="1\n00:00:00,000 --> 00:00:02,000\nSeu texto" />}
           </Field>
 
-          <SubmitButton busy={busy || !hasFile}>
+          <SubmitButton busy={busy} disabled={!hasFile}>
             {busy ? "Renderizando legendas…" : "Gerar vídeo legendado"}
           </SubmitButton>
         </form>

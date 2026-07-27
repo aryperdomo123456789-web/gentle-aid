@@ -91,7 +91,7 @@ function CanvaCleaner() {
             Remover todos os metadados (ISO, encoder, Canva, GPS)
           </label>
 
-          <SubmitButton busy={busy || !hasFile}>
+          <SubmitButton busy={busy} disabled={!hasFile}>
             {busy ? "Limpando e recodificando…" : "Executar limpeza"}
           </SubmitButton>
         </form>
