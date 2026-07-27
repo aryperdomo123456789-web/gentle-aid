@@ -65,8 +65,9 @@ function TikTokDashboard() {
 
   function clone(url: string) {
     setCloneUrl(url);
-    run(() => apiPostJson<Job>("/api/tiktok/clone", { url, nicho }));
+    run(() => apiPostJson<Job>("/api/tiktok/clone", { url, nicho, intensity }));
   }
+
 
   return (
     <ToolShell
