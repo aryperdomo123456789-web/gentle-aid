@@ -79,7 +79,10 @@ function ApisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [testingAll, setTestingAll] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("todas");
+
 
   const load = useCallback(async () => {
     setLoading(true);
