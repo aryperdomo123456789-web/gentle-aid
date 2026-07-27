@@ -266,6 +266,16 @@ function VoiceStudio() {
                 )}
               </Field>
 
+              <LinkInspector
+                url={mediaLink}
+                onInspected={setMediaCard}
+                actionLabel="Trocar a voz deste vídeo"
+                actionBusy={busy}
+                onAction={processCard}
+              />
+
+
+
               {mediaPicker}
 
 
