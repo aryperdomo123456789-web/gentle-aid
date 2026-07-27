@@ -226,6 +226,20 @@ function ApisPage() {
             </button>
             <button
               type="button"
+              onClick={() => void runScan()}
+              disabled={scanning}
+              title="Mostra onde o servidor procurou as chaves e o que encontrou"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface/70 px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/50 disabled:opacity-60"
+            >
+              {scanning ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Activity className="size-4" aria-hidden="true" />
+              )}
+              Diagnóstico
+
+            <button
+              type="button"
               onClick={() => void testAll()}
               disabled={testingAll}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
