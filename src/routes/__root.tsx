@@ -4,11 +4,14 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useLocation,
+  useNavigate,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
+import { AuthProvider, useAuth } from "@/components/AuthProvider";
 import appCss from "../styles.css?url";
 import { useAutoReloadOnDeploy } from "../hooks/use-auto-reload-on-deploy";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -135,8 +138,41 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AuthProvider>
+        <AuthGate />
+      </AuthProvider>
     </QueryClientProvider>
   );
+}
+
+function AuthGate() {
+  const auth = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!auth.ready) return;
+    if (!auth.user && location.pathname !== "/login") {
+      void navigate({ to: "/login", replace: true });
+    }
+    if (auth.user && location.pathname === "/login") {
+      void navigate({ to: "/", replace: true });
+    }
+  }, [auth.ready, auth.user, location.pathname, navigate]);
+
+  if (!auth.ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="panel max-w-md p-6 text-center">
+          <div className="mx-auto mb-4 size-12 animate-pulse rounded-2xl bg-primary/20" />
+          <p className="text-lg font-semibold">Carregando acesso seguro…</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Verificando sua sessão e preparando o painel.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return <Outlet />;
 }

@@ -8,8 +8,12 @@ import {
   History,
   Radar,
   KeyRound,
+  LogOut,
+  Shield,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+
+import { useAuth } from "@/components/AuthProvider";
 
 type Tool = { to: string; label: string; icon: LucideIcon };
 
@@ -25,25 +29,48 @@ export const TOOLS: Tool[] = [
 ];
 
 export function TopNav() {
+  const auth = useAuth();
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 md:px-8">
-        <div className="flex items-center gap-3">
-          <span
-            className="flex size-9 items-center justify-center rounded-xl text-sm font-bold text-primary-foreground"
-            style={{ backgroundImage: "var(--gradient-viral)" }}
-            aria-hidden="true"
-          >
-            EV
-          </span>
-          <div className="leading-tight">
-            <p className="font-display text-base font-bold tracking-tight">
-              Ecossistema <span className="text-gradient-viral">Viral</span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Pipeline FFmpeg · desvio algorítmico · aaPanel
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex size-9 items-center justify-center rounded-xl text-sm font-bold text-primary-foreground"
+              style={{ backgroundImage: "var(--gradient-viral)" }}
+              aria-hidden="true"
+            >
+              EV
+            </span>
+            <div className="leading-tight">
+              <p className="font-display text-base font-bold tracking-tight">
+                Ecossistema <span className="text-gradient-viral">Viral</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Pipeline FFmpeg · desvio algorítmico · aaPanel
+              </p>
+            </div>
           </div>
+
+          {auth.user ? (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                <Shield className="size-3.5 text-success" aria-hidden="true" />
+                {auth.user.name} · {auth.user.role === "owner" ? "dono" : "usuário"}
+              </span>
+              <span className="hidden rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs font-mono text-muted-foreground md:inline-flex">
+                {auth.user.email}
+              </span>
+              <button
+                type="button"
+                onClick={() => auth.logout()}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50"
+              >
+                <LogOut className="size-3.5" aria-hidden="true" />
+                Sair
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <nav aria-label="Ferramentas" className="-mx-1 pb-1">
