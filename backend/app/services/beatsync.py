@@ -21,6 +21,7 @@ mais próxima estiver longe demais (`tolerance`), a palavra fica onde estava.
 from __future__ import annotations
 
 import array
+import math
 import subprocess
 from dataclasses import dataclass
 from typing import Iterable, Sequence
@@ -88,8 +89,6 @@ def _onset_strength(env: Sequence[float]) -> list[float]:
     for i in range(1, len(env)):
         prev = env[i - 1] + 1e-6
         cur = env[i] + 1e-6
-        import math
-
         out.append(max(0.0, math.log(cur) - math.log(prev)))
     return out
 
