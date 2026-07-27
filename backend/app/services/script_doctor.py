@@ -337,7 +337,7 @@ def clean_for_speech(text: str) -> str:
         out = re.sub(rf"\b{re.escape(filler)}\b[,]?\s*", "", out, flags=re.IGNORECASE)
 
     # Depois de cortar muleta a frase pode começar em minúscula.
-    out = re.sub(r"(^|[.!?…]\s+)([a-zà-ÿ])", lambda m: m.group(1) + m.group(2).upper(), out)
+    out = re.sub(r"(^|[.!?]\s+)([a-zà-ÿ])", lambda m: m.group(1) + m.group(2).upper(), out)
 
     out = re.sub(r"([0-9])%", r"\1 por cento", out)
     out = re.sub(r"\bkm/h\b", "quilômetros por hora", out)
