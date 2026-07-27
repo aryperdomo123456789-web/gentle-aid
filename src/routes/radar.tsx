@@ -294,12 +294,35 @@ function RadarGlobal() {
           </section>
 
           <section className="panel p-5">
-            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
-              <Activity className="size-4 text-electric" aria-hidden="true" /> Vídeos com tração real
-            </h2>
-            <VideoList videos={[...(data?.niche_videos ?? []), ...(data?.tiktok ?? []), ...(data?.youtube_trending ?? [])]} />
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <Activity className="size-4 text-electric" aria-hidden="true" /> Vídeos com tração real
+              </h2>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                Mutação
+                <SelectInput
+                  aria-label="Nível de esterilização do clone"
+                  value={cloneLevel}
+                  onChange={(e) => setCloneLevel(e.target.value)}
+                  className="h-9 w-44 text-xs"
+                >
+                  {MUTATION_LEVELS.map((l) => (
+                    <option key={l.value} value={l.value}>
+                      {l.label}
+                    </option>
+                  ))}
+                </SelectInput>
+              </label>
+            </div>
+            <VideoList
+              videos={[...(data?.niche_videos ?? []), ...(data?.tiktok ?? []), ...(data?.youtube_trending ?? [])]}
+              onClone={cloneVideo}
+              busy={cloner.busy}
+              activeUrl={cloneTarget?.url ?? null}
+            />
           </section>
         </div>
+
 
         {data?.web?.results?.length ? (
           <section className="panel mt-6 p-5">
