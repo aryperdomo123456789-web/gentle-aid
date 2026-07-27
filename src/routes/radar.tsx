@@ -1,17 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
   Flame,
+  Loader2,
   RefreshCw,
   Radar as RadarIcon,
   Sparkles,
   TrendingUp,
+  Wand2,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Field, SelectInput, TextInput } from "@/components/form";
+import { MUTATION_LEVELS } from "@/components/MutationSelect";
+import { StatusPanel } from "@/components/StatusPanel";
 import { TopNav } from "@/components/TopNav";
-import { apiGet, friendlyError } from "@/lib/api";
+import { apiGet, apiPostJson, friendlyError, type Job } from "@/lib/api";
+import { useJobRunner } from "@/hooks/use-job-runner";
 
 export const Route = createFileRoute("/radar")({
   head: () => ({
@@ -81,6 +87,20 @@ function RadarGlobal() {
   const [loading, setLoading] = useState(false);
   const [forecasting, setForecasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cloneLevel, setCloneLevel] = useState("media");
+  const [cloneTarget, setCloneTarget] = useState<Video | null>(null);
+  const cloner = useJobRunner();
+
+  const cloneVideo = useCallback(
+    (video: Video) => {
+      setCloneTarget(video);
+      void cloner.run(() =>
+        apiPostJson<Job>("/api/tiktok/clone", { url: video.url, intensity: cloneLevel }),
+      );
+    },
+    [cloneLevel, cloner],
+  );
+
 
   const load = useCallback(
     async (refresh = false) => {
@@ -274,12 +294,35 @@ function RadarGlobal() {
           </section>
 
           <section className="panel p-5">
-            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
-              <Activity className="size-4 text-electric" aria-hidden="true" /> Vídeos com tração real
-            </h2>
-            <VideoList videos={[...(data?.niche_videos ?? []), ...(data?.tiktok ?? []), ...(data?.youtube_trending ?? [])]} />
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <Activity className="size-4 text-electric" aria-hidden="true" /> Vídeos com tração real
+              </h2>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                Mutação
+                <SelectInput
+                  aria-label="Nível de esterilização do clone"
+                  value={cloneLevel}
+                  onChange={(e) => setCloneLevel(e.target.value)}
+                  className="h-9 w-44 text-xs"
+                >
+                  {MUTATION_LEVELS.map((l) => (
+                    <option key={l.value} value={l.value}>
+                      {l.label}
+                    </option>
+                  ))}
+                </SelectInput>
+              </label>
+            </div>
+            <VideoList
+              videos={[...(data?.niche_videos ?? []), ...(data?.tiktok ?? []), ...(data?.youtube_trending ?? [])]}
+              onClone={cloneVideo}
+              busy={cloner.busy}
+              activeUrl={cloneTarget?.url ?? null}
+            />
           </section>
         </div>
+
 
         {data?.web?.results?.length ? (
           <section className="panel mt-6 p-5">
@@ -301,30 +344,102 @@ function RadarGlobal() {
             </ul>
           </section>
         ) : null}
+        {cloneTarget ? (
+          <section className="panel mt-6 p-5">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <Wand2 className="size-4 text-primary" aria-hidden="true" /> Esteira de clonagem
+                </h2>
+                <p className="mt-1 truncate text-xs text-muted-foreground">
+                  {cloneTarget.title} · mutação {cloneLevel}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/historico"
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-surface/60"
+                >
+                  Ver histórico
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cloner.reset();
+                    setCloneTarget(null);
+                  }}
+                  disabled={cloner.busy}
+                  className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                >
+                  <X className="size-3.5" aria-hidden="true" /> Fechar
+                </button>
+              </div>
+            </div>
+            <StatusPanel
+              job={cloner.job}
+              error={cloner.error}
+              busy={cloner.busy}
+              emptyHint="Aguardando o download e a esterilização do viral selecionado…"
+            />
+          </section>
+        ) : null}
       </main>
     </div>
   );
 }
 
-function VideoList({ videos }: { videos: Video[] }) {
+function VideoList({
+  videos,
+  onClone,
+  busy,
+  activeUrl,
+}: {
+  videos: Video[];
+  onClone: (video: Video) => void;
+  busy: boolean;
+  activeUrl: string | null;
+}) {
   if (!videos.length) return <p className="text-sm text-muted-foreground">Rode o radar para listar virais.</p>;
   return (
     <ul className="space-y-2">
-      {videos.slice(0, 20).map((v, i) => (
-        <li
-          key={`${v.id}-${i}`}
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2"
-        >
-          <div className="min-w-0 flex-1">
-            <a href={v.url} target="_blank" rel="noreferrer" className="block truncate text-sm font-medium hover:underline">
-              {v.title}
-            </a>
-            <p className="text-xs text-muted-foreground">
-              @{v.author} · {v.views_human} views · {v.is_short ? "short" : "longo"} · {v.source}
-            </p>
-          </div>
-        </li>
-      ))}
+      {videos.slice(0, 20).map((v, i) => {
+        const running = busy && activeUrl === v.url;
+        return (
+          <li
+            key={`${v.id}-${i}`}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 px-3 py-2"
+          >
+            <div className="min-w-0 flex-1">
+              <a
+                href={v.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block truncate text-sm font-medium hover:underline"
+              >
+                {v.title}
+              </a>
+              <p className="text-xs text-muted-foreground">
+                @{v.author} · {v.views_human} views · {v.is_short ? "short" : "longo"} · {v.source}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onClone(v)}
+              disabled={busy}
+              title="Baixar, esterilizar e entregar o clone virgem"
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-primary/20 disabled:opacity-50"
+            >
+              {running ? (
+                <Loader2 className="size-3.5 animate-spin text-primary" aria-hidden="true" />
+              ) : (
+                <Wand2 className="size-3.5 text-primary" aria-hidden="true" />
+              )}
+              {running ? "Clonando…" : "Clonar"}
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
+

@@ -1,6 +1,8 @@
 import { Loader2, UploadCloud } from "lucide-react";
 import { useId, useRef, useState, type ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
+
 export function Field({
   label,
   hint,
@@ -25,16 +27,16 @@ export function Field({
 const control =
   "w-full rounded-xl border border-input bg-background/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40";
 
-export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={control} />;
+export function TextInput({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={cn(control, className)} />;
 }
 
-export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={`${control} min-h-32 font-mono`} />;
+export function TextArea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={cn(control, "min-h-32 font-mono", className)} />;
 }
 
-export function SelectInput(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={control} />;
+export function SelectInput({ className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select {...props} className={cn(control, className)} />;
 }
 
 export function FileDrop({
