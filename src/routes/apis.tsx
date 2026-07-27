@@ -76,6 +76,14 @@ async function apiSend<T>(path: string, method: string, body?: unknown): Promise
   return data as T;
 }
 
+type ScanReport = {
+  roots: string[];
+  files_scanned: number;
+  files: string[];
+  env_vars_seen: number;
+  hits: { id: string; name: string; found: boolean; var?: string | null; origin?: string }[];
+};
+
 function ApisPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +92,10 @@ function ApisPage() {
   const [importing, setImporting] = useState(false);
   const [importReport, setImportReport] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("todas");
+  const [scanning, setScanning] = useState(false);
+  const [scan, setScan] = useState<ScanReport | null>(null);
+
+
 
 
   const load = useCallback(async () => {
