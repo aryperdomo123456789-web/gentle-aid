@@ -42,6 +42,8 @@ export type CaptionStyle = {
   yPct: number;
   /** Formato do palco escolhido pelo usuário. */
   aspect: CaptionAspect;
+  /** Encaixa cada palavra na batida da música do próprio vídeo (services/beatsync.py). */
+  beatSync: boolean;
 };
 
 export const DEFAULT_STYLE: CaptionStyle = {
@@ -55,6 +57,7 @@ export const DEFAULT_STYLE: CaptionStyle = {
   primary: "",
   yPct: 82,
   aspect: "auto",
+  beatSync: false,
 };
 
 export type CaptionPosition = "top" | "center" | "bottom";
@@ -94,6 +97,7 @@ export function applyStyle(form: FormData, style: CaptionStyle): FormData {
   form.set("uppercase", style.uppercase ? "1" : "0");
   form.set("emoji", style.emoji ? "1" : "0");
   form.set("aspect", style.aspect);
+  form.set("beat_sync", style.beatSync ? "1" : "0");
   if (style.accent) form.set("accent", style.accent);
   if (style.primary) form.set("primary", style.primary);
   return form;
