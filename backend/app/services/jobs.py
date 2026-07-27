@@ -128,3 +128,19 @@ def submit(job_id: str, work: Callable[[str], None]) -> None:
             update(job_id, status="error", message=str(exc), finished_at=_now())
 
     _executor.submit(runner)
+
+
+def delete(job_id: str) -> None:
+    """Remove o job do registro em memória, o JSON e os arquivos gerados."""
+    import shutil
+
+    job = get(job_id)
+    with _lock:
+        _jobs.pop(job_id, None)
+    _job_file(job_id).unlink(missing_ok=True)
+    if not job:
+        return
+    tool = job.get("tool") or ""
+    folder = config.tool_dir(tool) / job_id
+    if folder.exists() and folder.is_dir():
+        shutil.rmtree(folder, ignore_errors=True)
