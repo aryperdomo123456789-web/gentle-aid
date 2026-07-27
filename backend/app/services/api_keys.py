@@ -634,10 +634,16 @@ def _run_probe(spec: dict[str, Any], key: str) -> dict[str, Any]:
             return {"ok": True, "status": resp.status, "message": "Chave válida e respondendo."}
     except urllib.error.HTTPError as exc:
         status = exc.code
+        # No probe de áudio, 400 significa "credencial aceita, áudio de teste recusado".
+        if spec.get("audio_probe") and status == 400:
+            return {"ok": True, "status": status, "message": "Chave válida — transcrição autorizada."}
+        message = _HTTP_MESSAGES.get(status, f"Endpoint respondeu HTTP {status}.")
+        if spec.get("audio_probe") and status in (401, 402, 403) and spec.get("invalid_message"):
+            message = f"{spec['invalid_message']} {message}"
         return {
             "ok": status not in (400, 401, 402, 403, 429),
             "status": status,
-            "message": _HTTP_MESSAGES.get(status, f"Endpoint respondeu HTTP {status}."),
+            "message": message,
         }
     except urllib.error.URLError as exc:
         return {"ok": False, "status": 0, "message": f"Falha de rede: {exc.reason}"}
