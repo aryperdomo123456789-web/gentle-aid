@@ -233,9 +233,19 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
             >
               {busy === "preview" ? "Gerando prévia…" : "Ouvir prévia"}
             </button>
-            <SubmitButton busy={busy === "save"} onClick={() => void save()} type="button">
-              {draft.id ? "Salvar alterações" : "Salvar voz no catálogo"}
-            </SubmitButton>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={busy !== ""}
+              className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {busy === "save"
+                ? "Salvando…"
+                : draft.id
+                  ? "Salvar alterações"
+                  : "Salvar voz no catálogo"}
+            </button>
+
             {draft.id ? (
               <button
                 type="button"
