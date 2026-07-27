@@ -8,7 +8,9 @@ import {
   ExternalLink,
   KeyRound,
   Loader2,
+  DownloadCloud,
   RefreshCw,
+
   Save,
   Trash2,
 } from "lucide-react";
@@ -79,7 +81,10 @@ function ApisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [testingAll, setTestingAll] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("todas");
+
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,6 +133,30 @@ function ApisPage() {
     }
   }
 
+  async function importKeys(force: boolean) {
+    setImporting(true);
+    setError(null);
+    setImportReport(null);
+    try {
+      const data = await apiSend<{
+        providers: Provider[];
+        report: { imported: string[]; skipped: string[]; scanned: string[] };
+      }>("/api/apis/import", "POST", { force });
+      setProviders(data.providers ?? []);
+      const n = data.report?.imported?.length ?? 0;
+      setImportReport(
+        n > 0
+          ? `${n} chave(s) importada(s) automaticamente: ${data.report.imported.join(", ")}.`
+          : "Nenhuma chave nova encontrada no servidor (.env, app antigo e configs legadas já foram varridos).",
+      );
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+
   return (
     <div className="min-h-screen">
       <TopNav />
@@ -145,7 +174,7 @@ function ApisPage() {
               chaves ficam no servidor, nunca no navegador.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => void load()}
@@ -153,6 +182,20 @@ function ApisPage() {
             >
               <RefreshCw className="size-4" aria-hidden="true" />
               Recarregar
+            </button>
+            <button
+              type="button"
+              onClick={() => void importKeys(false)}
+              disabled={importing}
+              title="Varre .env, o app antigo e configs legadas do servidor e preenche as chaves sozinho"
+              className="inline-flex items-center gap-2 rounded-xl border border-accent/50 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-accent disabled:opacity-60"
+            >
+              {importing ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <DownloadCloud className="size-4" aria-hidden="true" />
+              )}
+              Preencher automaticamente
             </button>
             <button
               type="button"
@@ -169,6 +212,13 @@ function ApisPage() {
             </button>
           </div>
         </div>
+
+        {importReport ? (
+          <p className="mb-4 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-foreground">
+            {importReport}
+          </p>
+        ) : null}
+
 
         <dl className="mb-6 grid gap-3 sm:grid-cols-3">
           <Stat label="Integrações mapeadas" value={String(providers.length)} />

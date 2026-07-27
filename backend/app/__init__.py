@@ -30,6 +30,12 @@ def create_app(config: Config | None = None) -> Flask:
 
     cfg.ensure_dirs()
 
+    # Importa automaticamente as chaves de API que já existem no servidor
+    # (.env, app antigo, configs legadas) para o cofre da Central de APIs.
+    from .services import api_keys
+
+    api_keys.autofill_once()
+
     for bp in (youtube_bp, tiktok_bp, legendar_bp, voice_bp, canva_bp, jobs_bp, apis_bp, radar_bp):
         app.register_blueprint(bp)
 
