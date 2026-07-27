@@ -75,7 +75,16 @@ EOF
 else
   ok ".env já existe — preservado"
 fi
+
+# Sincroniza a porta da API no .env com o valor efetivo (evita porta obsoleta)
+if grep -q '^GUNICORN_BIND=' "$APP_DIR/.env"; then
+  sed -i "s|^GUNICORN_BIND=.*|GUNICORN_BIND=127.0.0.1:$API_PORT|" "$APP_DIR/.env"
+else
+  echo "GUNICORN_BIND=127.0.0.1:$API_PORT" >> "$APP_DIR/.env"
+fi
+ok "API bind: 127.0.0.1:$API_PORT"
 chmod 600 "$APP_DIR/.env" || true
+
 
 # --- 3. Python ---------------------------------------------------------------
 log "Ambiente virtual Python"
