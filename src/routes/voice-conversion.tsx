@@ -207,50 +207,8 @@ function VoiceStudio() {
                 )}
               </Field>
 
-              <Field label="Motor de voz">
-                {(id) => (
-                  <SelectInput
-                    id={id}
-                    name="engine"
-                    value={engine}
-                    onChange={(e) => setEngine(e.target.value as Engine)}
-                  >
-                    <option value="elevenlabs" disabled={!ready}>
-                      ElevenLabs — voz realista (speech-to-speech)
-                    </option>
-                    <option value="forge" disabled={!forgeReady}>
-                      Voice Forge — sua voz própria (sem custo)
-                    </option>
-                    <option value="local">Local FFmpeg — troca de timbre (sem custo)</option>
-                  </SelectInput>
-                )}
-              </Field>
+              {mediaPicker}
 
-              {engine === "elevenlabs" ? (
-                <Field label="Voz do novo narrador" hint="A narrativa, a entonação e as pausas do original são preservadas.">
-                  {voiceSelect}
-                </Field>
-              ) : engine === "forge" ? (
-                <Field
-                  label="Voz própria"
-                  hint="A fala original é reescrita com a assinatura acústica da sua voz — narrativa, ritmo e sincronia intactos."
-                >
-                  {personaSelect}
-                </Field>
-              ) : (
-                <Field label="Timbre alvo">
-                  {(id) => (
-                    <SelectInput id={id} name="target_voice" defaultValue="masc_grave">
-                      <option value="masc_grave">Masculino grave</option>
-                      <option value="masc_jovem">Masculino jovem</option>
-                      <option value="fem_suave">Feminino suave</option>
-                      <option value="fem_energetica">Feminino energética</option>
-                      <option value="narrador">Narrador documentário</option>
-
-                    </SelectInput>
-                  )}
-                </Field>
-              )}
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field label="Saída quando for vídeo">
