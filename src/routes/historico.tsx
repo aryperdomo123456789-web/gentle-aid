@@ -134,7 +134,9 @@ function Historico() {
       <main className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Central de Histórico</h1>
+            <h1 className="text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">
+              Central de Histórico
+            </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               Todos os jobs executados no servidor, com status de hash, metadados sanitizados e
               links de download servidos pelo Nginx.
@@ -202,7 +204,6 @@ function Historico() {
             className="min-h-10 w-full rounded-full border border-border bg-surface/60 px-4 text-xs outline-none transition-colors duration-200 hover:border-border/80 focus:border-primary/60 sm:w-72"
           />
         </div>
-
 
         {error ? (
           <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">

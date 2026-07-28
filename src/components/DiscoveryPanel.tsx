@@ -101,17 +101,17 @@ export function DiscoveryPanel({
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
       >
         <div className="sm:col-span-2 lg:col-span-1">
-        <Field label="Busca">
-          {(id) => (
-            <TextInput
-              id={id}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="ex.: renda extra · @criador · https://tiktok.com/@user/video/123"
-              maxLength={300}
-            />
-          )}
-        </Field>
+          <Field label="Busca">
+            {(id) => (
+              <TextInput
+                id={id}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ex.: renda extra · @criador · https://tiktok.com/@user/video/123"
+                maxLength={300}
+              />
+            )}
+          </Field>
         </div>
         <Field label="Plataforma">
           {(id) => (
@@ -149,8 +149,8 @@ export function DiscoveryPanel({
       {searched && !busy && cards.length === 0 && !error ? (
         <div className="surface-in mt-4 rounded-xl border border-dashed border-border bg-background/40 px-4 py-8 text-center">
           <p className="mx-auto max-w-md text-pretty text-sm leading-6 text-muted-foreground">
-            Nenhum pico de tráfego orgânico localizado para esse termo. Tente outra palavra-chave, um
-            @perfil ou cole a URL direta do vídeo.
+            Nenhum pico de tráfego orgânico localizado para esse termo. Tente outra palavra-chave,
+            um @perfil ou cole a URL direta do vídeo.
           </p>
         </div>
       ) : null}

@@ -67,8 +67,6 @@ function readForm(form: HTMLFormElement): Entry[] {
   const out: Entry[] = [];
   const seen = new Set<string>();
 
-
-
   for (const el of Array.from(form.elements)) {
     const field = el as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
     const name = field.name ?? "";
@@ -118,7 +116,6 @@ function readForm(form: HTMLFormElement): Entry[] {
       return entry;
     });
 }
-
 
 type Props = {
   busy: boolean;
@@ -201,7 +198,6 @@ export function JobSettingsGuard({
 
   const locked = !saved || stale;
 
-
   return (
     <div ref={anchor} className="@container space-y-3">
       <div
@@ -262,7 +258,6 @@ export function JobSettingsGuard({
         onClick={manual ? onStart : undefined}
         disabled={busy || disabled || locked}
         title={locked ? "Salve as configurações antes de iniciar" : undefined}
-
         className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-semibold shadow-lg shadow-primary/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none ${
           variant === "electric"
             ? "bg-electric text-electric-foreground"

@@ -36,10 +36,7 @@ export function ToolShell({
         </div>
 
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <section
-            aria-label="Controles"
-            className="panel surface-in min-w-0 p-4 sm:p-6 md:p-7"
-          >
+          <section aria-label="Controles" className="panel surface-in min-w-0 p-4 sm:p-6 md:p-7">
             {left}
           </section>
           <section
@@ -54,9 +51,9 @@ export function ToolShell({
       </main>
 
       <footer className="mx-auto w-full max-w-[1600px] px-3 pb-10 text-xs text-muted-foreground sm:px-4 md:px-8">
-        Jobs gravados em <code className="rounded bg-muted/50 px-1.5 py-0.5 font-mono">fabrica_clips/</code>
+        Jobs gravados em{" "}
+        <code className="rounded bg-muted/50 px-1.5 py-0.5 font-mono">fabrica_clips/</code>
       </footer>
     </div>
-
   );
 }

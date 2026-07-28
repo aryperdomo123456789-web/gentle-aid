@@ -117,7 +117,6 @@ export function StatusPanel({
         </p>
       ) : null}
 
-
       {auditSummary ? (
         <section className="rounded-xl border border-primary/30 bg-primary/5 p-3">
           <header className="mb-2 flex items-center justify-between gap-3">
@@ -209,13 +208,14 @@ export function StatusPanel({
   );
 }
 
-
 function HashRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-border bg-background/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 break-all font-mono text-foreground sm:truncate sm:text-right">{value}</dd>
+      <dd className="min-w-0 break-all font-mono text-foreground sm:truncate sm:text-right">
+        {value}
+      </dd>
     </div>
   );
 }

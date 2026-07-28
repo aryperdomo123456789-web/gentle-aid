@@ -140,7 +140,9 @@ export function ToolHistory({
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
-                <p className="break-words text-sm font-medium sm:truncate">{job.filename ?? job.job_id}</p>
+                <p className="break-words text-sm font-medium sm:truncate">
+                  {job.filename ?? job.job_id}
+                </p>
                 <p className="break-words text-xs text-muted-foreground sm:truncate">
                   {formatDateTime(job.created_at)} · {formatBytes(job.size_bytes)}
                   {job.md5_after ? (

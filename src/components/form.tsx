@@ -30,7 +30,6 @@ export function Field({
 const control =
   "w-full min-h-11 max-w-full rounded-xl border border-input bg-background/50 px-3.5 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted-foreground/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-[border-color,box-shadow,background-color] duration-200 hover:border-primary/40 focus:border-primary focus:bg-background/70 focus:outline-none focus:ring-2 focus:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-60";
 
-
 export function TextInput({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(control, className)} />;
 }
@@ -153,15 +152,12 @@ export function SubmitButton({
       disabled={busy || disabled}
       className={cn(
         "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-semibold shadow-lg shadow-primary/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none",
-        variant === "electric"
-          ? "bg-electric text-electric-foreground"
-          : "text-primary-foreground",
+        variant === "electric" ? "bg-electric text-electric-foreground" : "text-primary-foreground",
       )}
       style={variant === "primary" ? { backgroundImage: "var(--gradient-viral)" } : undefined}
     >
       {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
       {children}
     </button>
-
   );
 }
