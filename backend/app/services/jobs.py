@@ -93,8 +93,14 @@ def _job_file(job_id: str) -> Path:
     return config.jobs_dir / f"{job_id}.json"
 
 
+def _cancel_file(job_id: str) -> Path:
+    """Sinal de cancelamento em disco — funciona entre workers do Gunicorn."""
+    return config.jobs_dir / f"{job_id}.cancel"
+
+
 def _audit_file() -> Path:
     return config.jobs_dir / "_audit.log"
+
 
 
 def _parse_iso(value: Any) -> datetime | None:
