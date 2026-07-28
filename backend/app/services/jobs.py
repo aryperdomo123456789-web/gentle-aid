@@ -567,7 +567,25 @@ def summarize(items: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def persist(job_id: str) -> None:
+_last_persist: dict[str, float] = {}
+PERSIST_THROTTLE_SECONDS = 1.0
+
+
+def persist(job_id: str, *, throttle: bool = False) -> None:
+    """Grava o job em disco. Com `throttle`, no máximo 1x por segundo.
+
+    O FFmpeg cospe centenas de linhas por minuto; gravar o JSON inteiro a cada
+    linha transforma um job longo em I/O puro. Mudanças de status/progresso
+    continuam gravando na hora.
+    """
+    if throttle:
+        now = time.monotonic()
+        last = _last_persist.get(job_id, 0.0)
+        if now - last < PERSIST_THROTTLE_SECONDS:
+            return
+        _last_persist[job_id] = now
+    else:
+        _last_persist[job_id] = time.monotonic()
     job = None
     with _lock:
         if job_id in _jobs:
@@ -576,11 +594,12 @@ def persist(job_id: str) -> None:
         return
     try:
         config.jobs_dir.mkdir(parents=True, exist_ok=True)
-        _job_file(job_id).write_text(
-            json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        tmp = _job_file(job_id).with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(_job_file(job_id))
     except OSError:
         return
+
 
 
 # --- Pool próprio de execução ------------------------------------------------
