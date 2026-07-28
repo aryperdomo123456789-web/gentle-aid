@@ -34,7 +34,10 @@ class Config:
     ffmpeg_bin: str = _tool_bin("FFMPEG_BIN", "ffmpeg")
     ffprobe_bin: str = _tool_bin("FFPROBE_BIN", "ffprobe")
     ytdlp_bin: str = _tool_bin("YTDLP_BIN", "yt-dlp")
-    max_upload_bytes: int = int(os.environ.get("MAX_UPLOAD_MB", "500")) * 1024 * 1024
+    # Vídeo de até 3 h em 1080p passa fácil de 4 GB. O teto padrão precisa
+    # acompanhar o motor, senão o Flask corta o upload antes do job nascer.
+    max_upload_bytes: int = int(os.environ.get("MAX_UPLOAD_MB", "8192")) * 1024 * 1024
+
     max_workers: int = int(os.environ.get("VIRAL_WORKERS", str(_recommended_worker_count())))
     secret_key: str = os.environ.get("SECRET_KEY", "change-me-in-env")
 
