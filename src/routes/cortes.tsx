@@ -578,6 +578,26 @@ function Cortes() {
             onDelete={remove}
           />
 
+          {trackInfo ? (
+            <div className="rounded-xl border border-border bg-background/40 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Trilha aplicada
+              </p>
+              <p className="mt-1 text-sm font-medium text-foreground">{trackInfo.label}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {Math.round(trackInfo.grid_bpm || trackInfo.bpm)} BPM ·{" "}
+                {trackInfo.origin === "synth"
+                  ? "sintetizada no servidor (original)"
+                  : trackInfo.origin === "upload"
+                    ? "enviada por você"
+                    : "biblioteca do servidor"}
+              </p>
+              {trackInfo.reason ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">{trackInfo.reason}</p>
+              ) : null}
+            </div>
+          ) : null}
+
           {clips.length ? (
             <div className="space-y-3">
               <p className="text-sm font-semibold">
