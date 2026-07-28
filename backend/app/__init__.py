@@ -12,11 +12,11 @@ from .config import Config
 from .blueprints.auth import bp as auth_bp
 from .blueprints.apis import bp as apis_bp
 from .blueprints.canva_cleaner import bp as canva_bp
-from .blueprints.clips import bp as clips_bp
 from .blueprints.discover import bp as discover_bp
 from .blueprints.jobs import bp as jobs_bp
 from .blueprints.legendar import bp as legendar_bp
 from .blueprints.radar import bp as radar_bp
+from .blueprints.recap import bp as recap_bp
 from .blueprints.studio import bp as studio_bp
 from .blueprints.tiktok import bp as tiktok_bp
 from .blueprints.voice import bp as voice_bp
@@ -76,8 +76,8 @@ def create_app(config: Config | None = None) -> Flask:
         apis_bp,
         radar_bp,
         studio_bp,
-        clips_bp,
         discover_bp,
+        recap_bp,
     ):
         app.register_blueprint(bp)
 

@@ -11,12 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VoiceConversionRouteImport } from './routes/voice-conversion'
 import { Route as TiktokRouteImport } from './routes/tiktok'
+import { Route as RecapRouteImport } from './routes/recap'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LegendarRouteImport } from './routes/legendar'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as EstudioRouteImport } from './routes/estudio'
-import { Route as CortesRouteImport } from './routes/cortes'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
 import { Route as ApisRouteImport } from './routes/apis'
@@ -31,6 +31,11 @@ const VoiceConversionRoute = VoiceConversionRouteImport.update({
 const TiktokRoute = TiktokRouteImport.update({
   id: '/tiktok',
   path: '/tiktok',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecapRoute = RecapRouteImport.update({
+  id: '/recap',
+  path: '/recap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RadarRoute = RadarRouteImport.update({
@@ -56,11 +61,6 @@ const HistoricoRoute = HistoricoRouteImport.update({
 const EstudioRoute = EstudioRouteImport.update({
   id: '/estudio',
   path: '/estudio',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CortesRoute = CortesRouteImport.update({
-  id: '/cortes',
-  path: '/cortes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContaRoute = ContaRouteImport.update({
@@ -94,12 +94,12 @@ export interface FileRoutesByFullPath {
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/conta': typeof ContaRoute
-  '/cortes': typeof CortesRoute
   '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
+  '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
@@ -109,12 +109,12 @@ export interface FileRoutesByTo {
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/conta': typeof ContaRoute
-  '/cortes': typeof CortesRoute
   '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
+  '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
@@ -125,12 +125,12 @@ export interface FileRoutesById {
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/conta': typeof ContaRoute
-  '/cortes': typeof CortesRoute
   '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
+  '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
@@ -142,12 +142,12 @@ export interface FileRouteTypes {
     | '/apis'
     | '/canva-cleaner'
     | '/conta'
-    | '/cortes'
     | '/estudio'
     | '/historico'
     | '/legendar'
     | '/login'
     | '/radar'
+    | '/recap'
     | '/tiktok'
     | '/voice-conversion'
     | '/historico/$jobId'
@@ -157,12 +157,12 @@ export interface FileRouteTypes {
     | '/apis'
     | '/canva-cleaner'
     | '/conta'
-    | '/cortes'
     | '/estudio'
     | '/historico'
     | '/legendar'
     | '/login'
     | '/radar'
+    | '/recap'
     | '/tiktok'
     | '/voice-conversion'
     | '/historico/$jobId'
@@ -172,12 +172,12 @@ export interface FileRouteTypes {
     | '/apis'
     | '/canva-cleaner'
     | '/conta'
-    | '/cortes'
     | '/estudio'
     | '/historico'
     | '/legendar'
     | '/login'
     | '/radar'
+    | '/recap'
     | '/tiktok'
     | '/voice-conversion'
     | '/historico/$jobId'
@@ -188,12 +188,12 @@ export interface RootRouteChildren {
   ApisRoute: typeof ApisRoute
   CanvaCleanerRoute: typeof CanvaCleanerRoute
   ContaRoute: typeof ContaRoute
-  CortesRoute: typeof CortesRoute
   EstudioRoute: typeof EstudioRoute
   HistoricoRoute: typeof HistoricoRouteWithChildren
   LegendarRoute: typeof LegendarRoute
   LoginRoute: typeof LoginRoute
   RadarRoute: typeof RadarRoute
+  RecapRoute: typeof RecapRoute
   TiktokRoute: typeof TiktokRoute
   VoiceConversionRoute: typeof VoiceConversionRoute
 }
@@ -212,6 +212,13 @@ declare module '@tanstack/react-router' {
       path: '/tiktok'
       fullPath: '/tiktok'
       preLoaderRoute: typeof TiktokRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recap': {
+      id: '/recap'
+      path: '/recap'
+      fullPath: '/recap'
+      preLoaderRoute: typeof RecapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/radar': {
@@ -247,13 +254,6 @@ declare module '@tanstack/react-router' {
       path: '/estudio'
       fullPath: '/estudio'
       preLoaderRoute: typeof EstudioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cortes': {
-      id: '/cortes'
-      path: '/cortes'
-      fullPath: '/cortes'
-      preLoaderRoute: typeof CortesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/conta': {
@@ -311,12 +311,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApisRoute: ApisRoute,
   CanvaCleanerRoute: CanvaCleanerRoute,
   ContaRoute: ContaRoute,
-  CortesRoute: CortesRoute,
   EstudioRoute: EstudioRoute,
   HistoricoRoute: HistoricoRouteWithChildren,
   LegendarRoute: LegendarRoute,
   LoginRoute: LoginRoute,
   RadarRoute: RadarRoute,
+  RecapRoute: RecapRoute,
   TiktokRoute: TiktokRoute,
   VoiceConversionRoute: VoiceConversionRoute,
 }
