@@ -217,14 +217,33 @@ def synthesize(
     parts: list[Path] = []
     try:
         for index, chunk in enumerate(chunks, start=1):
+            jobs.check_cancelled(job_id)
             mp3 = workdir / f"edge_{index:04d}.mp3"
             wav = workdir / f"edge_{index:04d}.wav"
-            try:
-                asyncio.run(_synth_one(chunk, voice, rate, mp3))
-            except Exception as exc:  # noqa: BLE001 - erro de rede/voz inválida
-                raise EdgeTTSError(f"Falha no motor gratuito ao narrar o bloco {index}: {exc}") from exc
-            if not mp3.exists() or mp3.stat().st_size == 0:
-                raise EdgeTTSError(f"O motor gratuito devolveu áudio vazio no bloco {index}.")
+            last_error: Exception | None = None
+            for attempt in range(1, SYNTH_ATTEMPTS + 1):
+                try:
+                    mp3.unlink(missing_ok=True)
+                    _run_async(_synth_one(chunk, voice, rate, mp3))
+                    if not mp3.exists() or mp3.stat().st_size == 0:
+                        raise EdgeTTSError("áudio vazio devolvido pelo provedor")
+                    last_error = None
+                    break
+                except Exception as exc:  # noqa: BLE001 - erro de rede/voz inválida
+                    last_error = exc
+                    if attempt < SYNTH_ATTEMPTS:
+                        jobs.log(
+                            job_id,
+                            f"Bloco {index}: tentativa {attempt} falhou ({exc}). Refazendo…",
+                            level="warn",
+                        )
+                        time.sleep(1.5 * attempt)
+            if last_error is not None:
+                raise EdgeTTSError(
+                    f"Falha no motor gratuito ao narrar o bloco {index} "
+                    f"após {SYNTH_ATTEMPTS} tentativas: {last_error}"
+                ) from last_error
+
             media.run(
                 [
                     config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
