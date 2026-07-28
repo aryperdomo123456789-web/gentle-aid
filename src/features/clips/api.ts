@@ -25,6 +25,35 @@ export type ClipOptions = {
   transcription_hint?: string | null;
   ai_ready: boolean;
   max_clips: number;
+  soundtrack?: ClipSoundtrackCatalog;
+};
+
+export type ClipTrack = {
+  id: string;
+  label: string;
+  origin: string;
+  grid_bpm?: number;
+  bpm: number;
+  duration: number;
+  tags?: string[];
+  profile?: string | null;
+  reason?: string;
+};
+
+export type ClipMusicProfile = {
+  id: string;
+  label: string;
+  bpm: number;
+  energy: number;
+  tags?: string[];
+};
+
+export type ClipSoundtrackCatalog = {
+  modes: string[];
+  profiles: ClipMusicProfile[];
+  tracks: ClipTrack[];
+  library_dir?: string;
+  ai_ready?: boolean;
 };
 
 export type ClipResult = {
@@ -41,6 +70,10 @@ export type ClipResult = {
   md5_after?: string;
   size_bytes?: number;
 };
+
+export function fetchClipTracks(): Promise<{ tracks: ClipTrack[]; library_dir: string }> {
+  return apiGet("/api/clips/tracks");
+}
 
 export function fetchClipOptions(): Promise<ClipOptions> {
   return apiGet<ClipOptions>("/api/clips/options");

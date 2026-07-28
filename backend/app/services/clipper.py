@@ -6,7 +6,8 @@ Pipeline (mesmo padrão de jobs/rastro/esterilização do resto do ecossistema):
   2. escuta     → transcrição com timestamp por palavra (`transcribe`)
   3. inteligência → melhores momentos por nicho (`highlights.find` + IA opcional)
   4. corte      → recorte exato + reenquadramento 9:16 (crop ou fundo desfocado)
-  5. trilha     → música de fundo com ducking sobre a voz (opcional)
+  5. trilha     → upload, biblioteca ou trilha escolhida/gerada pela IA por nicho,
+                  com corte travado em compassos e punch-in na batida
   6. legenda    → ASS animado do Estúdio de Legendas, queimado na esterilização
   7. entrega    → cada corte vira artefato; o melhor vira o download principal
 """
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import config
-from . import captions, highlights, jobs, media, transcribe
+from . import beatsync, captions, highlights, jobs, media, soundtrack, transcribe
 from .delivery import deliver
 from .validation import output_path
 
@@ -54,6 +55,21 @@ def _video_filter(width: int, height: int, frame: str) -> str:
 
 
 
+def _beat_pulse(bpm: float, intensity: float) -> str:
+    """Punch-in no tempo da música: zoom que estoura na batida e relaxa até a próxima.
+
+    `zoompan` roda por quadro; `on/FPS` é o tempo em segundos do corte. A curva
+    `cos^8` deixa o pico bem curto (soco) em vez de um zoom lento e amador.
+    """
+    hz = max(0.2, bpm / 60.0)
+    amp = max(0.005, min(0.09, intensity))
+    zoom = f"1+{amp:.4f}*pow(abs(cos(PI*(on/{FPS})*{hz:.5f}))\\,8)"
+    return (
+        f"zoompan=z='{zoom}':d=1:fps={FPS}:s=WIDTHxHEIGHT"
+        ":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+    )
+
+
 def _cut(
     src: Path,
     dst: Path,
@@ -64,17 +80,31 @@ def _cut(
     frame: str,
     voice_volume: float,
     job_id: str,
+    pulse_bpm: float = 0.0,
+    pulse_intensity: float = 0.0,
 ) -> None:
-    """Recorte exato (seek preciso) já reenquadrado e normalizado."""
+    """Recorte exato (seek preciso) já reenquadrado, pulsado e normalizado."""
     cmd = [
         config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
         "-ss", f"{max(0.0, start):.3f}", "-i", str(src), "-t", f"{seconds:.3f}",
     ]
+    pulse = ""
+    if pulse_bpm > 0 and pulse_intensity > 0:
+        pulse = _beat_pulse(pulse_bpm, pulse_intensity)
     if size:
         width, height = size
-        cmd += ["-filter_complex", _video_filter(width, height, frame), "-map", "[v]"]
+        chain = _video_filter(width, height, frame)
+        if pulse:
+            chain += f";[v]{pulse.replace('WIDTH', str(width)).replace('HEIGHT', str(height))}[vp]"
+        cmd += ["-filter_complex", chain, "-map", "[vp]" if pulse else "[v]"]
     else:
-        cmd += ["-vf", f"fps={FPS},format=yuv420p", "-map", "0:v:0"]
+        vf = f"fps={FPS},format=yuv420p"
+        if pulse:
+            info = media.probe(src)
+            vf += "," + pulse.replace("WIDTH", str(info.width or 1080)).replace(
+                "HEIGHT", str(info.height or 1920)
+            )
+        cmd += ["-vf", vf, "-map", "0:v:0"]
     cmd += [
         "-map", "0:a:0?",
         "-af", f"volume={voice_volume:.2f},aresample=48000,loudnorm=I=-14:TP=-1.5:LRA=11",
@@ -85,19 +115,30 @@ def _cut(
     media.run(cmd, job_id=job_id)
 
 
-def _mix_music(video: Path, music: Path, dst: Path, *, volume: float, job_id: str) -> None:
-    """Trilha em ducking: abaixa sozinha quando a voz entra."""
+def _mix_music(
+    video: Path,
+    music: Path,
+    dst: Path,
+    *,
+    volume: float,
+    job_id: str,
+    offset: float = 0.0,
+) -> None:
+    """Trilha em ducking, começando exatamente no 1º ataque forte da música."""
     media.run(
         [
             config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
-            "-i", str(video), "-stream_loop", "-1", "-i", str(music),
+            "-i", str(video),
+            "-ss", f"{max(0.0, offset):.3f}", "-stream_loop", "-1", "-i", str(music),
             "-filter_complex",
-            f"[1:a]volume={volume:.2f},aresample=48000[m];"
+            f"[1:a]volume={volume:.2f},aresample=48000,"
+            "afade=t=in:st=0:d=0.25[m];"
             "[m][0:a]sidechaincompress=threshold=0.05:ratio=8:attack=20:release=350[duck];"
             "[0:a][duck]amix=inputs=2:duration=first:dropout_transition=0[a]",
             "-map", "0:v", "-map", "[a]",
             "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", str(dst),
         ],
+
         job_id=job_id,
     )
 
@@ -168,7 +209,12 @@ def generate(
     use_ai: bool,
     mutation: str,
     manual_segments: list[dict[str, Any]] | None = None,
+    music_mode: str = "upload",
+    music_track: str | None = None,
+    beat_sync: bool = True,
+    beat_zoom: float = 0.05,
 ) -> dict[str, Any]:
+
     """Roda o pipeline inteiro e entrega todos os cortes do vídeo."""
     size = ASPECTS.get(aspect, ASPECTS["9:16"])
     workdir = config.tool_dir("clips") / job_id / "_work"
@@ -247,6 +293,52 @@ def generate(
         else f"{len(clips)} corte(s) selecionado(s) no nicho '{niche_id}'.",
     )
 
+    # ---------------------------------------------------------------- trilha #
+    track = None
+    if music_mode and music_mode != "none":
+        jobs.stage(job_id, "trilha", "Definindo a trilha e o ritmo dos cortes.", progress=55)
+        transcript = " ".join(str(getattr(s, "text", "") or "") for s in segments)[:8000]
+        media_seconds = max(float(c["end"]) - float(c["start"]) for c in clips) if clips else 60.0
+        try:
+            track = soundtrack.resolve(
+                mode=music_mode,
+                upload=music,
+                track_id=music_track,
+                niche_id=niche_id,
+                transcript=transcript,
+                seconds=media_seconds,
+                workdir=workdir,
+                use_ai=use_ai,
+                job_id=job_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - trilha nunca derruba o job
+            jobs.log(job_id, f"Trilha indisponível ({exc}) — seguindo sem música.", level="warn")
+            track = None
+
+    if track:
+        jobs.log(
+            job_id,
+            f"Trilha: {track.label} · {track.grid_bpm:.0f} BPM · {track.origin}. {track.reason}".strip(),
+        )
+        jobs.update(
+            job_id,
+            soundtrack=track.as_dict(),
+            beat_sync=bool(beat_sync and track.bpm > 0),
+        )
+
+    # Trava a duração de cada corte em compassos inteiros da trilha: o corte
+    # termina no fim da frase musical, que é o que dá a sensação de "editado".
+    grid_bpm = track.grid_bpm if track else 0.0
+    if track and beat_sync and grid_bpm > 0:
+        for clip in clips:
+            start = float(clip["start"])
+            seconds = float(clip["end"]) - start
+            room = min(duration - start, max(seconds, max_seconds))
+            locked = soundtrack.bars_duration(seconds, grid_bpm, ceiling=room)
+            if locked >= max(2.0, min_seconds * 0.75) and abs(locked - seconds) > 0.05:
+                clip["end"] = round(start + locked, 3)
+        jobs.log(job_id, f"Cortes travados em compassos de {grid_bpm:.0f} BPM.")
+
 
     if size:
         width, height = size
@@ -277,11 +369,20 @@ def generate(
             frame=frame,
             voice_volume=voice_volume,
             job_id=job_id,
+            pulse_bpm=grid_bpm if (track and beat_sync) else 0.0,
+            pulse_intensity=beat_zoom if (track and beat_sync) else 0.0,
         )
 
-        if music and music.exists():
+        if track and track.path.exists():
             mixed = workdir / f"corte_{position:02d}_trilha.mp4"
-            _mix_music(raw, music, mixed, volume=music_volume, job_id=job_id)
+            _mix_music(
+                raw,
+                track.path,
+                mixed,
+                volume=music_volume,
+                job_id=job_id,
+                offset=track.offset if beat_sync else 0.0,
+            )
             raw.unlink(missing_ok=True)
             raw = mixed
 
@@ -291,7 +392,12 @@ def generate(
                 _local_segments(segments, float(clip["start"]), float(clip["end"])),
                 max_words=words_per_line,
             )
+            # Palavra na batida: a legenda estoura junto com o kick da trilha.
+            if lines and track and beat_sync and grid_bpm > 0:
+                grid = beatsync.beats_from_bpm(grid_bpm, seconds)
+                lines = beatsync.snap_lines(lines, grid, tolerance=0.16)
             if lines:
+
                 ass_path = output_path("clips", job_id, f"_corte{position:02d}.ass")
                 ass_path.write_text(
                     captions.build_ass(
@@ -352,5 +458,9 @@ def generate(
             f"{len(delivered)} corte(s) prontos e esterilizados. "
             f"Destaque: “{best_entry['title']}” ({best_entry['seconds']:.0f}s)."
         ),
-        extra={"clips": delivered, "clips_total": len(delivered)},
+        extra={
+            "clips": delivered,
+            "clips_total": len(delivered),
+            "soundtrack": track.as_dict() if track else None,
+        },
     )
