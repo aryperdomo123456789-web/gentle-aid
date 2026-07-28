@@ -203,25 +203,107 @@ function Cortes() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            <Field label="Formato de saída">
+            <Field label="Formato de saída" hint="16:9 entrega corte horizontal pronto para YouTube.">
               {(id) => (
-                <SelectInput id={id} name="aspect" defaultValue="9:16">
+                <SelectInput
+                  id={id}
+                  name="aspect"
+                  value={aspect}
+                  onChange={(e) => setAspect(e.target.value)}
+                >
                   <option value="9:16">9:16 — TikTok / Reels / Shorts</option>
                   <option value="1:1">1:1 — quadrado</option>
-                  <option value="16:9">16:9 — horizontal</option>
+                  <option value="16:9">16:9 — horizontal (YouTube)</option>
                   <option value="original">Manter o original</option>
                 </SelectInput>
               )}
             </Field>
             <Field label="Enquadramento">
               {(id) => (
-                <SelectInput id={id} name="frame" defaultValue="crop">
+                <SelectInput id={id} name="frame" value={frame} onChange={(e) => setFrame(e.target.value)}>
                   <option value="crop">Corte central (imagem cheia)</option>
                   <option value="blur">Vídeo inteiro com fundo desfocado</option>
+                  <option value="pad">Vídeo inteiro com barras pretas</option>
                 </SelectInput>
               )}
             </Field>
           </div>
+
+          <div className="rounded-xl border border-border bg-background/40 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Régua de edição manual</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {manualOn
+                    ? "A IA não escolhe nada: entrega exatamente os trechos abaixo, no formato selecionado."
+                    : "Ative para definir você mesmo o início e o fim de cada corte (mm:ss ou hh:mm:ss)."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManualOn((v) => !v)}
+                className={`rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition ${
+                  manualOn
+                    ? "border-primary/60 bg-primary/10 text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {manualOn ? "Modo manual ligado" : "Ativar edição manual"}
+              </button>
+            </div>
+
+            {manualOn ? (
+              <div className="mt-3 space-y-3">
+                {segments.map((seg, index) => (
+                  <div key={seg.uid} className="rounded-lg border border-border/70 bg-card/40 p-2.5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <TextInput
+                        value={seg.start}
+                        placeholder="00:00"
+                        aria-label={`Início do corte ${index + 1}`}
+                        onChange={(e) => patchSegment(seg.uid, { start: e.target.value })}
+                      />
+                      <TextInput
+                        value={seg.end}
+                        placeholder="01:30"
+                        aria-label={`Fim do corte ${index + 1}`}
+                        onChange={(e) => patchSegment(seg.uid, { end: e.target.value })}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <TextInput
+                        value={seg.title}
+                        placeholder={`Corte manual ${index + 1}`}
+                        aria-label={`Título do corte ${index + 1}`}
+                        onChange={(e) => patchSegment(seg.uid, { title: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSegment(seg.uid)}
+                        className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground transition hover:text-destructive"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      Duração: {segmentDurationLabel(seg)}
+                    </p>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addSegment()}
+                  className="w-full rounded-lg border border-dashed border-border py-2 text-[11px] font-semibold text-muted-foreground transition hover:text-foreground"
+                >
+                  + Adicionar corte
+                </button>
+                {manualError ? (
+                  <p className="text-[11px] text-destructive">{manualError}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
             <Field label="Estilo da legenda">
