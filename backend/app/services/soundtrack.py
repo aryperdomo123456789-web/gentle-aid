@@ -42,7 +42,7 @@ __all__ = [
     "synthesize",
 ]
 
-MODES = ("none", "upload", "library", "auto")
+MODES = ("none", "upload", "library", "auto", "synth")
 AUDIO_SUFFIX = (".mp3", ".wav", ".m4a", ".aac", ".ogg", ".opus", ".flac")
 
 # Rotas de LLM na mesma ordem do resto do ecossistema (grátis → barato → reserva).
