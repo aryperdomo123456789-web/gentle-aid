@@ -208,7 +208,12 @@ def generate(
     use_ai: bool,
     mutation: str,
     manual_segments: list[dict[str, Any]] | None = None,
+    music_mode: str = "upload",
+    music_track: str | None = None,
+    beat_sync: bool = True,
+    beat_zoom: float = 0.05,
 ) -> dict[str, Any]:
+
     """Roda o pipeline inteiro e entrega todos os cortes do vídeo."""
     size = ASPECTS.get(aspect, ASPECTS["9:16"])
     workdir = config.tool_dir("clips") / job_id / "_work"
