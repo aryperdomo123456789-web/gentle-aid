@@ -9,7 +9,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from ..config import config
-from ..services import captions, clipper, highlights, ingest, jobs, transcribe
+from ..services import captions, clipper, highlights, ingest, jobs, soundtrack, transcribe
 from ..services.sterilizer import normalize_level
 from ..services.validation import (
     AUDIO_EXT,
@@ -35,7 +35,32 @@ def options():
         transcription_hint=None if transcribe.available() else transcribe.missing_key_message(),
         ai_ready=highlights.llm_available(),
         max_clips=highlights.MAX_CLIPS_HARD,
+        soundtrack=soundtrack.catalog(),
     )
+
+
+@bp.get("/tracks")
+def tracks():
+    """Biblioteca de trilhas do servidor (pasta `<storage>/trilhas`)."""
+    refresh = request.args.get("refresh") in ("1", "true", "on")
+    return jsonify(
+        tracks=[t.as_dict() for t in soundtrack.library(refresh=refresh)],
+        library_dir=str(soundtrack.library_dir()),
+        profiles=[p.as_dict() for p in soundtrack.PROFILES.values()],
+        ai_ready=soundtrack.catalog()["ai_ready"],
+    )
+
+
+@bp.get("/soundtrack/suggest")
+def suggest_track():
+    """Prévia da decisão da IA: qual perfil sonoro cai bem neste nicho/texto."""
+    niche = (request.args.get("niche") or "auto").strip()
+    if niche not in highlights.NICHE_IDS:
+        return jsonify(error="Nicho inválido."), 400
+    text = clean_text(request.args.get("texto"), max_length=4000, field="texto") or ""
+    profile = soundtrack.profile_for(niche, text)
+    candidates = [t.as_dict() for t in soundtrack.library()][:12]
+    return jsonify(profile=profile.as_dict(), candidates=candidates)
 
 
 @bp.post("/preview")
@@ -213,6 +238,8 @@ def run_job():
     music_volume = _float("music_volume", 0.12, 0.02, 0.6)
     voice_volume = _float("voice_volume", 1.0, 0.2, 2.0)
     max_clips = int(_float("max_clips", 0, 0, highlights.MAX_CLIPS_HARD))
+    beat_sync = request.form.get("beat_sync") not in ("0", "false", "off")
+    beat_zoom = _float("beat_zoom", 0.05, 0.0, 0.09)
     use_ai = request.form.get("use_ai") not in ("0", "false", "off")
 
     def task(jid: str):
@@ -236,6 +263,10 @@ def run_job():
             use_ai=use_ai,
             mutation=mutation,
             manual_segments=manual_segments or None,
+            music_mode=music_mode,
+            music_track=music_track,
+            beat_sync=beat_sync,
+            beat_zoom=beat_zoom,
         )
 
     jobs.submit(job_id, task)
