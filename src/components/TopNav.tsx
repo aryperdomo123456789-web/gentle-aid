@@ -43,12 +43,15 @@ export function TopNav() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 shadow-[0_1px_0_0_rgba(255,255,255,0.04)] backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4 md:gap-4 md:px-8">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
-          <Link to="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <Link
+            to="/"
+            className="group flex min-w-0 items-center gap-2 rounded-xl transition-opacity hover:opacity-90 sm:gap-3"
+          >
             <span
-              className="flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-primary-foreground"
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-transform duration-200 group-hover:scale-105"
               style={{ backgroundImage: "var(--gradient-viral)" }}
               aria-hidden="true"
             >
@@ -78,7 +81,7 @@ export function TopNav() {
               <Link
                 to="/conta"
                 aria-label="Conta"
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 active:scale-95"
               >
                 <UserCog className="size-4 shrink-0" aria-hidden="true" />
                 <span className="hidden sm:inline">Conta</span>
@@ -87,7 +90,7 @@ export function TopNav() {
                 type="button"
                 onClick={handleLogout}
                 aria-label="Sair"
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-destructive/50 hover:text-destructive"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1.5 text-xs font-semibold text-foreground transition-all duration-200 hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive active:scale-95"
               >
                 <LogOut className="size-4 shrink-0" aria-hidden="true" />
                 <span className="hidden sm:inline">Sair</span>
@@ -96,14 +99,17 @@ export function TopNav() {
           ) : null}
         </div>
 
-        <nav aria-label="Ferramentas" className="-mx-3 overflow-x-auto pb-1 sm:-mx-1 sm:overflow-visible">
-          <ul className="flex w-max items-center gap-2 px-3 sm:w-auto sm:flex-wrap sm:px-1">
+        <nav
+          aria-label="Ferramentas"
+          className="scroll-x -mx-3 overflow-x-auto pb-1 sm:-mx-1 sm:overflow-visible"
+        >
+          <ul className="flex w-max items-center gap-1.5 px-3 sm:w-auto sm:flex-wrap sm:px-1">
             {TOOLS.map(({ to, label, icon: Icon }) => (
               <li key={to} className="shrink-0">
                 <Link
                   to={to}
                   activeOptions={{ exact: to === "/" }}
-                  className="flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border/80 bg-surface/70 px-3.5 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground data-[status=active]:border-transparent data-[status=active]:bg-primary data-[status=active]:text-primary-foreground sm:px-4 sm:text-sm"
+                  className="flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border/70 bg-surface/60 px-3.5 py-2 text-[13px] font-medium text-muted-foreground transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 hover:text-foreground active:scale-[0.97] data-[status=active]:border-transparent data-[status=active]:bg-primary data-[status=active]:text-primary-foreground data-[status=active]:shadow-lg data-[status=active]:shadow-primary/25 sm:px-4 sm:text-sm"
                 >
                   <Icon className="size-4 shrink-0" aria-hidden="true" />
                   {label}
@@ -116,3 +122,4 @@ export function TopNav() {
     </header>
   );
 }
+
