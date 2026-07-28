@@ -533,6 +533,23 @@ function Cortes() {
                       preload="none"
                       className="mt-3 w-full rounded-lg border border-border/60 bg-black"
                     />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => reeditClip(clip)}
+                        className="rounded-lg border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+                      >
+                        Editar tempos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => reeditClip(clip, "16:9")}
+                        className="rounded-lg border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+                      >
+                        Refazer em 16:9
+                      </button>
+                    </div>
+
                   </li>
                 ))}
               </ul>
