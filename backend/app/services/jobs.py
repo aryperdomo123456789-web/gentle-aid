@@ -13,9 +13,12 @@ por aqui. O objetivo é ter **um único padrão** de:
 from __future__ import annotations
 
 import json
+import os
+import queue
+import socket
 import threading
+import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -27,10 +30,38 @@ _lock = threading.Lock()
 _audit_lock = threading.Lock()
 _jobs: dict[str, dict[str, Any]] = {}
 _cancel_events: dict[str, threading.Event] = {}
-_futures: dict[str, Any] = {}
-_executor = ThreadPoolExecutor(max_workers=config.max_workers)
+_done_events: dict[str, threading.Event] = {}
+
+# --- Execução de jobs longos -------------------------------------------------
+# Não usamos ThreadPoolExecutor: ele registra um hook de `atexit` que tenta
+# agendar/join threads durante o shutdown do interpretador. Em jobs longos de
+# voz/dublagem isso produzia justamente o erro
+# `cannot schedule new futures after interpreter shutdown` quando o Gunicorn
+# reciclava o worker no meio do processamento. Aqui a fila é nossa e as threads
+# são daemon: o shutdown nunca fica preso nem tenta agendar trabalho novo.
+_queue: "queue.Queue[tuple[str, Callable[[str], None]]]" = queue.Queue()
+_pool_lock = threading.Lock()
+_pool_started = False
+_shutting_down = threading.Event()
+
+_PID = os.getpid()
+try:
+    _HOST = socket.gethostname()
+except OSError:  # pragma: no cover
+    _HOST = "desconhecido"
+
+# Batimento do job em disco. Se o processo morrer (deploy, restart, crash,
+# reciclagem do Gunicorn), o batimento para e o job é declarado interrompido
+# em vez de ficar "processando" para sempre na Central de Jobs.
+HEARTBEAT_SECONDS = int(os.environ.get("VIRAL_JOB_HEARTBEAT", "15"))
+STALE_AFTER_SECONDS = int(os.environ.get("VIRAL_JOB_STALE_SECONDS", "180"))
+INTERRUPTED_MESSAGE = (
+    "Job interrompido: o processo que executava a tarefa foi encerrado "
+    "(deploy, restart ou reciclagem do worker). Reenvie o job."
+)
 
 TERMINAL_STATUSES = {"done", "error", "cancelled"}
+
 
 TOOL_LABELS = {
     "youtube": "Desvio YouTube",
