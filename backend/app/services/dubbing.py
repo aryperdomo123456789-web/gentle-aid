@@ -161,6 +161,7 @@ def translate(segments: list[Segment], target: str, job_id: str) -> list[Segment
     batch = 40
     failures = 0
     for start in range(0, len(segments), batch):
+        jobs.check_cancelled(job_id)
         window = segments[start : start + batch]
         payload = [{"i": i, "t": seg.text} for i, seg in enumerate(window)]
         prompt = (
@@ -305,6 +306,7 @@ def build_track(
     cursor = 0.0
     try:
         for index, seg in enumerate(segments, start=1):
+            jobs.check_cancelled(job_id)
             text = _clean(seg.text)
             if not text:
                 continue
