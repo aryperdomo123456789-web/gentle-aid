@@ -10,8 +10,11 @@ worker_class = "gthread"
 timeout = 3600
 graceful_timeout = 60
 keepalive = 15
-max_requests = 200
-max_requests_jitter = 40
+# Jobs de voz/dublagem podem durar muitos minutos. Se o worker recicla por
+# contagem de requests, o interpretador entra em shutdown e quebra tarefas em
+# andamento. Desligamos o recycle automático para não matar jobs longos.
+max_requests = 0
+max_requests_jitter = 0
 accesslog = "-"
 errorlog = "-"
 loglevel = os.environ.get("LOG_LEVEL", "info")
