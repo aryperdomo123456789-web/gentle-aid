@@ -729,6 +729,35 @@ def _concat(parts: list[Path], dst: Path, job_id: str) -> Path:
     return dst
 
 
+# Quantos clipes entram em uma passada de concat. Vídeo de 3 h vira centenas de
+# blocos: colar tudo de uma vez estoura descritor de arquivo e listing gigante.
+CONCAT_BATCH = 60
+
+
+def _concat_batched(parts: list[Path], dst: Path, workdir: Path, job_id: str) -> Path:
+    """Cola em lotes e depois cola os lotes — escala para centenas de blocos."""
+    if len(parts) <= CONCAT_BATCH:
+        return _concat(parts, dst, job_id)
+
+    stage_dir = workdir / "concat_stage"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    groups: list[Path] = []
+    try:
+        for index in range(0, len(parts), CONCAT_BATCH):
+            jobs.check_cancelled(job_id)
+            chunk = parts[index : index + CONCAT_BATCH]
+            group = stage_dir / f"group_{index // CONCAT_BATCH:03d}.mp4"
+            _concat(chunk, group, job_id)
+            groups.append(group)
+            jobs.log(job_id, f"Montagem parcial {len(groups)} · {min(index + CONCAT_BATCH, len(parts))}/{len(parts)} blocos.")
+        return _concat(groups, dst, job_id)
+    finally:
+        for group in groups:
+            group.unlink(missing_ok=True)
+        sweep(stage_dir)
+
+
+
 def narrate_and_assemble(
     src: Path,
     beats: list[Beat],
