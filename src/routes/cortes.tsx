@@ -404,6 +404,11 @@ function Cortes() {
                 {manualError ? (
                   <p className="text-[11px] text-destructive">{manualError}</p>
                 ) : null}
+                {options?.transcription === false && captionPreset !== "none" ? (
+                  <p className="text-[11px] text-warning">
+                    Sem chave de transcrição: escolha “Sem legenda” para rodar os cortes manuais mesmo assim.
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
