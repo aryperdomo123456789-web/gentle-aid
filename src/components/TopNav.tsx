@@ -11,7 +11,6 @@ import {
   UserCog,
   LogOut,
   Shield,
-  FlaskConical,
   Clapperboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -30,9 +29,6 @@ export const TOOLS: Tool[] = [
   { to: "/radar", label: "Radar Global", icon: Radar },
   { to: "/historico", label: "Central de Jobs", icon: History },
   { to: "/apis", label: "Central de APIs", icon: KeyRound },
-  { to: "/lab", label: "Laboratório de APIs", icon: FlaskConical },
-  { to: "/lab-legenda", label: "Lab de Legendas", icon: Captions },
-
 ];
 
 export function TopNav() {
