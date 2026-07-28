@@ -236,11 +236,17 @@ def generate(
 
         if provider:
             jobs.log(job_id, f"Curadoria por IA via {provider}.")
-        else:
+        elif use_ai:
             jobs.log(job_id, "Curadoria por IA indisponível — mantendo ranking heurístico.", level="warn")
 
     jobs.update(job_id, clips_planned=len(clips), ai_provider=provider)
-    jobs.log(job_id, f"{len(clips)} corte(s) selecionado(s) no nicho '{niche_id}'.")
+    jobs.log(
+        job_id,
+        f"{len(clips)} corte(s) manuais na régua."
+        if manual
+        else f"{len(clips)} corte(s) selecionado(s) no nicho '{niche_id}'.",
+    )
+
 
     width, height = size if size else (1080, 1920)
     delivered: list[dict[str, Any]] = []
