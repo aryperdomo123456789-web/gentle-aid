@@ -48,7 +48,7 @@ FORMATS: dict[str, dict[str, Any]] = {
         "width": 1080,
         "height": 1920,
         "min_seconds": 45,
-        "max_seconds": 240,
+        "max_seconds": 600,
         "default_seconds": 120,
         "frame_mode": "crop",
     },
@@ -59,7 +59,7 @@ FORMATS: dict[str, dict[str, Any]] = {
         "width": 1920,
         "height": 1080,
         "min_seconds": 300,
-        "max_seconds": 1800,
+        "max_seconds": 3600,
         "default_seconds": 720,
         "frame_mode": "pad",
     },
@@ -68,10 +68,16 @@ FORMATS: dict[str, dict[str, Any]] = {
 # Palavras faladas por segundo (PT-BR de narração) — mesma régua do Doutor de Roteiro.
 WORDS_PER_SECOND = 2.6
 
+# Teto de blocos por recap e quantos blocos cada chamada de LLM escreve por vez.
+# Janelas pequenas = resposta curta, JSON íntegro e nada de timeout em recap longo.
+BEATS_HARD_CAP = 420
+BEATS_PER_LLM_CALL = 22
+
 # Quantos frames amostrar por minuto de vídeo, com teto para não estourar custo.
 FRAMES_PER_MINUTE = 2
 MAX_FRAMES = 36
 MIN_BEAT_SECONDS = 2.0
+
 
 
 class RecapError(RuntimeError):
