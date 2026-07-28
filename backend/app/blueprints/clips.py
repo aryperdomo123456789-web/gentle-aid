@@ -249,11 +249,9 @@ def run_job():
     if music_mode == "upload" and not music:
         music_mode = "none"
 
-    try:
-        pass
-    except ValidationError as exc:
-        jobs.fail(job_id, str(exc))
-        return jsonify(error=str(exc)), 400
+    jobs.update(job_id, music_mode=music_mode)
+
+
 
     language = (request.form.get("language") or "").strip() or None
     words_per_line = int(_float("words_per_line", 4, 1, 8))
