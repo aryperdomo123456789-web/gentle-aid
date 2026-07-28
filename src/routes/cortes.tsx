@@ -98,6 +98,7 @@ function Cortes() {
   const [manualOn, setManualOn] = useState(false);
   const [segments, setSegments] = useState<ManualSegment[]>([]);
   const [manualError, setManualError] = useState<string | null>(null);
+  const [captionPreset, setCaptionPreset] = useState("hormozi");
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -411,7 +412,7 @@ function Cortes() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
             <Field label="Estilo da legenda">
               {(id) => (
-                <SelectInput id={id} name="caption_preset" defaultValue="hormozi">
+                <SelectInput id={id} name="caption_preset" defaultValue="hormozi" onChange={(e) => setCaptionPreset(e.target.value)}>
                   {(options?.presets ?? []).map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.label}
@@ -483,7 +484,7 @@ function Cortes() {
 
           <JobSettingsGuard
             busy={busy}
-            disabled={(!hasFile && !card) || options?.transcription === false}
+            disabled={(!hasFile && !card) || (options?.transcription === false && !manualOn)}
             label="Gerar cortes"
             busyLabel="Cortando…"
           />
