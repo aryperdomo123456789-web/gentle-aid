@@ -27,12 +27,12 @@ ASPECTS: dict[str, tuple[int, int] | None] = {
     "16:9": (1920, 1080),
     "original": None,
 }
-FRAMES = ("crop", "blur")
+FRAMES = ("crop", "blur", "pad")
 FPS = 30
 
 
 def _video_filter(width: int, height: int, frame: str) -> str:
-    """Reenquadramento: corte central seco ou fundo desfocado (estilo TikTok)."""
+    """Reenquadramento: corte central, fundo desfocado (TikTok) ou barras pretas."""
     if frame == "blur":
         return (
             f"[0:v]split=2[bg][fg];"
@@ -41,10 +41,17 @@ def _video_filter(width: int, height: int, frame: str) -> str:
             f"[fg]scale={width}:{height}:force_original_aspect_ratio=decrease[fgs];"
             f"[bgb][fgs]overlay=(W-w)/2:(H-h)/2,fps={FPS},format=yuv420p[v]"
         )
+    if frame == "pad":
+        return (
+            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"setsar=1,fps={FPS},format=yuv420p[v]"
+        )
     return (
         f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height},fps={FPS},format=yuv420p[v]"
+        f"crop={width}:{height},setsar=1,fps={FPS},format=yuv420p[v]"
     )
+
 
 
 def _cut(
