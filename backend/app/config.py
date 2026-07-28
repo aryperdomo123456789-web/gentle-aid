@@ -74,12 +74,13 @@ class Config:
             "legendar": "_legenda_jobs",
             "voice": "_voice_jobs",
             "canva": "_canva_jobs",
+            "studio": "_studio_jobs",
         }
         return self.storage_dir / mapping.get(tool, "_misc_jobs")
 
     def ensure_dirs(self) -> None:
         dirs = [self.storage_dir, self.config_dir, self.uploads_dir, self.jobs_dir]
-        dirs += [self.tool_dir(t) for t in ("youtube", "tiktok", "legendar", "voice", "canva")]
+        dirs += [self.tool_dir(t) for t in ("youtube", "tiktok", "legendar", "voice", "canva", "studio")]
         for d in dirs:
             d.mkdir(parents=True, exist_ok=True)
 
