@@ -202,11 +202,105 @@
   backdrop-filter: blur(8px);
 }
 
+/* Cartão elevável: usado em grades de itens clicáveis */
+@utility card-lift {
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+  &:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklab, var(--primary) 45%, transparent);
+    box-shadow: var(--shadow-glow);
+  }
+}
+
+/* Superfície interna padrão (logs, blocos de leitura) */
+@utility inset-surface {
+  background-color: color-mix(in oklab, var(--background) 70%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+}
+
 @utility text-gradient-viral {
   background-image: var(--gradient-viral);
   background-clip: text;
   color: transparent;
 }
+
+@utility hairline-top {
+  background-image: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in oklab, var(--primary) 60%, transparent),
+    color-mix(in oklab, var(--electric) 60%, transparent),
+    transparent
+  );
+}
+
+@layer base {
+  /* Foco visível consistente e acessível em todo o sistema */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--primary) 80%, transparent);
+    outline-offset: 2px;
+    border-radius: var(--radius-md);
+  }
+
+  :where(button, a, [role="button"]) {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 45%, transparent);
+    color: var(--foreground);
+  }
+
+  /* Barras de rolagem discretas e alinhadas ao tema escuro */
+  * {
+    scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent;
+    scrollbar-width: thin;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--foreground) 16%, transparent);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--primary) 55%, transparent);
+    background-clip: content-box;
+  }
+}
+
+/* Entrada suave de conteúdo (painéis, resultados, listas) */
+@keyframes surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.surface-in {
+  animation: surface-in 0.28s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface-in {
+    animation: none;
+  }
+}
+
 
 /* Galeria de presets do Estúdio de Legendas — pulso da palavra ativa */
 @keyframes caption-demo-pulse {
