@@ -12,6 +12,7 @@ import {
   LogOut,
   Shield,
   FlaskConical,
+  Clapperboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -21,6 +22,7 @@ type Tool = { to: string; label: string; icon: LucideIcon };
 
 export const TOOLS: Tool[] = [
   { to: "/", label: "Desvio YouTube", icon: Download },
+  { to: "/estudio", label: "Estúdio de Vídeo IA", icon: Clapperboard },
   { to: "/tiktok", label: "Painel TikTok", icon: Music2 },
   { to: "/legendar", label: "Legendar", icon: Captions },
   { to: "/voice-conversion", label: "Voz V2V", icon: AudioLines },

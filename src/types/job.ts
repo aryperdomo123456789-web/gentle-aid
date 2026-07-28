@@ -4,7 +4,7 @@
 export type JobStatus = "queued" | "running" | "done" | "error" | "cancelled";
 
 /** Ferramentas do ecossistema que geram jobs. */
-export type ToolId = "youtube" | "tiktok" | "legendar" | "voice" | "canva";
+export type ToolId = "youtube" | "tiktok" | "legendar" | "voice" | "canva" | "studio";
 
 /** Relatório de esterilização devolvido pelo backend. */
 export type SterilizationReport = {

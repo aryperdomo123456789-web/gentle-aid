@@ -38,6 +38,7 @@ TOOL_LABELS = {
     "legendar": "Legendas",
     "voice": "Voz V2V",
     "canva": "Limpeza Canva",
+    "studio": "Estúdio de Vídeo IA",
 }
 
 MAX_EVENTS = 600
