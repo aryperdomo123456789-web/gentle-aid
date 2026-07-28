@@ -108,11 +108,23 @@ def run_job():
         return jsonify(error="Nível de mutação inválido."), 400
     if mutation is None:
         mutation = "media"
-    if not transcribe.available():
+
+    try:
+        manual_segments = _parse_segments(request.form.get("segments"))
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+
+    caption_preset: str | None = None
+    if preset_raw and preset_raw != "none":
+        caption_preset = captions.resolve_preset(preset_raw)["id"]
+
+    # Modo manual sem legenda dispensa transcrição — corta direto na régua.
+    if (not manual_segments or caption_preset) and not transcribe.available():
         return jsonify(error=transcribe.missing_key_message()), 400
 
     min_seconds = _float("min_seconds", 60, 8, 1200)
     max_seconds = _float("max_seconds", 180, 12, 1800)
+
     if max_seconds <= min_seconds:
         max_seconds = min_seconds + 15
 
