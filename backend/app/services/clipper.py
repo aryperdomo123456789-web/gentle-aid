@@ -455,5 +455,9 @@ def generate(
             f"{len(delivered)} corte(s) prontos e esterilizados. "
             f"Destaque: “{best_entry['title']}” ({best_entry['seconds']:.0f}s)."
         ),
-        extra={"clips": delivered, "clips_total": len(delivered)},
+        extra={
+            "clips": delivered,
+            "clips_total": len(delivered),
+            "soundtrack": track.as_dict() if track else None,
+        },
     )
