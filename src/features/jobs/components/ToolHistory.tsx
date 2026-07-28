@@ -127,7 +127,7 @@ export function ToolHistory({
       ) : null}
 
       {!error && jobs.length === 0 && !loading ? (
-        <p className="rounded-xl border border-border bg-background/40 p-6 text-center text-sm text-muted-foreground">
+        <p className="surface-in rounded-xl border border-dashed border-border bg-background/40 p-8 text-center text-sm text-muted-foreground">
           Nenhum vídeo processado por esta ferramenta ainda.
         </p>
       ) : null}
@@ -136,11 +136,13 @@ export function ToolHistory({
         {jobs.map((job) => (
           <li
             key={job.job_id}
-            className="min-w-0 rounded-xl border border-border bg-background/40 px-3 py-3 sm:px-4"
+            className="card-lift surface-in min-w-0 rounded-xl border border-border bg-background/40 px-3 py-3 sm:px-4"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
-                <p className="break-words text-sm font-medium sm:truncate">{job.filename ?? job.job_id}</p>
+                <p className="break-words text-sm font-medium sm:truncate">
+                  {job.filename ?? job.job_id}
+                </p>
                 <p className="break-words text-xs text-muted-foreground sm:truncate">
                   {formatDateTime(job.created_at)} · {formatBytes(job.size_bytes)}
                   {job.md5_after ? (
@@ -177,7 +179,7 @@ export function ToolHistory({
                     type="button"
                     onClick={() => setDialog({ job, kind: "cancel" })}
                     disabled={busyJobId === job.job_id}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold transition-all duration-200 hover:border-primary/50 hover:text-foreground active:scale-95 disabled:opacity-50"
                   >
                     <StopCircle className="size-3.5" aria-hidden="true" />
                     Cancelar
@@ -187,7 +189,7 @@ export function ToolHistory({
                   type="button"
                   onClick={() => setPreview(job)}
                   disabled={!hasPreview(job)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold transition-all duration-200 hover:border-primary/50 hover:text-foreground active:scale-95 disabled:opacity-50"
                 >
                   <Eye className="size-3.5" aria-hidden="true" />
                   Assistir
@@ -195,7 +197,7 @@ export function ToolHistory({
                 <Link
                   to="/historico/$jobId"
                   params={{ jobId: job.job_id }}
-                  className="rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50"
+                  className="rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold transition-all duration-200 hover:border-primary/50 hover:text-foreground active:scale-95"
                 >
                   Detalhes
                 </Link>

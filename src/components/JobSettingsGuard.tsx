@@ -67,8 +67,6 @@ function readForm(form: HTMLFormElement): Entry[] {
   const out: Entry[] = [];
   const seen = new Set<string>();
 
-
-
   for (const el of Array.from(form.elements)) {
     const field = el as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
     const name = field.name ?? "";
@@ -118,7 +116,6 @@ function readForm(form: HTMLFormElement): Entry[] {
       return entry;
     });
 }
-
 
 type Props = {
   busy: boolean;
@@ -201,10 +198,13 @@ export function JobSettingsGuard({
 
   const locked = !saved || stale;
 
-
   return (
     <div ref={anchor} className="@container space-y-3">
-      <div className="rounded-xl border border-border bg-background/40 p-3 @md:p-4">
+      <div
+        className={`rounded-xl border p-3 transition-colors duration-300 @md:p-4 ${
+          locked ? "border-amber-400/30 bg-amber-400/[0.04]" : "border-success/35 bg-success/[0.06]"
+        }`}
+      >
         <div className="flex flex-col gap-3 @md:flex-row @md:items-center @md:justify-between">
           <div className="flex items-start gap-2">
             {locked ? (
@@ -232,7 +232,7 @@ export function JobSettingsGuard({
             type="button"
             onClick={save}
             disabled={busy}
-            className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-4 py-2 @md:w-auto text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-4 py-2 @md:w-auto text-sm font-semibold text-secondary-foreground transition-all duration-200 hover:border-primary/40 hover:bg-secondary/80 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Lock className="size-4" aria-hidden="true" />
             {saved && !stale ? "Configurações salvas" : "Salvar configurações"}
@@ -240,7 +240,7 @@ export function JobSettingsGuard({
         </div>
 
         {saved && saved.length > 0 ? (
-          <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-border pt-3 text-xs @xl:grid-cols-2">
+          <dl className="surface-in mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-border pt-3 text-xs @xl:grid-cols-2">
             {saved.map((entry) => (
               <div key={entry.name} className="flex min-w-0 items-baseline justify-between gap-3">
                 <dt className="shrink-0 text-muted-foreground">{entry.label}</dt>
@@ -258,11 +258,10 @@ export function JobSettingsGuard({
         onClick={manual ? onStart : undefined}
         disabled={busy || disabled || locked}
         title={locked ? "Salve as configurações antes de iniciar" : undefined}
-
-        className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-center text-sm font-semibold shadow-lg shadow-primary/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none ${
           variant === "electric"
-            ? "bg-electric text-electric-foreground hover:opacity-90"
-            : "text-primary-foreground hover:opacity-90"
+            ? "bg-electric text-electric-foreground"
+            : "text-primary-foreground"
         }`}
         style={variant === "primary" ? { backgroundImage: "var(--gradient-viral)" } : undefined}
       >

@@ -134,7 +134,9 @@ function Historico() {
       <main className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-4 sm:py-8 md:px-8">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">Central de Histórico</h1>
+            <h1 className="text-2xl font-bold leading-tight sm:text-3xl md:text-4xl">
+              Central de Histórico
+            </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               Todos os jobs executados no servidor, com status de hash, metadados sanitizados e
               links de download servidos pelo Nginx.
@@ -144,7 +146,7 @@ function Historico() {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-4 py-2 text-sm font-medium disabled:opacity-60"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/70 px-4 py-2 text-sm font-medium transition-all duration-200 hover:border-primary/50 active:scale-95 disabled:opacity-60"
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
             Atualizar
@@ -199,10 +201,9 @@ function Historico() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por id, arquivo ou origem…"
             aria-label="Buscar jobs"
-            className="min-h-10 w-full rounded-full border border-border bg-surface/60 px-4 text-xs outline-none focus:border-primary/60 sm:w-72"
+            className="min-h-10 w-full rounded-full border border-border bg-surface/60 px-4 text-xs outline-none transition-colors duration-200 hover:border-border/80 focus:border-primary/60 sm:w-72"
           />
         </div>
-
 
         {error ? (
           <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
@@ -249,7 +250,7 @@ function Historico() {
                       type="button"
                       onClick={() => setDialog({ job, kind: "cancel" })}
                       disabled={busyJobId === job.job_id}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold transition-all duration-200 hover:border-primary/50 hover:text-foreground active:scale-95 disabled:opacity-50"
                     >
                       <StopCircle className="size-3.5" aria-hidden="true" />
                       Cancelar
