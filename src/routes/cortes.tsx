@@ -8,7 +8,7 @@ import { MutationSelect } from "@/components/MutationSelect";
 import { ToolShell } from "@/components/ToolShell";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
-import { fetchClipOptions, type ClipOptions, type ClipResult } from "@/features/clips/api";
+import { fetchClipOptions, type ClipOptions, type ClipResult, type ClipTrack } from "@/features/clips/api";
 import { useJobRunner } from "@/hooks/use-job-runner";
 import { apiPostForm, downloadUrl, friendlyError, type Job } from "@/lib/api";
 
@@ -198,6 +198,9 @@ function Cortes() {
   const clips = ((job?.meta as Record<string, unknown> | undefined)?.clips ??
     (job as unknown as { clips?: ClipResult[] })?.clips ??
     []) as ClipResult[];
+
+  const trackInfo = (((job?.meta as Record<string, unknown> | undefined)?.soundtrack ??
+    (job as unknown as { soundtrack?: ClipTrack })?.soundtrack) ?? null) as ClipTrack | null;
 
   return (
     <ToolShell
