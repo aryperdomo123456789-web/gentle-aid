@@ -365,11 +365,20 @@ def generate(
             frame=frame,
             voice_volume=voice_volume,
             job_id=job_id,
+            pulse_bpm=track.bpm if (track and beat_sync) else 0.0,
+            pulse_intensity=beat_zoom if (track and beat_sync) else 0.0,
         )
 
-        if music and music.exists():
+        if track and track.path.exists():
             mixed = workdir / f"corte_{position:02d}_trilha.mp4"
-            _mix_music(raw, music, mixed, volume=music_volume, job_id=job_id)
+            _mix_music(
+                raw,
+                track.path,
+                mixed,
+                volume=music_volume,
+                job_id=job_id,
+                offset=track.offset if beat_sync else 0.0,
+            )
             raw.unlink(missing_ok=True)
             raw = mixed
 
@@ -379,7 +388,12 @@ def generate(
                 _local_segments(segments, float(clip["start"]), float(clip["end"])),
                 max_words=words_per_line,
             )
+            # Palavra na batida: a legenda estoura junto com o kick da trilha.
+            if lines and track and beat_sync and track.bpm > 0:
+                grid = beatsync.beats_from_bpm(track.bpm, seconds)
+                lines = beatsync.snap_lines(lines, grid, tolerance=0.16)
             if lines:
+
                 ass_path = output_path("clips", job_id, f"_corte{position:02d}.ass")
                 ass_path.write_text(
                     captions.build_ass(
