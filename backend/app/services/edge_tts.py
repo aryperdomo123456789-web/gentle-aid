@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from pathlib import Path
 
 from ..config import config
@@ -111,7 +112,7 @@ def list_voices(locale_prefixes: tuple[str, ...] = LOCALE_PREFIXES) -> list[dict
     if module is None:
         return list(FALLBACK_VOICES)
     try:
-        raw = asyncio.run(module.list_voices())
+        raw = _run_async(module.list_voices())
     except Exception:  # noqa: BLE001 - rede/API instável não pode derrubar o catálogo
         return list(FALLBACK_VOICES)
 
@@ -157,11 +158,37 @@ def split_text(text: str, limit: int = TEXT_CHUNK) -> list[str]:
     return [c for c in chunks if c]
 
 
+def _run_async(coro):
+    """Executa a corrotina em um loop próprio, sem depender do `asyncio.run`.
+
+    `asyncio.run` cria executores auxiliares que, durante o shutdown do
+    interpretador (reciclagem/restart do worker do Gunicorn), estouram
+    `cannot schedule new futures after interpreter shutdown` e derrubam jobs
+    longos de voz. Aqui o loop é criado, usado e fechado explicitamente na
+    própria thread do job.
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+    finally:
+        try:
+            loop.close()
+        finally:
+            asyncio.set_event_loop(None)
+
+
 async def _synth_one(text: str, voice: str, rate: str, dst_mp3: Path) -> None:
     module = _module()
     assert module is not None
     communicate = module.Communicate(text, voice, rate=rate)
     await communicate.save(str(dst_mp3))
+
+
+# Roteiros longos derrubam a conexão do Edge TTS de vez em quando; o bloco é
+# refeito em vez de matar o job inteiro.
+SYNTH_ATTEMPTS = 3
+
 
 
 def synthesize(
@@ -191,14 +218,33 @@ def synthesize(
     parts: list[Path] = []
     try:
         for index, chunk in enumerate(chunks, start=1):
+            jobs.check_cancelled(job_id)
             mp3 = workdir / f"edge_{index:04d}.mp3"
             wav = workdir / f"edge_{index:04d}.wav"
-            try:
-                asyncio.run(_synth_one(chunk, voice, rate, mp3))
-            except Exception as exc:  # noqa: BLE001 - erro de rede/voz inválida
-                raise EdgeTTSError(f"Falha no motor gratuito ao narrar o bloco {index}: {exc}") from exc
-            if not mp3.exists() or mp3.stat().st_size == 0:
-                raise EdgeTTSError(f"O motor gratuito devolveu áudio vazio no bloco {index}.")
+            last_error: Exception | None = None
+            for attempt in range(1, SYNTH_ATTEMPTS + 1):
+                try:
+                    mp3.unlink(missing_ok=True)
+                    _run_async(_synth_one(chunk, voice, rate, mp3))
+                    if not mp3.exists() or mp3.stat().st_size == 0:
+                        raise EdgeTTSError("áudio vazio devolvido pelo provedor")
+                    last_error = None
+                    break
+                except Exception as exc:  # noqa: BLE001 - erro de rede/voz inválida
+                    last_error = exc
+                    if attempt < SYNTH_ATTEMPTS:
+                        jobs.log(
+                            job_id,
+                            f"Bloco {index}: tentativa {attempt} falhou ({exc}). Refazendo…",
+                            level="warn",
+                        )
+                        time.sleep(1.5 * attempt)
+            if last_error is not None:
+                raise EdgeTTSError(
+                    f"Falha no motor gratuito ao narrar o bloco {index} "
+                    f"após {SYNTH_ATTEMPTS} tentativas: {last_error}"
+                ) from last_error
+
             media.run(
                 [
                     config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",

@@ -13,9 +13,12 @@ por aqui. O objetivo é ter **um único padrão** de:
 from __future__ import annotations
 
 import json
+import os
+import queue
+import socket
 import threading
+import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -27,10 +30,38 @@ _lock = threading.Lock()
 _audit_lock = threading.Lock()
 _jobs: dict[str, dict[str, Any]] = {}
 _cancel_events: dict[str, threading.Event] = {}
-_futures: dict[str, Any] = {}
-_executor = ThreadPoolExecutor(max_workers=config.max_workers)
+_done_events: dict[str, threading.Event] = {}
+
+# --- Execução de jobs longos -------------------------------------------------
+# Não usamos ThreadPoolExecutor: ele registra um hook de `atexit` que tenta
+# agendar/join threads durante o shutdown do interpretador. Em jobs longos de
+# voz/dublagem isso produzia justamente o erro
+# `cannot schedule new futures after interpreter shutdown` quando o Gunicorn
+# reciclava o worker no meio do processamento. Aqui a fila é nossa e as threads
+# são daemon: o shutdown nunca fica preso nem tenta agendar trabalho novo.
+_queue: "queue.Queue[tuple[str, Callable[[str], None]]]" = queue.Queue()
+_pool_lock = threading.Lock()
+_pool_started = False
+_shutting_down = threading.Event()
+
+_PID = os.getpid()
+try:
+    _HOST = socket.gethostname()
+except OSError:  # pragma: no cover
+    _HOST = "desconhecido"
+
+# Batimento do job em disco. Se o processo morrer (deploy, restart, crash,
+# reciclagem do Gunicorn), o batimento para e o job é declarado interrompido
+# em vez de ficar "processando" para sempre na Central de Jobs.
+HEARTBEAT_SECONDS = int(os.environ.get("VIRAL_JOB_HEARTBEAT", "15"))
+STALE_AFTER_SECONDS = int(os.environ.get("VIRAL_JOB_STALE_SECONDS", "180"))
+INTERRUPTED_MESSAGE = (
+    "Job interrompido: o processo que executava a tarefa foi encerrado "
+    "(deploy, restart ou reciclagem do worker). Reenvie o job."
+)
 
 TERMINAL_STATUSES = {"done", "error", "cancelled"}
+
 
 TOOL_LABELS = {
     "youtube": "Desvio YouTube",
@@ -62,8 +93,14 @@ def _job_file(job_id: str) -> Path:
     return config.jobs_dir / f"{job_id}.json"
 
 
+def _cancel_file(job_id: str) -> Path:
+    """Sinal de cancelamento em disco — funciona entre workers do Gunicorn."""
+    return config.jobs_dir / f"{job_id}.cancel"
+
+
 def _audit_file() -> Path:
     return config.jobs_dir / "_audit.log"
+
 
 
 def _parse_iso(value: Any) -> datetime | None:
@@ -96,10 +133,121 @@ def _normalize(job: dict[str, Any]) -> dict[str, Any]:
     job.setdefault("meta", {})
     job.setdefault("progress", 0)
     job.setdefault("updated_at", job.get("finished_at") or job.get("created_at"))
+    job.setdefault("heartbeat_at", None)
+    job.setdefault("owner_pid", None)
+    job.setdefault("owner_host", None)
     job["tool_label"] = tool_label(job.get("tool") or "")
     job["duration_ms"] = _duration_ms(job)
     job["terminal"] = job.get("status") in TERMINAL_STATUSES
     return job
+
+
+# --- Detecção de job órfão (processo morreu no meio) -------------------------
+
+
+def _pid_alive(pid: Any) -> bool:
+    try:
+        os.kill(int(pid), 0)
+    except (TypeError, ValueError):
+        return False
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _is_orphan(job: dict[str, Any]) -> bool:
+    """Job não-terminal cujo processo dono não bate mais o coração."""
+    if job.get("status") in TERMINAL_STATUSES:
+        return False
+    owner_pid = job.get("owner_pid")
+    owner_host = job.get("owner_host")
+    if owner_host == _HOST and owner_pid == _PID:
+        return False  # é nosso: está vivo por definição
+    if owner_host == _HOST and owner_pid and _pid_alive(owner_pid):
+        return False  # outro worker do Gunicorn, ainda vivo
+    beat = _parse_iso(job.get("heartbeat_at")) or _parse_iso(job.get("updated_at"))
+    if not beat:
+        beat = _parse_iso(job.get("created_at"))
+    if not beat:
+        return False
+    age = (datetime.now(timezone.utc) - beat).total_seconds()
+    return age > STALE_AFTER_SECONDS
+
+
+def _write_job_file(job: dict[str, Any]) -> None:
+    try:
+        config.jobs_dir.mkdir(parents=True, exist_ok=True)
+        _job_file(job["job_id"]).write_text(
+            json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except (OSError, KeyError):
+        return
+
+
+def _heal(job: dict[str, Any]) -> dict[str, Any]:
+    """Converte job órfão em falha explícita — nunca deixa 'processando' eterno."""
+    if not _is_orphan(job):
+        return job
+    job["status"] = "error"
+    job["stage"] = "interrompido"
+    job["message"] = INTERRUPTED_MESSAGE
+    job["finished_at"] = job.get("finished_at") or _now()
+    job["updated_at"] = _now()
+    job["terminal"] = True
+    events = list(job.get("events") or [])
+    events.append(
+        {"ts": _now(), "level": "error", "stage": "interrompido", "message": INTERRUPTED_MESSAGE}
+    )
+    job["events"] = events[-MAX_EVENTS:]
+    lines = list(job.get("log") or [])
+    lines.append(f"[{_now()[11:19]}] ERROR     interrompido · {INTERRUPTED_MESSAGE}")
+    job["log"] = lines[-MAX_LOG_LINES:]
+    _write_job_file(job)
+    with _lock:
+        _jobs.pop(job["job_id"], None)
+    audit("interrupted", job.get("job_id") or "", job.get("tool") or "", "processo dono encerrado")
+    return job
+
+
+def reconcile_orphans() -> int:
+    """Roda no boot: fecha jobs que ficaram presos em `running` após restart."""
+    healed = 0
+    try:
+        files = list(config.jobs_dir.glob("*.json"))
+    except OSError:
+        return 0
+    for file in files:
+        try:
+            data = json.loads(file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not isinstance(data, dict) or not data.get("job_id"):
+            continue
+        data = _normalize(data)
+        if data.get("status") in TERMINAL_STATUSES:
+            continue
+        # No boot, qualquer job não-terminal sem dono vivo é órfão — mesmo recente.
+        owner_pid = data.get("owner_pid")
+        if data.get("owner_host") == _HOST and owner_pid and _pid_alive(owner_pid):
+            continue
+        data["heartbeat_at"] = data.get("heartbeat_at") or data.get("updated_at")
+        data["owner_pid"] = None
+        data["owner_host"] = None
+        data["status"] = "error"
+        data["stage"] = "interrompido"
+        data["message"] = INTERRUPTED_MESSAGE
+        data["finished_at"] = data.get("finished_at") or _now()
+        data["updated_at"] = _now()
+        data["terminal"] = True
+        _write_job_file(data)
+        audit("interrupted", data["job_id"], data.get("tool") or "", "reconciliação de boot")
+        healed += 1
+    return healed
+
 
 
 # --- Trilha de auditoria append-only ----------------------------------------
@@ -209,7 +357,9 @@ def _event(job_id: str, level: str, message: str, stage: str | None = None) -> N
         lines.append(f"[{clock}] {level.upper():<9} {current_stage} · {message}")
         job["log"] = lines[-MAX_LOG_LINES:]
         job["updated_at"] = ts
-    persist(job_id)
+    # Log é gravado com throttle: status/progresso usam `update()`, que grava na hora.
+    persist(job_id, throttle=level == "info")
+
 
 
 def log(job_id: str, line: str, level: str = "info", stage: str | None = None) -> None:
@@ -280,8 +430,26 @@ def cancel_event(job_id: str) -> threading.Event:
         return event
 
 
+_cancel_cache: dict[str, tuple[float, bool]] = {}
+_CANCEL_TTL = 1.0
+
+
 def is_cancelled(job_id: str) -> bool:
-    return cancel_event(job_id).is_set()
+    """Vale para o processo atual **e** para cancelamentos vindos de outro worker."""
+    if cancel_event(job_id).is_set():
+        return True
+    now = time.monotonic()
+    cached = _cancel_cache.get(job_id)
+    if cached and now - cached[0] < _CANCEL_TTL:
+        return cached[1]
+    try:
+        flagged = _cancel_file(job_id).exists()
+    except OSError:
+        flagged = False
+    _cancel_cache[job_id] = (now, flagged)
+    if flagged:
+        cancel_event(job_id).set()
+    return flagged
 
 
 def check_cancelled(job_id: str) -> None:
@@ -296,6 +464,12 @@ def request_cancel(job_id: str) -> dict[str, Any] | None:
         return None
 
     cancel_event(job_id).set()
+    _cancel_cache[job_id] = (time.monotonic(), True)
+    try:
+        config.jobs_dir.mkdir(parents=True, exist_ok=True)
+        _cancel_file(job_id).write_text(_now(), encoding="utf-8")
+    except OSError:
+        pass
     if job.get("status") in TERMINAL_STATUSES:
         return job
 
@@ -311,27 +485,32 @@ def request_cancel(job_id: str) -> dict[str, Any] | None:
     return get(job_id)
 
 
-def wait(job_id: str, timeout: float = 8.0) -> None:
-    future = None
+def _done_event(job_id: str) -> threading.Event:
     with _lock:
-        future = _futures.get(job_id)
-    if future is None:
+        event = _done_events.get(job_id)
+        if event is None:
+            event = threading.Event()
+            _done_events[job_id] = event
+        return event
+
+
+def wait(job_id: str, timeout: float = 8.0) -> None:
+    with _lock:
+        event = _done_events.get(job_id)
+    if event is None:
         return
-    try:
-        future.result(timeout=timeout)
-    except Exception:  # noqa: BLE001
-        return
+    event.wait(timeout=timeout)
 
 
 def get(job_id: str) -> dict[str, Any] | None:
     with _lock:
         job = _jobs.get(job_id)
         if job:
-            return _normalize(dict(job))
+            return _heal(_normalize(dict(job)))
     file = _job_file(job_id)
     if file.exists():
         try:
-            return _normalize(json.loads(file.read_text(encoding="utf-8")))
+            return _heal(_normalize(json.loads(file.read_text(encoding="utf-8"))))
         except json.JSONDecodeError:
             return None
     return None
@@ -352,13 +531,15 @@ def list_jobs(limit: int = 200) -> list[dict[str, Any]]:
             continue
         if not isinstance(data, dict) or not data.get("job_id"):
             continue
-        seen[data["job_id"]] = _normalize(data)
+        seen[data["job_id"]] = _heal(_normalize(data))
         if len(seen) >= limit:
             break
     with _lock:
-        for job_id, job in _jobs.items():
-            seen[job_id] = _normalize(dict(job))
+        snapshot = {job_id: dict(job) for job_id, job in _jobs.items()}
+    for job_id, job in snapshot.items():
+        seen[job_id] = _heal(_normalize(job))
     return sorted(seen.values(), key=lambda j: j.get("created_at") or "", reverse=True)[:limit]
+
 
 
 def summarize(items: list[dict[str, Any]]) -> dict[str, Any]:
@@ -388,7 +569,25 @@ def summarize(items: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def persist(job_id: str) -> None:
+_last_persist: dict[str, float] = {}
+PERSIST_THROTTLE_SECONDS = 1.0
+
+
+def persist(job_id: str, *, throttle: bool = False) -> None:
+    """Grava o job em disco. Com `throttle`, no máximo 1x por segundo.
+
+    O FFmpeg cospe centenas de linhas por minuto; gravar o JSON inteiro a cada
+    linha transforma um job longo em I/O puro. Mudanças de status/progresso
+    continuam gravando na hora.
+    """
+    if throttle:
+        now = time.monotonic()
+        last = _last_persist.get(job_id, 0.0)
+        if now - last < PERSIST_THROTTLE_SECONDS:
+            return
+        _last_persist[job_id] = now
+    else:
+        _last_persist[job_id] = time.monotonic()
     job = None
     with _lock:
         if job_id in _jobs:
@@ -397,17 +596,45 @@ def persist(job_id: str) -> None:
         return
     try:
         config.jobs_dir.mkdir(parents=True, exist_ok=True)
-        _job_file(job_id).write_text(
-            json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        tmp = _job_file(job_id).with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(_job_file(job_id))
     except OSError:
         return
 
 
-def submit(job_id: str, work: Callable[[str], None]) -> None:
-    """Executa o trabalho pesado fora do request, capturando qualquer falha."""
 
-    def runner() -> None:
+# --- Pool próprio de execução ------------------------------------------------
+
+
+def _touch_heartbeat(job_id: str) -> None:
+    with _lock:
+        job = _jobs.get(job_id)
+        if not job or job.get("status") in TERMINAL_STATUSES:
+            return
+        job["heartbeat_at"] = _now()
+        job["owner_pid"] = _PID
+        job["owner_host"] = _HOST
+    persist(job_id)
+
+
+def _heartbeat_loop() -> None:
+    """Prova de vida periódica: sem ela, o job é declarado interrompido."""
+    while not _shutting_down.is_set():
+        _shutting_down.wait(HEARTBEAT_SECONDS)
+        with _lock:
+            active = [
+                jid
+                for jid, job in _jobs.items()
+                if job.get("status") in {"running", "queued"} and job.get("owner_pid") == _PID
+            ]
+        for job_id in active:
+            _touch_heartbeat(job_id)
+
+
+def _run_job(job_id: str, work: Callable[[str], None]) -> None:
+    done = _done_event(job_id)
+    try:
         if is_cancelled(job_id):
             update(
                 job_id,
@@ -417,7 +644,15 @@ def submit(job_id: str, work: Callable[[str], None]) -> None:
                 finished_at=_now(),
             )
             return
-        update(job_id, status="running", stage="processando", message="Processando…")
+        update(
+            job_id,
+            status="running",
+            stage="processando",
+            message="Processando…",
+            owner_pid=_PID,
+            owner_host=_HOST,
+            heartbeat_at=_now(),
+        )
         try:
             work(job_id)
             job = get(job_id) or {}
@@ -440,23 +675,66 @@ def submit(job_id: str, work: Callable[[str], None]) -> None:
                 message="Job cancelado pelo operador.",
                 finished_at=_now(),
             )
-        except Exception as exc:  # noqa: BLE001 - toda falha vira status de job
+        except BaseException as exc:  # noqa: BLE001 - toda falha vira status de job
+            # BaseException cobre SystemExit/KeyboardInterrupt disparados quando o
+            # worker do Gunicorn é encerrado no meio do processamento.
             _event(job_id, "error", f"ERRO: {exc}", stage="falha")
             update(
                 job_id,
                 status="error",
                 stage="falha",
-                message=str(exc),
+                message=str(exc) or exc.__class__.__name__,
                 finished_at=_now(),
             )
-        finally:
-            with _lock:
-                _futures.pop(job_id, None)
+    finally:
+        done.set()
 
+
+def _worker_loop() -> None:
+    while True:
+        try:
+            item = _queue.get(timeout=1.0)
+        except queue.Empty:
+            if _shutting_down.is_set():
+                return
+            continue
+        job_id, work = item
+        try:
+            _run_job(job_id, work)
+        finally:
+            _queue.task_done()
+
+
+def _ensure_pool() -> None:
+    global _pool_started
+    with _pool_lock:
+        if _pool_started:
+            return
+        for index in range(max(1, config.max_workers)):
+            threading.Thread(
+                target=_worker_loop, name=f"viral-job-{index}", daemon=True
+            ).start()
+        threading.Thread(target=_heartbeat_loop, name="viral-job-heartbeat", daemon=True).start()
+        _pool_started = True
+
+
+def shutdown(_signum: Any = None, _frame: Any = None) -> None:
+    """Encerramento limpo: para o batimento e não aceita trabalho novo."""
+    _shutting_down.set()
+
+
+def queue_depth() -> int:
+    return _queue.qsize()
+
+
+def submit(job_id: str, work: Callable[[str], None]) -> None:
+    """Executa o trabalho pesado fora do request, capturando qualquer falha."""
+    _ensure_pool()
+    _done_event(job_id).clear()
     audit("queued", job_id, (get(job_id) or {}).get("tool") or "")
-    future = _executor.submit(runner)
-    with _lock:
-        _futures[job_id] = future
+    _touch_heartbeat(job_id)
+    _queue.put((job_id, work))
+
 
 
 def fail(job_id: str, message: str) -> None:
@@ -479,8 +757,10 @@ def delete(job_id: str) -> None:
     with _lock:
         _jobs.pop(job_id, None)
         _cancel_events.pop(job_id, None)
-        _futures.pop(job_id, None)
-    paths: list[Path] = [_job_file(job_id)]
+        _done_events.pop(job_id, None)
+    _cancel_cache.pop(job_id, None)
+    paths: list[Path] = [_job_file(job_id), _cancel_file(job_id)]
+
     if job:
         for raw in job.get("artifacts") or []:
             if isinstance(raw, str) and raw:

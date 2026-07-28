@@ -352,6 +352,7 @@ def transcribe(
     last_error: Exception | None = None
     try:
         for index in range(blocks):
+            jobs.check_cancelled(job_id)
             offset = index * CHUNK_SECONDS
             piece = _extract_mp3(
                 src, work / f"stt_{index:04d}.mp3",
