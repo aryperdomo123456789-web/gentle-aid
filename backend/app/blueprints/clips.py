@@ -128,10 +128,6 @@ def run_job():
     if max_seconds <= min_seconds:
         max_seconds = min_seconds + 15
 
-    caption_preset: str | None = None
-    if preset_raw and preset_raw != "none":
-        caption_preset = captions.resolve_preset(preset_raw)["id"]
-
     try:
         source_url = clean_text(request.form.get("url"), max_length=500, field="url")
         source_card = parse_json_object(request.form.get("source_card"), field="source_card")
@@ -148,6 +144,8 @@ def run_job():
             "niche": niche,
             "aspect": aspect,
             "frame": frame,
+            "mode": "manual" if manual_segments else "auto",
+            "manual_segments": manual_segments or None,
             "min_seconds": min_seconds,
             "max_seconds": max_seconds,
             "caption_preset": caption_preset,
@@ -156,6 +154,7 @@ def run_job():
             "source_card": source_card,
         },
     )
+
     job_id = job["job_id"]
 
     try:
