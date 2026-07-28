@@ -90,10 +90,10 @@ export function DiscoveryPanel({
   );
 
   return (
-    <section className="panel p-6" aria-label="Pesquisa de conteúdo viral">
-      <header className="mb-4">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
+    <section className="panel p-4 sm:p-6" aria-label="Pesquisa de conteúdo viral">
+      <header className="mb-4 border-l-2 border-primary/50 pl-3">
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        <p className="mt-1 text-pretty text-sm leading-6 text-muted-foreground">{hint}</p>
       </header>
 
       <form
@@ -141,16 +141,18 @@ export function DiscoveryPanel({
       </form>
 
       {error ? (
-        <p className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive-foreground">
+        <p className="surface-in mt-4 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive-foreground">
           {error}
         </p>
       ) : null}
 
       {searched && !busy && cards.length === 0 && !error ? (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Nenhum pico de tráfego orgânico localizado para esse termo. Tente outra palavra-chave, um
-          @perfil ou cole a URL direta do vídeo.
-        </p>
+        <div className="surface-in mt-4 rounded-xl border border-dashed border-border bg-background/40 px-4 py-8 text-center">
+          <p className="mx-auto max-w-md text-pretty text-sm leading-6 text-muted-foreground">
+            Nenhum pico de tráfego orgânico localizado para esse termo. Tente outra palavra-chave, um
+            @perfil ou cole a URL direta do vídeo.
+          </p>
+        </div>
       ) : null}
 
       {cards.length > 0 ? (
@@ -160,7 +162,7 @@ export function DiscoveryPanel({
             return (
               <article
                 key={card.id + card.url}
-                className="flex flex-col justify-between rounded-xl border border-border bg-background/50 p-4 transition hover:border-primary/40"
+                className="card-lift surface-in flex flex-col justify-between rounded-2xl border border-border bg-background/50 p-4"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
@@ -181,7 +183,7 @@ export function DiscoveryPanel({
                       src={card.thumbnail}
                       alt={`Miniatura do vídeo de @${card.author}`}
                       loading="lazy"
-                      className="mt-3 h-40 w-full rounded-lg object-cover"
+                      className="mt-3 h-40 w-full rounded-xl object-cover ring-1 ring-border"
                     />
                   ) : null}
 
@@ -200,7 +202,7 @@ export function DiscoveryPanel({
                     <button
                       type="button"
                       onClick={() => setPlayer(card)}
-                      className="rounded-lg border border-border px-3 py-2 text-xs font-semibold transition hover:border-primary/50"
+                      className="min-h-9 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 active:scale-95"
                     >
                       ▶ Assistir
                     </button>
@@ -208,7 +210,7 @@ export function DiscoveryPanel({
                       type="button"
                       disabled={running}
                       onClick={() => onAction(card)}
-                      className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                      className="min-h-9 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 transition-all duration-200 hover:shadow-lg hover:shadow-primary/30 active:scale-95 disabled:opacity-50 disabled:shadow-none"
                     >
                       {running ? "Processando…" : actionLabel}
                     </button>
@@ -216,7 +218,7 @@ export function DiscoveryPanel({
                       href={card.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/50"
+                      className="min-h-9 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition-all duration-200 hover:border-primary/50 hover:text-foreground active:scale-95"
                     >
                       Abrir original
                     </a>
