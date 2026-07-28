@@ -248,7 +248,12 @@ def generate(
     )
 
 
-    width, height = size if size else (1080, 1920)
+    if size:
+        width, height = size
+    else:
+        info = media.probe(src)
+        width, height = (info.width or 1080), (info.height or 1920)
+
     delivered: list[dict[str, Any]] = []
     best: tuple[float, Path, dict[str, Any], Any] | None = None
 
