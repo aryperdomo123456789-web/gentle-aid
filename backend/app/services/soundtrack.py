@@ -614,7 +614,9 @@ def resolve(
         workdir=workdir,
         use_ai=use_ai,
         job_id=job_id,
+        force_synth=mode == "synth",
     )
+
 
 
 def bars_duration(
