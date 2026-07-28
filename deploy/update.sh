@@ -11,6 +11,15 @@ printf '\n\033[1;35m==>\033[0m Puxando código do GitHub\n'
 git fetch --all --prune
 git reset --hard "origin/$(git rev-parse --abbrev-ref HEAD)"
 
+printf '\n\033[1;35m==>\033[0m Removendo laboratórios do fluxo\n'
+rm -f \
+  src/routes/lab.tsx \
+  src/routes/lab-legenda.tsx \
+  src/lib/api-lab.server.ts \
+  src/lib/api-lab.presets.ts \
+  src/lib/api-lab.functions.ts \
+  src/lib/caption-lab.ts
+
 printf '\n\033[1;35m==>\033[0m Dependências Python\n'
 "$APP_DIR/.venv/bin/pip" install -q -r backend/requirements.txt
 
