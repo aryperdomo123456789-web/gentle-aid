@@ -182,7 +182,10 @@ function RecapPage() {
             </div>
           ) : null}
 
-          <Field label="Vídeo longo" hint="MP4, MOV, MKV ou WEBM. Use conteúdo próprio ou faça recap comentado.">
+          <Field
+            label="Vídeo longo"
+            hint="MP4, MOV, MKV ou WEBM. Use conteúdo próprio ou faça recap comentado."
+          >
             {(id) => (
               <FileDrop
                 id={id}
@@ -383,7 +386,10 @@ function RecapPage() {
           </fieldset>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            <Field label="Áudio original ao fundo" hint="0 = só a narração. 0.12 mantém a ambiência.">
+            <Field
+              label="Áudio original ao fundo"
+              hint="0 = só a narração. 0.12 mantém a ambiência."
+            >
               {(id) => (
                 <SelectInput id={id} name="ambience" defaultValue="0.12">
                   <option value="0">Silenciar o original</option>
