@@ -357,7 +357,9 @@ def _event(job_id: str, level: str, message: str, stage: str | None = None) -> N
         lines.append(f"[{clock}] {level.upper():<9} {current_stage} · {message}")
         job["log"] = lines[-MAX_LOG_LINES:]
         job["updated_at"] = ts
-    persist(job_id)
+    # Log é gravado com throttle: status/progresso usam `update()`, que grava na hora.
+    persist(job_id, throttle=level == "info")
+
 
 
 def log(job_id: str, line: str, level: str = "info", stage: str | None = None) -> None:
