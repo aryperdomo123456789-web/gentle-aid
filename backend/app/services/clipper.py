@@ -318,7 +318,7 @@ def generate(
     if track:
         jobs.log(
             job_id,
-            f"Trilha: {track.label} · {track.bpm:.0f} BPM · {track.origin}. {track.reason}".strip(),
+            f"Trilha: {track.label} · {track.grid_bpm:.0f} BPM · {track.origin}. {track.reason}".strip(),
         )
         jobs.update(
             job_id,
@@ -328,13 +328,16 @@ def generate(
 
     # Trava a duração de cada corte em compassos inteiros da trilha: o corte
     # termina no fim da frase musical, que é o que dá a sensação de "editado".
-    if track and beat_sync and track.bpm > 0:
+    grid_bpm = track.grid_bpm if track else 0.0
+    if track and beat_sync and grid_bpm > 0:
         for clip in clips:
-            seconds = float(clip["end"]) - float(clip["start"])
-            locked = soundtrack.bars_duration(seconds, track.bpm)
-            if locked >= max(2.0, min_seconds * 0.6) and abs(locked - seconds) > 0.05:
-                clip["end"] = round(float(clip["start"]) + locked, 3)
-        jobs.log(job_id, f"Cortes travados em compassos de {track.bpm:.0f} BPM.")
+            start = float(clip["start"])
+            seconds = float(clip["end"]) - start
+            room = min(duration - start, max(seconds, max_seconds))
+            locked = soundtrack.bars_duration(seconds, grid_bpm, ceiling=room)
+            if locked >= max(2.0, min_seconds * 0.75) and abs(locked - seconds) > 0.05:
+                clip["end"] = round(start + locked, 3)
+        jobs.log(job_id, f"Cortes travados em compassos de {grid_bpm:.0f} BPM.")
 
 
     if size:
@@ -366,7 +369,7 @@ def generate(
             frame=frame,
             voice_volume=voice_volume,
             job_id=job_id,
-            pulse_bpm=track.bpm if (track and beat_sync) else 0.0,
+            pulse_bpm=grid_bpm if (track and beat_sync) else 0.0,
             pulse_intensity=beat_zoom if (track and beat_sync) else 0.0,
         )
 
@@ -390,8 +393,8 @@ def generate(
                 max_words=words_per_line,
             )
             # Palavra na batida: a legenda estoura junto com o kick da trilha.
-            if lines and track and beat_sync and track.bpm > 0:
-                grid = beatsync.beats_from_bpm(track.bpm, seconds)
+            if lines and track and beat_sync and grid_bpm > 0:
+                grid = beatsync.beats_from_bpm(grid_bpm, seconds)
                 lines = beatsync.snap_lines(lines, grid, tolerance=0.16)
             if lines:
 

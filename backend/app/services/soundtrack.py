@@ -194,11 +194,24 @@ class Track:
     offset: float = 0.0             # 1º ataque forte (onde a trilha deve começar)
     confidence: float = 0.0
 
+    @property
+    def grid_bpm(self) -> float:
+        """BPM normalizado para 90–180 — evita grade em meio-tempo (68 → 136)."""
+        bpm = self.bpm
+        if bpm <= 0:
+            return 0.0
+        while bpm < 90:
+            bpm *= 2
+        while bpm > 180:
+            bpm /= 2
+        return round(bpm, 2)
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "label": self.label,
             "origin": self.origin,
+            "grid_bpm": self.grid_bpm,
             "bpm": round(self.bpm, 2),
             "duration": round(self.duration, 2),
             "tags": self.tags,
@@ -604,15 +617,25 @@ def resolve(
     )
 
 
-def bars_duration(seconds: float, bpm: float, *, beats_per_bar: int = 4) -> float:
-    """Arredonda a duração para um número inteiro de compassos (nunca aumenta)."""
+def bars_duration(
+    seconds: float, bpm: float, *, beats_per_bar: int = 4, ceiling: float | None = None
+) -> float:
+    """Encaixa a duração no compasso mais próximo (encurta ou estica um pouco).
+
+    `ceiling` é o limite que o corte não pode ultrapassar (fim do vídeo ou
+    duração máxima pedida). Sem espaço para esticar, encurta.
+    """
     if bpm <= 0:
         return seconds
     bar = 60.0 / bpm * beats_per_bar
     if bar <= 0 or seconds < bar:
         return seconds
-    bars = math.floor(seconds / bar)
-    return round(bars * bar, 3)
+    low = math.floor(seconds / bar) * bar
+    high = low + bar
+    if ceiling is not None and high > ceiling:
+        return round(low, 3)
+    best = high if (high - seconds) <= (seconds - low) else low
+    return round(best, 3)
 
 
 def catalog() -> dict[str, Any]:
