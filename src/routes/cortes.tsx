@@ -99,6 +99,8 @@ function Cortes() {
   const [segments, setSegments] = useState<ManualSegment[]>([]);
   const [manualError, setManualError] = useState<string | null>(null);
   const [captionPreset, setCaptionPreset] = useState("hormozi");
+  const [musicMode, setMusicMode] = useState("auto");
+  const [beatSync, setBeatSync] = useState(true);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -438,11 +440,80 @@ function Cortes() {
             </Field>
           </div>
 
-          <Field label="Música de fundo (opcional)" hint="Entra com ducking: abaixa sozinha quando a voz fala.">
-            {(id) => (
-              <FileDrop id={id} name="music" accept="audio/mpeg,audio/wav,audio/mp4,audio/aac" hint="MP3 / WAV / M4A" />
-            )}
-          </Field>
+          <div className="space-y-4 rounded-xl border border-border/70 bg-muted/20 p-3 sm:p-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+              <Field label="Trilha sonora" hint="A trilha entra com ducking: abaixa sozinha quando a voz fala.">
+                {(id) => (
+                  <SelectInput
+                    id={id}
+                    name="music_mode"
+                    value={musicMode}
+                    onChange={(e) => setMusicMode(e.target.value)}
+                  >
+                    <option value="auto">IA escolhe pelo nicho (livre de direitos)</option>
+                    <option value="library">Faixa da biblioteca do servidor</option>
+                    <option value="upload">Enviar meu arquivo</option>
+                    <option value="synth">Gerar trilha original agora</option>
+                    <option value="none">Sem trilha</option>
+                  </SelectInput>
+                )}
+              </Field>
+              {musicMode === "library" ? (
+                <Field label="Faixa da biblioteca" hint={library.length ? `${library.length} faixa(s) em ${libraryDir}` : "Nenhuma faixa encontrada na pasta do servidor."}>
+                  {(id) => (
+                    <SelectInput id={id} name="music_track" defaultValue={library[0]?.id ?? ""}>
+                      {library.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.label} · {Math.round(t.grid_bpm || t.bpm)} BPM
+                        </option>
+                      ))}
+                    </SelectInput>
+                  )}
+                </Field>
+              ) : musicMode === "upload" ? (
+                <Field label="Arquivo da trilha">
+                  {(id) => (
+                    <FileDrop id={id} name="music" accept="audio/mpeg,audio/wav,audio/mp4,audio/aac" hint="MP3 / WAV / M4A" />
+                  )}
+                </Field>
+              ) : (
+                <Field label="Sincronia com a batida" hint="Corta no compasso, legenda estoura no kick e o zoom pulsa no ritmo.">
+                  {(id) => (
+                    <SelectInput
+                      id={id}
+                      name="beat_zoom"
+                      defaultValue="0.05"
+                      disabled={musicMode === "none" || !beatSync}
+                    >
+                      <option value="0.02">Pulso suave</option>
+                      <option value="0.05">Pulso padrão</option>
+                      <option value="0.08">Pulso agressivo</option>
+                    </SelectInput>
+                  )}
+                </Field>
+              )}
+            </div>
+            <label className="flex items-start gap-2 text-[12px] text-muted-foreground">
+              <input
+                type="checkbox"
+                name="beat_sync"
+                value="1"
+                checked={beatSync}
+                disabled={musicMode === "none"}
+                onChange={(e) => setBeatSync(e.target.checked)}
+                className="mt-0.5 size-4 accent-primary"
+              />
+              <span>
+                Travar cortes, legendas e zoom no ritmo da trilha (recomendado para conteúdo viral).
+              </span>
+            </label>
+            {musicMode === "auto" ? (
+              <p className="text-[11px] text-muted-foreground">
+                A IA lê o nicho e a transcrição, escolhe a faixa mais compatível da biblioteca e, se
+                não houver nenhuma, sintetiza uma trilha original — sem Content ID.
+              </p>
+            ) : null}
+          </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
             <Field label="Volume da trilha">
