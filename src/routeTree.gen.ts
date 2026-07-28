@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VoiceConversionRouteImport } from './routes/voice-conversion'
 import { Route as TiktokRouteImport } from './routes/tiktok'
+import { Route as RecapRouteImport } from './routes/recap'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LegendarRouteImport } from './routes/legendar'
@@ -30,6 +31,11 @@ const VoiceConversionRoute = VoiceConversionRouteImport.update({
 const TiktokRoute = TiktokRouteImport.update({
   id: '/tiktok',
   path: '/tiktok',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecapRoute = RecapRouteImport.update({
+  id: '/recap',
+  path: '/recap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RadarRoute = RadarRouteImport.update({
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
+  '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
+  '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/legendar': typeof LegendarRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
+  '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/legendar'
     | '/login'
     | '/radar'
+    | '/recap'
     | '/tiktok'
     | '/voice-conversion'
     | '/historico/$jobId'
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/legendar'
     | '/login'
     | '/radar'
+    | '/recap'
     | '/tiktok'
     | '/voice-conversion'
     | '/historico/$jobId'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/legendar'
     | '/login'
     | '/radar'
+    | '/recap'
     | '/tiktok'
     | '/voice-conversion'
     | '/historico/$jobId'
@@ -181,6 +193,7 @@ export interface RootRouteChildren {
   LegendarRoute: typeof LegendarRoute
   LoginRoute: typeof LoginRoute
   RadarRoute: typeof RadarRoute
+  RecapRoute: typeof RecapRoute
   TiktokRoute: typeof TiktokRoute
   VoiceConversionRoute: typeof VoiceConversionRoute
 }
@@ -199,6 +212,13 @@ declare module '@tanstack/react-router' {
       path: '/tiktok'
       fullPath: '/tiktok'
       preLoaderRoute: typeof TiktokRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recap': {
+      id: '/recap'
+      path: '/recap'
+      fullPath: '/recap'
+      preLoaderRoute: typeof RecapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/radar': {
@@ -296,6 +316,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegendarRoute: LegendarRoute,
   LoginRoute: LoginRoute,
   RadarRoute: RadarRoute,
+  RecapRoute: RecapRoute,
   TiktokRoute: TiktokRoute,
   VoiceConversionRoute: VoiceConversionRoute,
 }
