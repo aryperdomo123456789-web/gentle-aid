@@ -144,7 +144,7 @@ function Historico() {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-4 py-2 text-sm font-medium disabled:opacity-60"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/70 px-4 py-2 text-sm font-medium transition-all duration-200 hover:border-primary/50 active:scale-95 disabled:opacity-60"
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
             Atualizar
@@ -199,7 +199,7 @@ function Historico() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por id, arquivo ou origem…"
             aria-label="Buscar jobs"
-            className="min-h-10 w-full rounded-full border border-border bg-surface/60 px-4 text-xs outline-none focus:border-primary/60 sm:w-72"
+            className="min-h-10 w-full rounded-full border border-border bg-surface/60 px-4 text-xs outline-none transition-colors duration-200 hover:border-border/80 focus:border-primary/60 sm:w-72"
           />
         </div>
 
@@ -249,7 +249,7 @@ function Historico() {
                       type="button"
                       onClick={() => setDialog({ job, kind: "cancel" })}
                       disabled={busyJobId === job.job_id}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold hover:border-primary/50 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1.5 text-xs font-semibold transition-all duration-200 hover:border-primary/50 hover:text-foreground active:scale-95 disabled:opacity-50"
                     >
                       <StopCircle className="size-3.5" aria-hidden="true" />
                       Cancelar
