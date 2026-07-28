@@ -54,6 +54,21 @@ def _video_filter(width: int, height: int, frame: str) -> str:
 
 
 
+def _beat_pulse(bpm: float, intensity: float) -> str:
+    """Punch-in no tempo da música: zoom que estoura na batida e relaxa até a próxima.
+
+    `zoompan` roda por quadro; `on/FPS` é o tempo em segundos do corte. A curva
+    `cos^8` deixa o pico bem curto (soco) em vez de um zoom lento e amador.
+    """
+    hz = max(0.2, bpm / 60.0)
+    amp = max(0.005, min(0.09, intensity))
+    zoom = f"1+{amp:.4f}*pow(abs(cos(PI*(on/{FPS})*{hz:.5f}))\\,8)"
+    return (
+        f"zoompan=z='{zoom}':d=1:fps={FPS}:s=WIDTHxHEIGHT"
+        ":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+    )
+
+
 def _cut(
     src: Path,
     dst: Path,
@@ -64,17 +79,31 @@ def _cut(
     frame: str,
     voice_volume: float,
     job_id: str,
+    pulse_bpm: float = 0.0,
+    pulse_intensity: float = 0.0,
 ) -> None:
-    """Recorte exato (seek preciso) já reenquadrado e normalizado."""
+    """Recorte exato (seek preciso) já reenquadrado, pulsado e normalizado."""
     cmd = [
         config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
         "-ss", f"{max(0.0, start):.3f}", "-i", str(src), "-t", f"{seconds:.3f}",
     ]
+    pulse = ""
+    if pulse_bpm > 0 and pulse_intensity > 0:
+        pulse = _beat_pulse(pulse_bpm, pulse_intensity)
     if size:
         width, height = size
-        cmd += ["-filter_complex", _video_filter(width, height, frame), "-map", "[v]"]
+        chain = _video_filter(width, height, frame)
+        if pulse:
+            chain += f";[v]{pulse.replace('WIDTH', str(width)).replace('HEIGHT', str(height))}[vp]"
+        cmd += ["-filter_complex", chain, "-map", "[vp]" if pulse else "[v]"]
     else:
-        cmd += ["-vf", f"fps={FPS},format=yuv420p", "-map", "0:v:0"]
+        vf = f"fps={FPS},format=yuv420p"
+        if pulse:
+            info = media.probe(src)
+            vf += "," + pulse.replace("WIDTH", str(info.width or 1080)).replace(
+                "HEIGHT", str(info.height or 1920)
+            )
+        cmd += ["-vf", vf, "-map", "0:v:0"]
     cmd += [
         "-map", "0:a:0?",
         "-af", f"volume={voice_volume:.2f},aresample=48000,loudnorm=I=-14:TP=-1.5:LRA=11",
@@ -85,19 +114,30 @@ def _cut(
     media.run(cmd, job_id=job_id)
 
 
-def _mix_music(video: Path, music: Path, dst: Path, *, volume: float, job_id: str) -> None:
-    """Trilha em ducking: abaixa sozinha quando a voz entra."""
+def _mix_music(
+    video: Path,
+    music: Path,
+    dst: Path,
+    *,
+    volume: float,
+    job_id: str,
+    offset: float = 0.0,
+) -> None:
+    """Trilha em ducking, começando exatamente no 1º ataque forte da música."""
     media.run(
         [
             config.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error",
-            "-i", str(video), "-stream_loop", "-1", "-i", str(music),
+            "-i", str(video),
+            "-ss", f"{max(0.0, offset):.3f}", "-stream_loop", "-1", "-i", str(music),
             "-filter_complex",
-            f"[1:a]volume={volume:.2f},aresample=48000[m];"
+            f"[1:a]volume={volume:.2f},aresample=48000,"
+            "afade=t=in:st=0:d=0.25[m];"
             "[m][0:a]sidechaincompress=threshold=0.05:ratio=8:attack=20:release=350[duck];"
             "[0:a][duck]amix=inputs=2:duration=first:dropout_transition=0[a]",
             "-map", "0:v", "-map", "[a]",
             "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", str(dst),
         ],
+
         job_id=job_id,
     )
 
