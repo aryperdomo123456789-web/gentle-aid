@@ -583,10 +583,37 @@ def persist(job_id: str) -> None:
         return
 
 
-def submit(job_id: str, work: Callable[[str], None]) -> None:
-    """Executa o trabalho pesado fora do request, capturando qualquer falha."""
+# --- Pool próprio de execução ------------------------------------------------
 
-    def runner() -> None:
+
+def _touch_heartbeat(job_id: str) -> None:
+    with _lock:
+        job = _jobs.get(job_id)
+        if not job or job.get("status") in TERMINAL_STATUSES:
+            return
+        job["heartbeat_at"] = _now()
+        job["owner_pid"] = _PID
+        job["owner_host"] = _HOST
+    persist(job_id)
+
+
+def _heartbeat_loop() -> None:
+    """Prova de vida periódica: sem ela, o job é declarado interrompido."""
+    while not _shutting_down.is_set():
+        _shutting_down.wait(HEARTBEAT_SECONDS)
+        with _lock:
+            active = [
+                jid
+                for jid, job in _jobs.items()
+                if job.get("status") in {"running", "queued"} and job.get("owner_pid") == _PID
+            ]
+        for job_id in active:
+            _touch_heartbeat(job_id)
+
+
+def _run_job(job_id: str, work: Callable[[str], None]) -> None:
+    done = _done_event(job_id)
+    try:
         if is_cancelled(job_id):
             update(
                 job_id,
@@ -596,7 +623,15 @@ def submit(job_id: str, work: Callable[[str], None]) -> None:
                 finished_at=_now(),
             )
             return
-        update(job_id, status="running", stage="processando", message="Processando…")
+        update(
+            job_id,
+            status="running",
+            stage="processando",
+            message="Processando…",
+            owner_pid=_PID,
+            owner_host=_HOST,
+            heartbeat_at=_now(),
+        )
         try:
             work(job_id)
             job = get(job_id) or {}
@@ -619,23 +654,66 @@ def submit(job_id: str, work: Callable[[str], None]) -> None:
                 message="Job cancelado pelo operador.",
                 finished_at=_now(),
             )
-        except Exception as exc:  # noqa: BLE001 - toda falha vira status de job
+        except BaseException as exc:  # noqa: BLE001 - toda falha vira status de job
+            # BaseException cobre SystemExit/KeyboardInterrupt disparados quando o
+            # worker do Gunicorn é encerrado no meio do processamento.
             _event(job_id, "error", f"ERRO: {exc}", stage="falha")
             update(
                 job_id,
                 status="error",
                 stage="falha",
-                message=str(exc),
+                message=str(exc) or exc.__class__.__name__,
                 finished_at=_now(),
             )
-        finally:
-            with _lock:
-                _futures.pop(job_id, None)
+    finally:
+        done.set()
 
+
+def _worker_loop() -> None:
+    while True:
+        try:
+            item = _queue.get(timeout=1.0)
+        except queue.Empty:
+            if _shutting_down.is_set():
+                return
+            continue
+        job_id, work = item
+        try:
+            _run_job(job_id, work)
+        finally:
+            _queue.task_done()
+
+
+def _ensure_pool() -> None:
+    global _pool_started
+    with _pool_lock:
+        if _pool_started:
+            return
+        for index in range(max(1, config.max_workers)):
+            threading.Thread(
+                target=_worker_loop, name=f"viral-job-{index}", daemon=True
+            ).start()
+        threading.Thread(target=_heartbeat_loop, name="viral-job-heartbeat", daemon=True).start()
+        _pool_started = True
+
+
+def shutdown(_signum: Any = None, _frame: Any = None) -> None:
+    """Encerramento limpo: para o batimento e não aceita trabalho novo."""
+    _shutting_down.set()
+
+
+def queue_depth() -> int:
+    return _queue.qsize()
+
+
+def submit(job_id: str, work: Callable[[str], None]) -> None:
+    """Executa o trabalho pesado fora do request, capturando qualquer falha."""
+    _ensure_pool()
+    _done_event(job_id).clear()
     audit("queued", job_id, (get(job_id) or {}).get("tool") or "")
-    future = _executor.submit(runner)
-    with _lock:
-        _futures[job_id] = future
+    _touch_heartbeat(job_id)
+    _queue.put((job_id, work))
+
 
 
 def fail(job_id: str, message: str) -> None:
