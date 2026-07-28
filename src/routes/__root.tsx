@@ -145,8 +145,8 @@ function RootComponent() {
   );
 }
 
-// Rotas que rodam 100% no cliente (laboratórios locais) não dependem do backend.
-const PUBLIC_PATHS = new Set(["/login", "/lab-legenda"]);
+// Rotas públicas que não exigem autenticação.
+const PUBLIC_PATHS = new Set(["/login"]);
 
 function AuthGate() {
   const auth = useAuth();
