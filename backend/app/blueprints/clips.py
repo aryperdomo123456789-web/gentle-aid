@@ -162,6 +162,8 @@ def run_job():
     frame = (request.form.get("frame") or "crop").strip()
     position = (request.form.get("caption_position") or "bottom").strip()
     preset_raw = (request.form.get("caption_preset") or "hormozi").strip()
+    music_mode = (request.form.get("music_mode") or "").strip()
+    music_track = (request.form.get("music_track") or "").strip() or None
     raw_mutation = request.form.get("mutation")
     mutation = normalize_level(raw_mutation)
 
@@ -173,6 +175,12 @@ def run_job():
         return jsonify(error="Modo de enquadramento inválido."), 400
     if position not in captions.POSITIONS:
         return jsonify(error="Posição de legenda inválida."), 400
+    if music_mode and music_mode not in soundtrack.MODES:
+        return jsonify(error="Modo de trilha inválido."), 400
+    if music_mode == "library" and not music_track:
+        return jsonify(error="Escolha a faixa da biblioteca."), 400
+    if music_mode == "library" and not soundtrack.find(music_track or ""):
+        return jsonify(error="Faixa não encontrada na biblioteca do servidor."), 400
     if raw_mutation not in (None, "") and mutation is None:
         return jsonify(error="Nível de mutação inválido."), 400
     if mutation is None:
@@ -219,6 +227,8 @@ def run_job():
             "max_seconds": max_seconds,
             "caption_preset": caption_preset,
             "caption_position": position,
+            "music_mode": music_mode or None,
+            "music_track": music_track,
             "mutation": mutation,
             "source_card": source_card,
         },
@@ -229,6 +239,18 @@ def run_job():
     try:
         src = save_upload(request.files.get("video"), job_id, VIDEO_EXT) if has_upload else None
         music = _save_music(job_id)
+    except ValidationError as exc:
+        jobs.fail(job_id, str(exc))
+        return jsonify(error=str(exc)), 400
+
+    # Compatibilidade: quem só manda o arquivo continua caindo no modo upload.
+    if not music_mode:
+        music_mode = "upload" if music else "none"
+    if music_mode == "upload" and not music:
+        music_mode = "none"
+
+    try:
+        pass
     except ValidationError as exc:
         jobs.fail(job_id, str(exc))
         return jsonify(error=str(exc)), 400
