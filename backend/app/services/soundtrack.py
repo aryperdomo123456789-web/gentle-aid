@@ -642,7 +642,7 @@ def catalog() -> dict[str, Any]:
     return {
         "modes": list(MODES),
         "profiles": [p.as_dict() for p in PROFILES.values()],
-        "library": [t.as_dict() for t in library()],
+        "tracks": [t.as_dict() for t in library()],
         "library_dir": str(library_dir()),
         "ai_ready": any(api_keys.get_key(pid) for pid, _u, _m in _ROUTES),
     }
