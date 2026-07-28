@@ -428,8 +428,26 @@ def cancel_event(job_id: str) -> threading.Event:
         return event
 
 
+_cancel_cache: dict[str, tuple[float, bool]] = {}
+_CANCEL_TTL = 1.0
+
+
 def is_cancelled(job_id: str) -> bool:
-    return cancel_event(job_id).is_set()
+    """Vale para o processo atual **e** para cancelamentos vindos de outro worker."""
+    if cancel_event(job_id).is_set():
+        return True
+    now = time.monotonic()
+    cached = _cancel_cache.get(job_id)
+    if cached and now - cached[0] < _CANCEL_TTL:
+        return cached[1]
+    try:
+        flagged = _cancel_file(job_id).exists()
+    except OSError:
+        flagged = False
+    _cancel_cache[job_id] = (now, flagged)
+    if flagged:
+        cancel_event(job_id).set()
+    return flagged
 
 
 def check_cancelled(job_id: str) -> None:
@@ -444,6 +462,12 @@ def request_cancel(job_id: str) -> dict[str, Any] | None:
         return None
 
     cancel_event(job_id).set()
+    _cancel_cache[job_id] = (time.monotonic(), True)
+    try:
+        config.jobs_dir.mkdir(parents=True, exist_ok=True)
+        _cancel_file(job_id).write_text(_now(), encoding="utf-8")
+    except OSError:
+        pass
     if job.get("status") in TERMINAL_STATUSES:
         return job
 
@@ -459,27 +483,32 @@ def request_cancel(job_id: str) -> dict[str, Any] | None:
     return get(job_id)
 
 
-def wait(job_id: str, timeout: float = 8.0) -> None:
-    future = None
+def _done_event(job_id: str) -> threading.Event:
     with _lock:
-        future = _futures.get(job_id)
-    if future is None:
+        event = _done_events.get(job_id)
+        if event is None:
+            event = threading.Event()
+            _done_events[job_id] = event
+        return event
+
+
+def wait(job_id: str, timeout: float = 8.0) -> None:
+    with _lock:
+        event = _done_events.get(job_id)
+    if event is None:
         return
-    try:
-        future.result(timeout=timeout)
-    except Exception:  # noqa: BLE001
-        return
+    event.wait(timeout=timeout)
 
 
 def get(job_id: str) -> dict[str, Any] | None:
     with _lock:
         job = _jobs.get(job_id)
         if job:
-            return _normalize(dict(job))
+            return _heal(_normalize(dict(job)))
     file = _job_file(job_id)
     if file.exists():
         try:
-            return _normalize(json.loads(file.read_text(encoding="utf-8")))
+            return _heal(_normalize(json.loads(file.read_text(encoding="utf-8"))))
         except json.JSONDecodeError:
             return None
     return None
@@ -500,13 +529,15 @@ def list_jobs(limit: int = 200) -> list[dict[str, Any]]:
             continue
         if not isinstance(data, dict) or not data.get("job_id"):
             continue
-        seen[data["job_id"]] = _normalize(data)
+        seen[data["job_id"]] = _heal(_normalize(data))
         if len(seen) >= limit:
             break
     with _lock:
-        for job_id, job in _jobs.items():
-            seen[job_id] = _normalize(dict(job))
+        snapshot = {job_id: dict(job) for job_id, job in _jobs.items()}
+    for job_id, job in snapshot.items():
+        seen[job_id] = _heal(_normalize(job))
     return sorted(seen.values(), key=lambda j: j.get("created_at") or "", reverse=True)[:limit]
+
 
 
 def summarize(items: list[dict[str, Any]]) -> dict[str, Any]:
