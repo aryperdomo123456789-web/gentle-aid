@@ -27,12 +27,12 @@ ASPECTS: dict[str, tuple[int, int] | None] = {
     "16:9": (1920, 1080),
     "original": None,
 }
-FRAMES = ("crop", "blur")
+FRAMES = ("crop", "blur", "pad")
 FPS = 30
 
 
 def _video_filter(width: int, height: int, frame: str) -> str:
-    """Reenquadramento: corte central seco ou fundo desfocado (estilo TikTok)."""
+    """Reenquadramento: corte central, fundo desfocado (TikTok) ou barras pretas."""
     if frame == "blur":
         return (
             f"[0:v]split=2[bg][fg];"
@@ -41,10 +41,17 @@ def _video_filter(width: int, height: int, frame: str) -> str:
             f"[fg]scale={width}:{height}:force_original_aspect_ratio=decrease[fgs];"
             f"[bgb][fgs]overlay=(W-w)/2:(H-h)/2,fps={FPS},format=yuv420p[v]"
         )
+    if frame == "pad":
+        return (
+            f"[0:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"setsar=1,fps={FPS},format=yuv420p[v]"
+        )
     return (
         f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height},fps={FPS},format=yuv420p[v]"
+        f"crop={width}:{height},setsar=1,fps={FPS},format=yuv420p[v]"
     )
+
 
 
 def _cut(
@@ -160,6 +167,7 @@ def generate(
     voice_volume: float,
     use_ai: bool,
     mutation: str,
+    manual_segments: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Roda o pipeline inteiro e entrega todos os cortes do vídeo."""
     size = ASPECTS.get(aspect, ASPECTS["9:16"])
@@ -169,42 +177,83 @@ def generate(
     duration = max(1.0, media.probe_duration(src))
     jobs.update(job_id, source_duration=round(duration, 1))
 
-    jobs.stage(job_id, "ouvindo", f"Transcrevendo {duration / 60:.1f} min de vídeo.", progress=8)
-    segments, detected = transcribe.transcribe(
-        src, job_id=job_id, language=language, word_timestamps=True
-    )
-    jobs.log(job_id, f"Idioma detectado: {detected or 'desconhecido'} · {len(segments)} trecho(s).")
+    manual = list(manual_segments or [])
+    segments: list[Any] = []
+    detected: str | None = None
+    provider = None
 
-    jobs.stage(job_id, "analisando", "Procurando os melhores momentos do vídeo.", progress=48)
-    clips = highlights.find(
-        segments,
-        niche_id=niche_id,
-        min_seconds=min_seconds,
-        max_seconds=max_seconds,
-        max_clips=max_clips,
-        total_duration=duration,
-    )
-    if not clips:
-        raise RuntimeError(
-            "Nenhum trecho com fala suficiente para o intervalo pedido — "
-            "reduza a duração mínima do corte."
+    # Modo manual sem legenda não precisa ouvir o vídeo: corta na régua e pronto.
+    needs_transcript = bool(caption_preset) or not manual
+    if needs_transcript:
+        jobs.stage(job_id, "ouvindo", f"Transcrevendo {duration / 60:.1f} min de vídeo.", progress=8)
+        segments, detected = transcribe.transcribe(
+            src, job_id=job_id, language=language, word_timestamps=True
+        )
+        jobs.log(
+            job_id, f"Idioma detectado: {detected or 'desconhecido'} · {len(segments)} trecho(s)."
         )
 
-    provider = None
-    if use_ai and highlights.llm_available():
-        jobs.stage(job_id, "curadoria", "IA especialista rankeando e batizando os cortes.", progress=54)
-        refined = highlights.refine(clips, niche_id=niche_id, language="português do Brasil")
-        clips = refined["clips"]
-        provider = refined.get("provider")
+    if manual:
+        clips = []
+        for position, item in enumerate(manual):
+            start = max(0.0, min(float(item.get("start") or 0.0), duration - 1.0))
+            end = min(duration, max(start + 1.0, float(item.get("end") or 0.0)))
+            clips.append(
+                {
+                    "start": round(start, 3),
+                    "end": round(end, 3),
+                    "title": str(item.get("title") or f"Corte manual {position + 1}").strip(),
+                    "score": None,
+                    "reasons": ["Corte definido manualmente na régua de edição."],
+                }
+            )
+        jobs.stage(
+            job_id, "editando", f"{len(clips)} corte(s) manuais na régua.", progress=50
+        )
+    else:
+        jobs.stage(job_id, "analisando", "Procurando os melhores momentos do vídeo.", progress=48)
+        clips = highlights.find(
+            segments,
+            niche_id=niche_id,
+            min_seconds=min_seconds,
+            max_seconds=max_seconds,
+            max_clips=max_clips,
+            total_duration=duration,
+        )
+        if not clips:
+            raise RuntimeError(
+                "Nenhum trecho com fala suficiente para o intervalo pedido — "
+                "reduza a duração mínima do corte."
+            )
+
+        if use_ai and highlights.llm_available():
+            jobs.stage(
+                job_id, "curadoria", "IA especialista rankeando e batizando os cortes.", progress=54
+            )
+            refined = highlights.refine(clips, niche_id=niche_id, language="português do Brasil")
+            clips = refined["clips"]
+            provider = refined.get("provider")
+
         if provider:
             jobs.log(job_id, f"Curadoria por IA via {provider}.")
-        else:
+        elif use_ai:
             jobs.log(job_id, "Curadoria por IA indisponível — mantendo ranking heurístico.", level="warn")
 
     jobs.update(job_id, clips_planned=len(clips), ai_provider=provider)
-    jobs.log(job_id, f"{len(clips)} corte(s) selecionado(s) no nicho '{niche_id}'.")
+    jobs.log(
+        job_id,
+        f"{len(clips)} corte(s) manuais na régua."
+        if manual
+        else f"{len(clips)} corte(s) selecionado(s) no nicho '{niche_id}'.",
+    )
 
-    width, height = size if size else (1080, 1920)
+
+    if size:
+        width, height = size
+    else:
+        info = media.probe(src)
+        width, height = (info.width or 1080), (info.height or 1920)
+
     delivered: list[dict[str, Any]] = []
     best: tuple[float, Path, dict[str, Any], Any] | None = None
 

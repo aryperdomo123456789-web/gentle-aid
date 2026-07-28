@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
@@ -68,6 +70,48 @@ def _float(name: str, default: float, low: float, high: float) -> float:
         return default
     return max(low, min(high, value))
 
+MAX_MANUAL_SEGMENTS = 40
+
+
+def _parse_segments(raw: str | None) -> list[dict[str, object]]:
+    """Cortes manuais da régua de edição: [{start, end, title}]."""
+    text = (raw or "").strip()
+    if not text:
+        return []
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValidationError("Lista de cortes manuais inválida.") from exc
+    if not isinstance(data, list):
+        raise ValidationError("Lista de cortes manuais deve ser um array.")
+    if len(data) > MAX_MANUAL_SEGMENTS:
+        raise ValidationError(f"Máximo de {MAX_MANUAL_SEGMENTS} cortes manuais por job.")
+
+    out: list[dict[str, object]] = []
+    for index, item in enumerate(data):
+        if not isinstance(item, dict):
+            raise ValidationError("Cada corte manual deve ser um objeto.")
+        try:
+            start = float(item.get("start") or 0.0)
+            end = float(item.get("end") or 0.0)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f"Tempos inválidos no corte {index + 1}.") from exc
+        if start < 0 or end <= start:
+            raise ValidationError(f"O corte {index + 1} precisa terminar depois de começar.")
+        if end - start < 1.0:
+            raise ValidationError(f"O corte {index + 1} é curto demais (mínimo 1s).")
+        if end - start > 3600:
+            raise ValidationError(f"O corte {index + 1} passa de 1 hora.")
+        title = clean_text(
+            str(item.get("title") or f"Corte manual {index + 1}"),
+            max_length=120,
+            field="title",
+        )
+        out.append({"start": start, "end": end, "title": title or f"Corte manual {index + 1}"})
+    out.sort(key=lambda seg: float(seg["start"]))  # type: ignore[arg-type]
+    return out
+
+
 
 def _save_music(job_id: str) -> Path | None:
     file = request.files.get("music")
@@ -108,17 +152,25 @@ def run_job():
         return jsonify(error="Nível de mutação inválido."), 400
     if mutation is None:
         mutation = "media"
-    if not transcribe.available():
-        return jsonify(error=transcribe.missing_key_message()), 400
 
-    min_seconds = _float("min_seconds", 60, 8, 1200)
-    max_seconds = _float("max_seconds", 180, 12, 1800)
-    if max_seconds <= min_seconds:
-        max_seconds = min_seconds + 15
+    try:
+        manual_segments = _parse_segments(request.form.get("segments"))
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
 
     caption_preset: str | None = None
     if preset_raw and preset_raw != "none":
         caption_preset = captions.resolve_preset(preset_raw)["id"]
+
+    # Modo manual sem legenda dispensa transcrição — corta direto na régua.
+    if (not manual_segments or caption_preset) and not transcribe.available():
+        return jsonify(error=transcribe.missing_key_message()), 400
+
+    min_seconds = _float("min_seconds", 60, 8, 1200)
+    max_seconds = _float("max_seconds", 180, 12, 1800)
+
+    if max_seconds <= min_seconds:
+        max_seconds = min_seconds + 15
 
     try:
         source_url = clean_text(request.form.get("url"), max_length=500, field="url")
@@ -136,6 +188,8 @@ def run_job():
             "niche": niche,
             "aspect": aspect,
             "frame": frame,
+            "mode": "manual" if manual_segments else "auto",
+            "manual_segments": manual_segments or None,
             "min_seconds": min_seconds,
             "max_seconds": max_seconds,
             "caption_preset": caption_preset,
@@ -144,6 +198,7 @@ def run_job():
             "source_card": source_card,
         },
     )
+
     job_id = job["job_id"]
 
     try:
@@ -180,6 +235,7 @@ def run_job():
             voice_volume=voice_volume,
             use_ai=use_ai,
             mutation=mutation,
+            manual_segments=manual_segments or None,
         )
 
     jobs.submit(job_id, task)

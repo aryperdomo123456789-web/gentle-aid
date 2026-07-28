@@ -49,6 +49,41 @@ function secondsLabel(value: number) {
   return sec ? `${min}min ${sec}s` : `${min}min`;
 }
 
+/** Aceita "90", "1:30" ou "01:02:03" e devolve segundos. */
+function parseTimecode(raw: string): number | null {
+  const text = raw.trim().replace(",", ".");
+  if (!text) return null;
+  const parts = text.split(":").map((p) => Number(p));
+  if (parts.some((p) => Number.isNaN(p) || p < 0)) return null;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+function toTimecode(seconds: number) {
+  const total = Math.max(0, Math.round(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+type ManualSegment = { uid: string; start: string; end: string; title: string };
+
+function newUid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+function segmentDurationLabel(seg: ManualSegment) {
+  const start = parseTimecode(seg.start);
+  const end = parseTimecode(seg.end);
+  if (start === null || end === null || end <= start) return "—";
+  return secondsLabel(end - start);
+}
+
 function Cortes() {
   const { job, error, busy, run, cancel, remove } = useJobRunner("clips");
   const [options, setOptions] = useState<ClipOptions | null>(null);
@@ -58,6 +93,12 @@ function Cortes() {
   const [range, setRange] = useState("padrao");
   const [minSeconds, setMinSeconds] = useState(60);
   const [maxSeconds, setMaxSeconds] = useState(180);
+  const [aspect, setAspect] = useState("9:16");
+  const [frame, setFrame] = useState("crop");
+  const [manualOn, setManualOn] = useState(false);
+  const [segments, setSegments] = useState<ManualSegment[]>([]);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [captionPreset, setCaptionPreset] = useState("hormozi");
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -79,13 +120,76 @@ function Cortes() {
     }
   }
 
+  function addSegment(seed?: Partial<ManualSegment>) {
+    setSegments((list) => [
+      ...list,
+      {
+        uid: newUid(),
+        start: seed?.start ?? "00:00",
+        end: seed?.end ?? "01:00",
+        title: seed?.title ?? "",
+      },
+    ]);
+  }
+
+  function patchSegment(uid: string, patch: Partial<ManualSegment>) {
+    setManualError(null);
+    setSegments((list) => list.map((seg) => (seg.uid === uid ? { ...seg, ...patch } : seg)));
+  }
+
+  function removeSegment(uid: string) {
+    setSegments((list) => list.filter((seg) => seg.uid !== uid));
+  }
+
+  /** Manda o corte entregue de volta para a régua (ex.: refazer em 16:9). */
+  function reeditClip(clip: ClipResult, nextAspect?: string) {
+    setManualOn(true);
+    if (nextAspect) setAspect(nextAspect);
+    setSegments([
+      {
+        uid: newUid(),
+        start: toTimecode(clip.start),
+        end: toTimecode(clip.end),
+        title: clip.title,
+      },
+    ]);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     form.set("min_seconds", String(minSeconds));
     form.set("max_seconds", String(Math.max(minSeconds + 5, maxSeconds)));
+
+    if (manualOn) {
+      const parsed: { start: number; end: number; title: string }[] = [];
+      for (const [index, seg] of segments.entries()) {
+        const start = parseTimecode(seg.start);
+        const end = parseTimecode(seg.end);
+        if (start === null || end === null) {
+          setManualError(`Tempo inválido no corte ${index + 1}. Use mm:ss ou hh:mm:ss.`);
+          return;
+        }
+        if (end - start < 1) {
+          setManualError(`O corte ${index + 1} precisa ter pelo menos 1 segundo.`);
+          return;
+        }
+        parsed.push({ start, end, title: seg.title.trim() || `Corte manual ${index + 1}` });
+      }
+      if (!parsed.length) {
+        setManualError("Adicione pelo menos um corte na régua ou desligue o modo manual.");
+        return;
+      }
+      setManualError(null);
+      form.set("segments", JSON.stringify(parsed));
+    } else {
+      form.delete("segments");
+    }
+
     run(() => apiPostForm<Job>("/api/clips/run", form));
   }
+
 
   const clips = ((job?.meta as Record<string, unknown> | undefined)?.clips ??
     (job as unknown as { clips?: ClipResult[] })?.clips ??
@@ -203,30 +307,117 @@ function Cortes() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            <Field label="Formato de saída">
+            <Field label="Formato de saída" hint="16:9 entrega corte horizontal pronto para YouTube.">
               {(id) => (
-                <SelectInput id={id} name="aspect" defaultValue="9:16">
+                <SelectInput
+                  id={id}
+                  name="aspect"
+                  value={aspect}
+                  onChange={(e) => setAspect(e.target.value)}
+                >
                   <option value="9:16">9:16 — TikTok / Reels / Shorts</option>
                   <option value="1:1">1:1 — quadrado</option>
-                  <option value="16:9">16:9 — horizontal</option>
+                  <option value="16:9">16:9 — horizontal (YouTube)</option>
                   <option value="original">Manter o original</option>
                 </SelectInput>
               )}
             </Field>
             <Field label="Enquadramento">
               {(id) => (
-                <SelectInput id={id} name="frame" defaultValue="crop">
+                <SelectInput id={id} name="frame" value={frame} onChange={(e) => setFrame(e.target.value)}>
                   <option value="crop">Corte central (imagem cheia)</option>
                   <option value="blur">Vídeo inteiro com fundo desfocado</option>
+                  <option value="pad">Vídeo inteiro com barras pretas</option>
                 </SelectInput>
               )}
             </Field>
           </div>
 
+          <div className="rounded-xl border border-border bg-background/40 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Régua de edição manual</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {manualOn
+                    ? "A IA não escolhe nada: entrega exatamente os trechos abaixo, no formato selecionado."
+                    : "Ative para definir você mesmo o início e o fim de cada corte (mm:ss ou hh:mm:ss)."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManualOn((v) => !v)}
+                className={`rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition ${
+                  manualOn
+                    ? "border-primary/60 bg-primary/10 text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {manualOn ? "Modo manual ligado" : "Ativar edição manual"}
+              </button>
+            </div>
+
+            {manualOn ? (
+              <div className="mt-3 space-y-3">
+                {segments.map((seg, index) => (
+                  <div key={seg.uid} className="rounded-lg border border-border/70 bg-card/40 p-2.5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <TextInput
+                        value={seg.start}
+                        placeholder="00:00"
+                        aria-label={`Início do corte ${index + 1}`}
+                        onChange={(e) => patchSegment(seg.uid, { start: e.target.value })}
+                      />
+                      <TextInput
+                        value={seg.end}
+                        placeholder="01:30"
+                        aria-label={`Fim do corte ${index + 1}`}
+                        onChange={(e) => patchSegment(seg.uid, { end: e.target.value })}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <TextInput
+                        value={seg.title}
+                        placeholder={`Corte manual ${index + 1}`}
+                        aria-label={`Título do corte ${index + 1}`}
+                        onChange={(e) => patchSegment(seg.uid, { title: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSegment(seg.uid)}
+                        className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground transition hover:text-destructive"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      Duração: {segmentDurationLabel(seg)}
+                    </p>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addSegment()}
+                  className="w-full rounded-lg border border-dashed border-border py-2 text-[11px] font-semibold text-muted-foreground transition hover:text-foreground"
+                >
+                  + Adicionar corte
+                </button>
+                {manualError ? (
+                  <p className="text-[11px] text-destructive">{manualError}</p>
+                ) : null}
+                {options?.transcription === false && captionPreset !== "none" ? (
+                  <p className="text-[11px] text-warning">
+                    Sem chave de transcrição: escolha “Sem legenda” para rodar os cortes manuais mesmo assim.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
             <Field label="Estilo da legenda">
               {(id) => (
-                <SelectInput id={id} name="caption_preset" defaultValue="hormozi">
+                <SelectInput id={id} name="caption_preset" defaultValue="hormozi" onChange={(e) => setCaptionPreset(e.target.value)}>
                   {(options?.presets ?? []).map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.label}
@@ -298,7 +489,7 @@ function Cortes() {
 
           <JobSettingsGuard
             busy={busy}
-            disabled={(!hasFile && !card) || options?.transcription === false}
+            disabled={(!hasFile && !card) || (options?.transcription === false && !manualOn)}
             label="Gerar cortes"
             busyLabel="Cortando…"
           />
@@ -348,6 +539,23 @@ function Cortes() {
                       preload="none"
                       className="mt-3 w-full rounded-lg border border-border/60 bg-black"
                     />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => reeditClip(clip)}
+                        className="rounded-lg border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+                      >
+                        Editar tempos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => reeditClip(clip, "16:9")}
+                        className="rounded-lg border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+                      >
+                        Refazer em 16:9
+                      </button>
+                    </div>
+
                   </li>
                 ))}
               </ul>
