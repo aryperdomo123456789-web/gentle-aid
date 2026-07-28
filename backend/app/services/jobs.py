@@ -736,8 +736,10 @@ def delete(job_id: str) -> None:
     with _lock:
         _jobs.pop(job_id, None)
         _cancel_events.pop(job_id, None)
-        _futures.pop(job_id, None)
-    paths: list[Path] = [_job_file(job_id)]
+        _done_events.pop(job_id, None)
+    _cancel_cache.pop(job_id, None)
+    paths: list[Path] = [_job_file(job_id), _cancel_file(job_id)]
+
     if job:
         for raw in job.get("artifacts") or []:
             if isinstance(raw, str) and raw:
