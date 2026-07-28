@@ -101,6 +101,8 @@ function Cortes() {
   const [captionPreset, setCaptionPreset] = useState("hormozi");
   const [musicMode, setMusicMode] = useState("auto");
   const [beatSync, setBeatSync] = useState(true);
+  const library = options?.soundtrack?.tracks ?? [];
+  const libraryDir = options?.soundtrack?.library_dir ?? "storage/trilhas";
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -493,11 +495,10 @@ function Cortes() {
                 </Field>
               )}
             </div>
+            <input type="hidden" name="beat_sync" value={beatSync ? "1" : "0"} />
             <label className="flex items-start gap-2 text-[12px] text-muted-foreground">
               <input
                 type="checkbox"
-                name="beat_sync"
-                value="1"
                 checked={beatSync}
                 disabled={musicMode === "none"}
                 onChange={(e) => setBeatSync(e.target.checked)}
