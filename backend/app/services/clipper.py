@@ -167,6 +167,7 @@ def generate(
     voice_volume: float,
     use_ai: bool,
     mutation: str,
+    manual_segments: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Roda o pipeline inteiro e entrega todos os cortes do vídeo."""
     size = ASPECTS.get(aspect, ASPECTS["9:16"])
@@ -176,33 +177,63 @@ def generate(
     duration = max(1.0, media.probe_duration(src))
     jobs.update(job_id, source_duration=round(duration, 1))
 
-    jobs.stage(job_id, "ouvindo", f"Transcrevendo {duration / 60:.1f} min de vídeo.", progress=8)
-    segments, detected = transcribe.transcribe(
-        src, job_id=job_id, language=language, word_timestamps=True
-    )
-    jobs.log(job_id, f"Idioma detectado: {detected or 'desconhecido'} · {len(segments)} trecho(s).")
+    manual = list(manual_segments or [])
+    segments: list[Any] = []
+    detected: str | None = None
+    provider = None
 
-    jobs.stage(job_id, "analisando", "Procurando os melhores momentos do vídeo.", progress=48)
-    clips = highlights.find(
-        segments,
-        niche_id=niche_id,
-        min_seconds=min_seconds,
-        max_seconds=max_seconds,
-        max_clips=max_clips,
-        total_duration=duration,
-    )
-    if not clips:
-        raise RuntimeError(
-            "Nenhum trecho com fala suficiente para o intervalo pedido — "
-            "reduza a duração mínima do corte."
+    # Modo manual sem legenda não precisa ouvir o vídeo: corta na régua e pronto.
+    needs_transcript = bool(caption_preset) or not manual
+    if needs_transcript:
+        jobs.stage(job_id, "ouvindo", f"Transcrevendo {duration / 60:.1f} min de vídeo.", progress=8)
+        segments, detected = transcribe.transcribe(
+            src, job_id=job_id, language=language, word_timestamps=True
+        )
+        jobs.log(
+            job_id, f"Idioma detectado: {detected or 'desconhecido'} · {len(segments)} trecho(s)."
         )
 
-    provider = None
-    if use_ai and highlights.llm_available():
-        jobs.stage(job_id, "curadoria", "IA especialista rankeando e batizando os cortes.", progress=54)
-        refined = highlights.refine(clips, niche_id=niche_id, language="português do Brasil")
-        clips = refined["clips"]
-        provider = refined.get("provider")
+    if manual:
+        clips = []
+        for position, item in enumerate(manual):
+            start = max(0.0, min(float(item.get("start") or 0.0), duration - 1.0))
+            end = min(duration, max(start + 1.0, float(item.get("end") or 0.0)))
+            clips.append(
+                {
+                    "start": round(start, 3),
+                    "end": round(end, 3),
+                    "title": str(item.get("title") or f"Corte manual {position + 1}").strip(),
+                    "score": None,
+                    "reasons": ["Corte definido manualmente na régua de edição."],
+                }
+            )
+        jobs.stage(
+            job_id, "editando", f"{len(clips)} corte(s) manuais na régua.", progress=50
+        )
+    else:
+        jobs.stage(job_id, "analisando", "Procurando os melhores momentos do vídeo.", progress=48)
+        clips = highlights.find(
+            segments,
+            niche_id=niche_id,
+            min_seconds=min_seconds,
+            max_seconds=max_seconds,
+            max_clips=max_clips,
+            total_duration=duration,
+        )
+        if not clips:
+            raise RuntimeError(
+                "Nenhum trecho com fala suficiente para o intervalo pedido — "
+                "reduza a duração mínima do corte."
+            )
+
+        if use_ai and highlights.llm_available():
+            jobs.stage(
+                job_id, "curadoria", "IA especialista rankeando e batizando os cortes.", progress=54
+            )
+            refined = highlights.refine(clips, niche_id=niche_id, language="português do Brasil")
+            clips = refined["clips"]
+            provider = refined.get("provider")
+
         if provider:
             jobs.log(job_id, f"Curadoria por IA via {provider}.")
         else:
