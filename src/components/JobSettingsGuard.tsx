@@ -203,9 +203,9 @@ export function JobSettingsGuard({
 
 
   return (
-    <div ref={anchor} className="space-y-3">
-      <div className="rounded-xl border border-border bg-background/40 p-3 sm:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div ref={anchor} className="@container space-y-3">
+      <div className="rounded-xl border border-border bg-background/40 p-3 @md:p-4">
+        <div className="flex flex-col gap-3 @md:flex-row @md:items-center @md:justify-between">
           <div className="flex items-start gap-2">
             {locked ? (
               <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-400" aria-hidden="true" />
@@ -232,7 +232,7 @@ export function JobSettingsGuard({
             type="button"
             onClick={save}
             disabled={busy}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-secondary px-4 py-2 @md:w-auto text-sm font-semibold text-secondary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Lock className="size-4" aria-hidden="true" />
             {saved && !stale ? "Configurações salvas" : "Salvar configurações"}
@@ -240,7 +240,7 @@ export function JobSettingsGuard({
         </div>
 
         {saved && saved.length > 0 ? (
-          <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-border pt-3 text-xs sm:grid-cols-2">
+          <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-border pt-3 text-xs @xl:grid-cols-2">
             {saved.map((entry) => (
               <div key={entry.name} className="flex min-w-0 items-baseline justify-between gap-3">
                 <dt className="shrink-0 text-muted-foreground">{entry.label}</dt>
