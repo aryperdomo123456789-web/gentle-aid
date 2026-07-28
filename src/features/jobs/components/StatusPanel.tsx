@@ -52,8 +52,10 @@ export function StatusPanel({
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Terminal className="size-4 text-primary" aria-hidden="true" />
+        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <span className="grid size-8 place-items-center rounded-lg bg-primary/12">
+            <Terminal className="size-4 text-primary" aria-hidden="true" />
+          </span>
           Status do processamento
         </h2>
         <StatusPill status={status} />
@@ -69,7 +71,7 @@ export function StatusPanel({
           <Link
             to="/historico/$jobId"
             params={{ jobId: job.job_id }}
-            className="ml-auto inline-flex items-center gap-1 font-semibold text-primary"
+            className="ml-auto inline-flex items-center gap-1 font-semibold text-primary transition-opacity hover:opacity-80"
           >
             Rastro completo
             <ExternalLink className="size-3" aria-hidden="true" />
@@ -84,7 +86,7 @@ export function StatusPanel({
               type="button"
               onClick={() => setDialog("cancel")}
               disabled={acting}
-              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/60 px-4 text-xs font-semibold disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface/60 px-4 text-xs font-semibold transition-all duration-200 hover:border-foreground/40 hover:bg-surface active:scale-95 disabled:opacity-50"
             >
               <StopCircle className="size-4" aria-hidden="true" /> Cancelar job
             </button>
@@ -94,7 +96,7 @@ export function StatusPanel({
               type="button"
               onClick={() => setDialog("delete")}
               disabled={acting}
-              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-destructive/50 bg-destructive/10 px-4 text-xs font-semibold disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-destructive/50 bg-destructive/10 px-4 text-xs font-semibold transition-all duration-200 hover:bg-destructive/20 active:scale-95 disabled:opacity-50"
             >
               <Trash2 className="size-4 text-destructive" aria-hidden="true" /> Apagar job
             </button>
@@ -103,7 +105,7 @@ export function StatusPanel({
       ) : null}
 
       {error ? (
-        <p className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-foreground">
+        <p className="surface-in flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-foreground">
           <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
           {error}
         </p>
@@ -130,11 +132,18 @@ export function StatusPanel({
         </section>
       ) : null}
 
-      <div className="min-h-40 max-h-[45vh] flex-1 overflow-auto overflow-x-hidden rounded-xl border border-border bg-background/70 p-3">
+      <div className="inset-surface min-h-40 max-h-[45vh] flex-1 overflow-auto overflow-x-hidden p-3">
         {lines.length === 0 ? (
-          <p className="font-mono text-xs text-muted-foreground">
-            {busy ? "Iniciando FFmpeg…" : emptyHint}
-          </p>
+          <div className="flex h-full min-h-32 flex-col items-center justify-center gap-2 px-4 text-center">
+            {busy ? (
+              <Loader2 className="size-5 animate-spin text-primary" aria-hidden="true" />
+            ) : (
+              <Terminal className="size-5 text-muted-foreground/60" aria-hidden="true" />
+            )}
+            <p className="max-w-sm text-pretty text-xs leading-5 text-muted-foreground">
+              {busy ? "Iniciando FFmpeg…" : emptyHint}
+            </p>
+          </div>
         ) : (
           <ol className="space-y-1 font-mono text-xs text-muted-foreground">
             {lines.map((line, i) => (
@@ -162,7 +171,7 @@ export function StatusPanel({
         aria-disabled={!job?.download_url}
         className={
           job?.download_url
-            ? "inline-flex items-center justify-center gap-2 min-h-12 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-success-foreground transition-opacity hover:opacity-90"
+            ? "inline-flex items-center justify-center gap-2 min-h-12 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-success-foreground shadow-lg shadow-success/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-success/30 active:translate-y-0 active:scale-[0.99]"
             : "pointer-events-none inline-flex items-center justify-center gap-2 min-h-12 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm font-semibold text-muted-foreground"
         }
       >
@@ -222,7 +231,7 @@ export function StatusPill({ status }: { status: string }) {
   };
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${map[status] ?? map.idle}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-200 ${map[status] ?? map.idle}`}
     >
       {status === "running" || status === "queued" ? (
         <Loader2 className="size-3 animate-spin" aria-hidden="true" />
