@@ -49,6 +49,41 @@ function secondsLabel(value: number) {
   return sec ? `${min}min ${sec}s` : `${min}min`;
 }
 
+/** Aceita "90", "1:30" ou "01:02:03" e devolve segundos. */
+function parseTimecode(raw: string): number | null {
+  const text = raw.trim().replace(",", ".");
+  if (!text) return null;
+  const parts = text.split(":").map((p) => Number(p));
+  if (parts.some((p) => Number.isNaN(p) || p < 0)) return null;
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+function toTimecode(seconds: number) {
+  const total = Math.max(0, Math.round(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+type ManualSegment = { uid: string; start: string; end: string; title: string };
+
+function newUid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+function segmentDurationLabel(seg: ManualSegment) {
+  const start = parseTimecode(seg.start);
+  const end = parseTimecode(seg.end);
+  if (start === null || end === null || end <= start) return "—";
+  return secondsLabel(end - start);
+}
+
 function Cortes() {
   const { job, error, busy, run, cancel, remove } = useJobRunner("clips");
   const [options, setOptions] = useState<ClipOptions | null>(null);
@@ -58,6 +93,11 @@ function Cortes() {
   const [range, setRange] = useState("padrao");
   const [minSeconds, setMinSeconds] = useState(60);
   const [maxSeconds, setMaxSeconds] = useState(180);
+  const [aspect, setAspect] = useState("9:16");
+  const [frame, setFrame] = useState("crop");
+  const [manualOn, setManualOn] = useState(false);
+  const [segments, setSegments] = useState<ManualSegment[]>([]);
+  const [manualError, setManualError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -79,13 +119,76 @@ function Cortes() {
     }
   }
 
+  function addSegment(seed?: Partial<ManualSegment>) {
+    setSegments((list) => [
+      ...list,
+      {
+        uid: newUid(),
+        start: seed?.start ?? "00:00",
+        end: seed?.end ?? "01:00",
+        title: seed?.title ?? "",
+      },
+    ]);
+  }
+
+  function patchSegment(uid: string, patch: Partial<ManualSegment>) {
+    setManualError(null);
+    setSegments((list) => list.map((seg) => (seg.uid === uid ? { ...seg, ...patch } : seg)));
+  }
+
+  function removeSegment(uid: string) {
+    setSegments((list) => list.filter((seg) => seg.uid !== uid));
+  }
+
+  /** Manda o corte entregue de volta para a régua (ex.: refazer em 16:9). */
+  function reeditClip(clip: ClipResult, nextAspect?: string) {
+    setManualOn(true);
+    if (nextAspect) setAspect(nextAspect);
+    setSegments([
+      {
+        uid: newUid(),
+        start: toTimecode(clip.start),
+        end: toTimecode(clip.end),
+        title: clip.title,
+      },
+    ]);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     form.set("min_seconds", String(minSeconds));
     form.set("max_seconds", String(Math.max(minSeconds + 5, maxSeconds)));
+
+    if (manualOn) {
+      const parsed: { start: number; end: number; title: string }[] = [];
+      for (const [index, seg] of segments.entries()) {
+        const start = parseTimecode(seg.start);
+        const end = parseTimecode(seg.end);
+        if (start === null || end === null) {
+          setManualError(`Tempo inválido no corte ${index + 1}. Use mm:ss ou hh:mm:ss.`);
+          return;
+        }
+        if (end - start < 1) {
+          setManualError(`O corte ${index + 1} precisa ter pelo menos 1 segundo.`);
+          return;
+        }
+        parsed.push({ start, end, title: seg.title.trim() || `Corte manual ${index + 1}` });
+      }
+      if (!parsed.length) {
+        setManualError("Adicione pelo menos um corte na régua ou desligue o modo manual.");
+        return;
+      }
+      setManualError(null);
+      form.set("segments", JSON.stringify(parsed));
+    } else {
+      form.delete("segments");
+    }
+
     run(() => apiPostForm<Job>("/api/clips/run", form));
   }
+
 
   const clips = ((job?.meta as Record<string, unknown> | undefined)?.clips ??
     (job as unknown as { clips?: ClipResult[] })?.clips ??
