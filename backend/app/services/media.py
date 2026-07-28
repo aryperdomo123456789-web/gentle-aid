@@ -94,9 +94,10 @@ def run(
     thread.start()
 
     started = time.monotonic()
-    cancel_event = jobs.cancel_event(job_id) if job_id else None
     while True:
-        if cancel_event and cancel_event.is_set():
+        # `is_cancelled` também lê o flag em disco: o cancelamento pode ter
+        # chegado em outro worker do Gunicorn, não no que roda o FFmpeg.
+        if job_id and jobs.is_cancelled(job_id):
             proc.kill()
             try:
                 proc.wait(timeout=5)
