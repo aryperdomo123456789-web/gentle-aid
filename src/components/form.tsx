@@ -51,12 +51,15 @@ export function FileDrop({
   accept,
   onSelect,
   hint,
+  multiple = false,
 }: {
   id: string;
   name: string;
   accept: string;
   hint: string;
   onSelect?: (file: File | null) => void;
+  /** Aceita vários arquivos (ex.: mídias por cena do Estúdio de Vídeo IA). */
+  multiple?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -69,10 +72,13 @@ export function FileDrop({
         name={name}
         type="file"
         accept={accept}
+        multiple={multiple}
         className="sr-only"
         onChange={(e) => {
-          const file = e.target.files?.[0] ?? null;
-          setFileName(file?.name ?? null);
+          const files = e.target.files;
+          const file = files?.[0] ?? null;
+          const count = files?.length ?? 0;
+          setFileName(count > 1 ? `${count} arquivos selecionados` : (file?.name ?? null));
           onSelect?.(file);
         }}
       />
@@ -83,7 +89,7 @@ export function FileDrop({
       >
         <UploadCloud className="size-6 text-primary" aria-hidden="true" />
         <span className="w-full break-words text-sm font-medium text-foreground">
-          {fileName ?? "Selecionar arquivo do computador"}
+          {fileName ?? (multiple ? "Selecionar arquivos do computador" : "Selecionar arquivo do computador")}
         </span>
         <span className="text-xs text-muted-foreground">{hint}</span>
       </button>

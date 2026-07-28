@@ -347,6 +347,27 @@ PROVIDERS: list[dict[str, Any]] = [
         ],
     },
 
+    {
+        "id": "pexels",
+        "name": "Pexels",
+        "category": "Banco de mídia",
+        "env": "PEXELS_API_KEY",
+        "docs": "https://www.pexels.com/api/documentation/",
+        "usage": "B-roll real (vídeo e foto) para o Estúdio de Vídeo IA. Grátis.",
+        "format_hint": "Crie a chave em pexels.com/api — é gratuita e liberada na hora.",
+        "test": {"url": "https://api.pexels.com/videos/search?query=city&per_page=1", "auth": "header", "header": "Authorization"},
+    },
+    {
+        "id": "pixabay",
+        "name": "Pixabay",
+        "category": "Banco de mídia",
+        "env": "PIXABAY_API_KEY",
+        "docs": "https://pixabay.com/api/docs/",
+        "usage": "Reserva de b-roll gratuito quando o Pexels não tem o tema.",
+        "format_hint": "Chave em pixabay.com/api/docs (precisa estar logado). Gratuita.",
+        "test": {"url": "https://pixabay.com/api/videos/?q=city&per_page=3", "auth": "query", "param": "key"},
+    },
+
 
 ]
 
@@ -768,6 +789,8 @@ ALIASES: dict[str, list[str]] = {
     "whisper": ["WHISPER_KEY", "OPENAI_API_KEY"],
     "tikapi": ["TIKAPI_API_KEY", "TIK_API_KEY"],
     "lamatok": ["LAMATOK_KEY", "LAMATOK_TOKEN"],
+    "pexels": ["PEXELS_KEY"],
+    "pixabay": ["PIXABAY_KEY"],
 }
 
 # Assinatura por prefixo — pega a chave mesmo com nome de variável desconhecido.

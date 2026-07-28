@@ -16,6 +16,7 @@ from .blueprints.discover import bp as discover_bp
 from .blueprints.jobs import bp as jobs_bp
 from .blueprints.legendar import bp as legendar_bp
 from .blueprints.radar import bp as radar_bp
+from .blueprints.studio import bp as studio_bp
 from .blueprints.tiktok import bp as tiktok_bp
 from .blueprints.voice import bp as voice_bp
 from .blueprints.youtube import bp as youtube_bp
@@ -73,6 +74,7 @@ def create_app(config: Config | None = None) -> Flask:
         jobs_bp,
         apis_bp,
         radar_bp,
+        studio_bp,
         discover_bp,
     ):
         app.register_blueprint(bp)

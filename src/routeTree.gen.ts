@@ -17,6 +17,7 @@ import { Route as LegendarRouteImport } from './routes/legendar'
 import { Route as LabLegendaRouteImport } from './routes/lab-legenda'
 import { Route as LabRouteImport } from './routes/lab'
 import { Route as HistoricoRouteImport } from './routes/historico'
+import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
 import { Route as ApisRouteImport } from './routes/apis'
@@ -63,6 +64,11 @@ const HistoricoRoute = HistoricoRouteImport.update({
   path: '/historico',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EstudioRoute = EstudioRouteImport.update({
+  id: '/estudio',
+  path: '/estudio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContaRoute = ContaRouteImport.update({
   id: '/conta',
   path: '/conta',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/conta': typeof ContaRoute
+  '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/lab': typeof LabRoute
   '/lab-legenda': typeof LabLegendaRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/conta': typeof ContaRoute
+  '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/lab': typeof LabRoute
   '/lab-legenda': typeof LabLegendaRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/apis': typeof ApisRoute
   '/canva-cleaner': typeof CanvaCleanerRoute
   '/conta': typeof ContaRoute
+  '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/lab': typeof LabRoute
   '/lab-legenda': typeof LabLegendaRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/apis'
     | '/canva-cleaner'
     | '/conta'
+    | '/estudio'
     | '/historico'
     | '/lab'
     | '/lab-legenda'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/apis'
     | '/canva-cleaner'
     | '/conta'
+    | '/estudio'
     | '/historico'
     | '/lab'
     | '/lab-legenda'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/apis'
     | '/canva-cleaner'
     | '/conta'
+    | '/estudio'
     | '/historico'
     | '/lab'
     | '/lab-legenda'
@@ -188,6 +200,7 @@ export interface RootRouteChildren {
   ApisRoute: typeof ApisRoute
   CanvaCleanerRoute: typeof CanvaCleanerRoute
   ContaRoute: typeof ContaRoute
+  EstudioRoute: typeof EstudioRoute
   HistoricoRoute: typeof HistoricoRouteWithChildren
   LabRoute: typeof LabRoute
   LabLegendaRoute: typeof LabLegendaRoute
@@ -256,6 +269,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HistoricoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/estudio': {
+      id: '/estudio'
+      path: '/estudio'
+      fullPath: '/estudio'
+      preLoaderRoute: typeof EstudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/conta': {
       id: '/conta'
       path: '/conta'
@@ -311,6 +331,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApisRoute: ApisRoute,
   CanvaCleanerRoute: CanvaCleanerRoute,
   ContaRoute: ContaRoute,
+  EstudioRoute: EstudioRoute,
   HistoricoRoute: HistoricoRouteWithChildren,
   LabRoute: LabRoute,
   LabLegendaRoute: LabLegendaRoute,
@@ -323,3 +344,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
