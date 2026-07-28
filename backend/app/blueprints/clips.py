@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
@@ -233,6 +235,7 @@ def run_job():
             voice_volume=voice_volume,
             use_ai=use_ai,
             mutation=mutation,
+            manual_segments=manual_segments or None,
         )
 
     jobs.submit(job_id, task)
