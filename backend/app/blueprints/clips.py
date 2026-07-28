@@ -68,6 +68,48 @@ def _float(name: str, default: float, low: float, high: float) -> float:
         return default
     return max(low, min(high, value))
 
+MAX_MANUAL_SEGMENTS = 40
+
+
+def _parse_segments(raw: str | None) -> list[dict[str, object]]:
+    """Cortes manuais da régua de edição: [{start, end, title}]."""
+    text = (raw or "").strip()
+    if not text:
+        return []
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValidationError("Lista de cortes manuais inválida.") from exc
+    if not isinstance(data, list):
+        raise ValidationError("Lista de cortes manuais deve ser um array.")
+    if len(data) > MAX_MANUAL_SEGMENTS:
+        raise ValidationError(f"Máximo de {MAX_MANUAL_SEGMENTS} cortes manuais por job.")
+
+    out: list[dict[str, object]] = []
+    for index, item in enumerate(data):
+        if not isinstance(item, dict):
+            raise ValidationError("Cada corte manual deve ser um objeto.")
+        try:
+            start = float(item.get("start") or 0.0)
+            end = float(item.get("end") or 0.0)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f"Tempos inválidos no corte {index + 1}.") from exc
+        if start < 0 or end <= start:
+            raise ValidationError(f"O corte {index + 1} precisa terminar depois de começar.")
+        if end - start < 1.0:
+            raise ValidationError(f"O corte {index + 1} é curto demais (mínimo 1s).")
+        if end - start > 3600:
+            raise ValidationError(f"O corte {index + 1} passa de 1 hora.")
+        title = clean_text(
+            str(item.get("title") or f"Corte manual {index + 1}"),
+            max_length=120,
+            field="title",
+        )
+        out.append({"start": start, "end": end, "title": title or f"Corte manual {index + 1}"})
+    out.sort(key=lambda seg: float(seg["start"]))  # type: ignore[arg-type]
+    return out
+
+
 
 def _save_music(job_id: str) -> Path | None:
     file = request.files.get("music")
