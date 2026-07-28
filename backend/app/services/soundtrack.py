@@ -503,6 +503,7 @@ def pick(
     workdir: Path | None = None,
     use_ai: bool = True,
     job_id: str | None = None,
+    force_synth: bool = False,
 ) -> Track:
     """Modo automático: perfil por IA (ou heurística) → melhor faixa → síntese."""
     profile = profile_for(niche_id, transcript)
@@ -520,7 +521,7 @@ def pick(
         if best is None or score > best[0]:
             best = (score, track, reasons)
 
-    if best and best[0] >= 3.0:
+    if best and best[0] >= 3.0 and not force_synth:
         score, track, reasons = best
         track.profile = profile.id
         track.reason = " ".join(
