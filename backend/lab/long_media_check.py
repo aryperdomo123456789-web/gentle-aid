@@ -73,14 +73,14 @@ def main() -> int:
         )
 
         # Plano de narração: nenhum bloco pode passar do teto do motor.
-        plan = voice_engine.plan_chunks(probed) if hasattr(voice_engine, "plan_chunks") else None
-        if plan is not None:
-            worst = max((end - start) for start, end in plan)
-            check(
-                f"áudio {seconds}s · plano de voz",
-                worst <= voice_engine.CHUNK_MAX + 1,
-                f"{len(plan)} blocos, maior {worst:.0f}s",
-            )
+        plan = voice_engine.plan_cuts(probed, [])
+        worst = max((end - start) for start, end in plan)
+        check(
+            f"áudio {seconds}s · plano de voz",
+            worst <= voice_engine.CHUNK_MAX + 1,
+            f"{len(plan)} blocos, maior {worst:.0f}s",
+        )
+
 
         # Plano de transcrição: blocos de CHUNK_SECONDS cobrindo tudo.
         blocks = max(1, int((probed + transcribe.CHUNK_SECONDS - 1) // transcribe.CHUNK_SECONDS))
