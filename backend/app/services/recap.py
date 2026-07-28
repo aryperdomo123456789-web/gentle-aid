@@ -48,7 +48,7 @@ FORMATS: dict[str, dict[str, Any]] = {
         "width": 1080,
         "height": 1920,
         "min_seconds": 45,
-        "max_seconds": 240,
+        "max_seconds": 600,
         "default_seconds": 120,
         "frame_mode": "crop",
     },
@@ -59,7 +59,7 @@ FORMATS: dict[str, dict[str, Any]] = {
         "width": 1920,
         "height": 1080,
         "min_seconds": 300,
-        "max_seconds": 1800,
+        "max_seconds": 3600,
         "default_seconds": 720,
         "frame_mode": "pad",
     },
@@ -68,10 +68,16 @@ FORMATS: dict[str, dict[str, Any]] = {
 # Palavras faladas por segundo (PT-BR de narração) — mesma régua do Doutor de Roteiro.
 WORDS_PER_SECOND = 2.6
 
+# Teto de blocos por recap e quantos blocos cada chamada de LLM escreve por vez.
+# Janelas pequenas = resposta curta, JSON íntegro e nada de timeout em recap longo.
+BEATS_HARD_CAP = 420
+BEATS_PER_LLM_CALL = 22
+
 # Quantos frames amostrar por minuto de vídeo, com teto para não estourar custo.
 FRAMES_PER_MINUTE = 2
 MAX_FRAMES = 36
 MIN_BEAT_SECONDS = 2.0
+
 
 
 class RecapError(RuntimeError):
@@ -475,6 +481,23 @@ def _parse_ts(value: Any, duration: float) -> float:
     return max(0.0, min(max(0.0, duration - 0.5), seconds))
 
 
+def _beats_from_payload(parsed: dict[str, Any], duration: float) -> list[Beat]:
+    out: list[Beat] = []
+    for item in parsed.get("blocos") or []:
+        try:
+            text = script_doctor.clean_for_speech(str(item["fala"]).strip())
+        except (KeyError, TypeError):
+            continue
+        if len(text) < 2:
+            continue
+        out.append(Beat(kind="corpo", text=text, source_start=_parse_ts(item.get("em"), duration)))
+    return out
+
+
+def _slice_window(items, start: float, end: float, key):
+    return [item for item in items if start <= key(item) < end]
+
+
 def write_beats(
     brief: dict[str, Any],
     segments: list[Segment],
@@ -486,12 +509,18 @@ def write_beats(
     blocks: dict[str, str],
     job_id: str,
 ) -> list[Beat]:
-    """Escreve o roteiro do recap ancorado em timestamps reais do vídeo."""
+    """Escreve o roteiro do recap ancorado em timestamps reais do vídeo.
+
+    Recaps longos são escritos em janelas: cada chamada ao LLM cobre um pedaço
+    do vídeo e devolve poucos blocos. Isso evita resposta truncada, JSON
+    quebrado e timeout — que é o que fazia narração longa falhar no meio.
+    """
     jobs.stage(job_id, "roteirizando", "Escrevendo a narração no tom detectado.", progress=45)
     style = script_doctor.get_style(style_id)
     words_budget = int(target_seconds * WORDS_PER_SECOND)
     # Blocos de ~9 s de narração cada dão ritmo de recap sem virar slideshow.
-    beats_target = max(6, min(60, int(target_seconds / 9)))
+    beats_target = max(6, min(BEATS_HARD_CAP, int(target_seconds / 9)))
+    windows = max(1, -(-beats_target // BEATS_PER_LLM_CALL))
 
     system = (
         "Você é roteirista de recap narrado em português do Brasil — o formato dos canais de "
@@ -504,25 +533,50 @@ def write_beats(
         "- O primeiro bloco é gancho: precisa prender nos 3 primeiros segundos.\n"
         "- Cada bloco aponta o instante do vídeo que deve aparecer na tela enquanto ele é narrado."
     )
-    prompt = (
-        f"DIAGNÓSTICO DA OBRA:\n{json.dumps(brief, ensure_ascii=False)}\n\n"
-        f"LINHA DO TEMPO:\n{_timeline_text(segments, shots, duration)}\n\n"
-        f"Escreva o recap com cerca de {beats_target} blocos, somando aproximadamente "
-        f"{words_budget} palavras (≈ {target_seconds} segundos de narração). "
-        "Cubra começo, meio e fim da história, na ordem. "
-        'Responda SOMENTE JSON: {"blocos":[{"em":"m:ss","fala":"texto narrado"}]}'
-    )
-    parsed = _llm_json(system, prompt, job_id=job_id)
 
     beats: list[Beat] = []
-    for item in parsed.get("blocos") or []:
+    span = duration / windows
+    for index in range(windows):
+        jobs.check_cancelled(job_id)
+        w_start = index * span
+        w_end = duration if index == windows - 1 else (index + 1) * span
+        w_segments = _slice_window(segments, w_start, w_end, lambda s: s.start) if windows > 1 else segments
+        w_shots = _slice_window(shots, w_start, w_end, lambda s: s.at) if windows > 1 else shots
+        if windows > 1 and not w_segments and not w_shots:
+            continue
+
+        recap_so_far = " ".join(beat.text for beat in beats[-4:])
+        prompt = (
+            f"DIAGNÓSTICO DA OBRA:\n{json.dumps(brief, ensure_ascii=False)}\n\n"
+            + (
+                f"PARTE {index + 1} de {windows} — de {_mmss(w_start)} até {_mmss(w_end)}.\n"
+                f"ÚLTIMOS BLOCOS JÁ NARRADOS (não repita):\n{recap_so_far or '(nenhum)'}\n\n"
+                if windows > 1
+                else ""
+            )
+            + f"LINHA DO TEMPO:\n{_timeline_text(w_segments, w_shots, duration)}\n\n"
+            f"Escreva {max(3, beats_target // windows)} blocos, somando cerca de "
+            f"{max(60, words_budget // windows)} palavras. "
+            + ("Continue a história na ordem, sem recomeçar do zero. " if index else "Cubra o começo da história. ")
+            + ("Feche a história no último bloco. " if index == windows - 1 else "")
+            + 'Responda SOMENTE JSON: {"blocos":[{"em":"m:ss","fala":"texto narrado"}]}'
+        )
         try:
-            text = script_doctor.clean_for_speech(str(item["fala"]).strip())
-        except (KeyError, TypeError):
+            parsed = _llm_json(system, prompt, job_id=job_id)
+        except RecapError:
+            if windows == 1 or index == 0:
+                raise
+            jobs.log(job_id, f"Parte {index + 1}/{windows} do roteiro falhou — seguindo com o resto.")
             continue
-        if len(text) < 2:
-            continue
-        beats.append(Beat(kind="corpo", text=text, source_start=_parse_ts(item.get("em"), duration)))
+        chunk = _beats_from_payload(parsed, duration)
+        if windows > 1:
+            for beat in chunk:
+                if not (w_start <= beat.source_start < w_end):
+                    beat.source_start = min(max(beat.source_start, w_start), max(w_start, w_end - 0.5))
+        beats.extend(chunk)
+        if windows > 1:
+            jobs.update(job_id, progress=min(54, 45 + int(9 * (index + 1) / windows)))
+            jobs.log(job_id, f"Roteiro parte {index + 1}/{windows} · {len(beats)} bloco(s) até aqui.")
 
     if not beats:
         raise RecapError("A IA não devolveu nenhum bloco de narração utilizável. Tente de novo.")
@@ -532,6 +586,7 @@ def write_beats(
     beats = _insert_fixed_blocks(beats, blocks, duration)
     jobs.log(job_id, f"Roteiro com {len(beats)} bloco(s) de narração.")
     return beats
+
 
 
 def _insert_fixed_blocks(beats: list[Beat], blocks: dict[str, str], duration: float) -> list[Beat]:
@@ -696,49 +751,83 @@ def narrate_and_assemble(
     workdir.mkdir(parents=True, exist_ok=True)
     source_has_audio = _has_audio(src)
     clips: list[Path] = []
+    rendered: list[Beat] = []
+    failures = 0
     cursor = 0.0
 
     for index, beat in enumerate(beats, start=1):
         jobs.check_cancelled(job_id)
-        raw = workdir / f"nar_{index:03d}_raw.wav"
-        final_audio = workdir / f"nar_{index:03d}.wav"
-        _synth(beat.text, raw, engine=engine, voice=voice, rate=rate, job_id=job_id)
-        if persona is not None and engine != "elevenlabs":
-            beat.audio = _apply_persona(raw, final_audio, persona)
-        else:
-            raw.replace(final_audio)
-            beat.audio = final_audio
+        raw = workdir / f"nar_{index:04d}_raw.wav"
+        final_audio = workdir / f"nar_{index:04d}.wav"
+        clip = workdir / f"clip_{index:04d}.mp4"
+        try:
+            # Duas tentativas por bloco: falha de rede no TTS ou hiccup do FFmpeg
+            # não pode derrubar uma narração de meia hora inteira.
+            for attempt in (1, 2):
+                try:
+                    _synth(beat.text, raw, engine=engine, voice=voice, rate=rate, job_id=job_id)
+                    if persona is not None and engine != "elevenlabs":
+                        beat.audio = _apply_persona(raw, final_audio, persona)
+                    else:
+                        raw.replace(final_audio)
+                        beat.audio = final_audio
 
-        beat.duration = max(MIN_BEAT_SECONDS, media.probe_duration(beat.audio))
-        beat.timeline_start = cursor
+                    beat.duration = max(MIN_BEAT_SECONDS, media.probe_duration(beat.audio))
+                    beat.timeline_start = cursor
+
+                    _render_beat(
+                        src,
+                        beat,
+                        clip,
+                        width=width,
+                        height=height,
+                        frame_mode=frame_mode,
+                        ambience=ambience,
+                        source_has_audio=source_has_audio,
+                        source_duration=source_duration,
+                        job_id=job_id,
+                    )
+                    break
+                except Exception:  # noqa: BLE001
+                    jobs.check_cancelled(job_id)
+                    if attempt == 2:
+                        raise
+                    time.sleep(1.5)
+        except Exception as exc:  # noqa: BLE001
+            failures += 1
+            jobs.log(job_id, f"Bloco {index} pulado após 2 tentativas: {exc}")
+            raw.unlink(missing_ok=True)
+            final_audio.unlink(missing_ok=True)
+            clip.unlink(missing_ok=True)
+            if failures > max(4, len(beats) // 5):
+                raise RecapError(
+                    "Muitos blocos de narração falharam seguidamente. Verifique a chave de voz em /apis."
+                ) from exc
+            continue
+
         cursor += beat.duration
-
-        clip = workdir / f"clip_{index:03d}.mp4"
-        _render_beat(
-            src,
-            beat,
-            clip,
-            width=width,
-            height=height,
-            frame_mode=frame_mode,
-            ambience=ambience,
-            source_has_audio=source_has_audio,
-            source_duration=source_duration,
-            job_id=job_id,
-        )
         beat.clip = clip
         clips.append(clip)
+        rendered.append(beat)
         beat.audio.unlink(missing_ok=True)
+        raw.unlink(missing_ok=True)
 
         jobs.update(job_id, progress=min(82, 55 + int(27 * index / len(beats))))
         if index % 3 == 0 or index == len(beats):
             jobs.log(job_id, f"Recap {index}/{len(beats)} blocos narrados e montados.")
 
+    if not clips:
+        raise RecapError("Nenhum bloco de narração pôde ser gerado. Verifique o motor de voz em /apis.")
+    if failures:
+        jobs.log(job_id, f"{failures} bloco(s) descartados — recap montado com os {len(clips)} válidos.")
+
     jobs.stage(job_id, "montando", "Colando os trechos na ordem da história.", progress=85)
-    _concat(clips, dst, job_id)
+    _concat_batched(clips, dst, workdir, job_id)
     for clip in clips:
         clip.unlink(missing_ok=True)
-    return beats
+    beats[:] = rendered
+    return rendered
+
 
 
 def caption_lines(beats: list[Beat], *, max_words: int = 4):
