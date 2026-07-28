@@ -6,7 +6,8 @@ Pipeline (mesmo padrão de jobs/rastro/esterilização do resto do ecossistema):
   2. escuta     → transcrição com timestamp por palavra (`transcribe`)
   3. inteligência → melhores momentos por nicho (`highlights.find` + IA opcional)
   4. corte      → recorte exato + reenquadramento 9:16 (crop ou fundo desfocado)
-  5. trilha     → música de fundo com ducking sobre a voz (opcional)
+  5. trilha     → upload, biblioteca ou trilha escolhida/gerada pela IA por nicho,
+                  com corte travado em compassos e punch-in na batida
   6. legenda    → ASS animado do Estúdio de Legendas, queimado na esterilização
   7. entrega    → cada corte vira artefato; o melhor vira o download principal
 """
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import config
-from . import captions, highlights, jobs, media, transcribe
+from . import beatsync, captions, highlights, jobs, media, soundtrack, transcribe
 from .delivery import deliver
 from .validation import output_path
 
