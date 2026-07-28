@@ -60,7 +60,11 @@ def _decode_pcm(path, *, max_seconds: float = 600.0) -> array.array:
         "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE),
         "-f", "s16le", "-",
     ]
-    proc = subprocess.run(cmd, capture_output=True, check=False)
+    try:
+        # sem timeout, um arquivo corrompido prenderia o job para sempre
+        proc = subprocess.run(cmd, capture_output=True, check=False, timeout=600)
+    except subprocess.TimeoutExpired:
+        return array.array("h")
     raw = proc.stdout or b""
     if len(raw) < 4:
         return array.array("h")
