@@ -14,18 +14,22 @@ export function Field({
 }) {
   const id = useId();
   return (
-    <div className="space-y-2">
-      <label htmlFor={id} className="block text-sm font-medium text-foreground">
+    <div className="space-y-1.5">
+      <label
+        htmlFor={id}
+        className="block text-[13px] font-semibold tracking-tight text-foreground"
+      >
         {label}
       </label>
       {children(id)}
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {hint ? <p className="text-xs leading-5 text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
 
 const control =
-  "w-full min-h-11 max-w-full rounded-xl border border-input bg-background/60 px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40";
+  "w-full min-h-11 max-w-full rounded-xl border border-input bg-background/50 px-3.5 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted-foreground/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-[border-color,box-shadow,background-color] duration-200 hover:border-primary/40 focus:border-primary focus:bg-background/70 focus:outline-none focus:ring-2 focus:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-60";
+
 
 export function TextInput({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(control, className)} />;
