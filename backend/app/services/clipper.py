@@ -292,6 +292,49 @@ def generate(
         else f"{len(clips)} corte(s) selecionado(s) no nicho '{niche_id}'.",
     )
 
+    # ---------------------------------------------------------------- trilha #
+    track = None
+    if music_mode and music_mode != "none":
+        jobs.stage(job_id, "trilha", "Definindo a trilha e o ritmo dos cortes.", progress=55)
+        transcript = " ".join(str(getattr(s, "text", "") or "") for s in segments)[:8000]
+        media_seconds = max(float(c["end"]) - float(c["start"]) for c in clips) if clips else 60.0
+        try:
+            track = soundtrack.resolve(
+                mode=music_mode,
+                upload=music,
+                track_id=music_track,
+                niche_id=niche_id,
+                transcript=transcript,
+                seconds=media_seconds,
+                workdir=workdir,
+                use_ai=use_ai,
+                job_id=job_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - trilha nunca derruba o job
+            jobs.log(job_id, f"Trilha indisponível ({exc}) — seguindo sem música.", level="warn")
+            track = None
+
+    if track:
+        jobs.log(
+            job_id,
+            f"Trilha: {track.label} · {track.bpm:.0f} BPM · {track.origin}. {track.reason}".strip(),
+        )
+        jobs.update(
+            job_id,
+            soundtrack=track.as_dict(),
+            beat_sync=bool(beat_sync and track.bpm > 0),
+        )
+
+    # Trava a duração de cada corte em compassos inteiros da trilha: o corte
+    # termina no fim da frase musical, que é o que dá a sensação de "editado".
+    if track and beat_sync and track.bpm > 0:
+        for clip in clips:
+            seconds = float(clip["end"]) - float(clip["start"])
+            locked = soundtrack.bars_duration(seconds, track.bpm)
+            if locked >= max(2.0, min_seconds * 0.6) and abs(locked - seconds) > 0.05:
+                clip["end"] = round(float(clip["start"]) + locked, 3)
+        jobs.log(job_id, f"Cortes travados em compassos de {track.bpm:.0f} BPM.")
+
 
     if size:
         width, height = size
