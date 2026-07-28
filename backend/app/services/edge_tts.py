@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from pathlib import Path
 
 from ..config import config
@@ -111,7 +112,7 @@ def list_voices(locale_prefixes: tuple[str, ...] = LOCALE_PREFIXES) -> list[dict
     if module is None:
         return list(FALLBACK_VOICES)
     try:
-        raw = asyncio.run(module.list_voices())
+        raw = _run_async(module.list_voices())
     except Exception:  # noqa: BLE001 - rede/API instável não pode derrubar o catálogo
         return list(FALLBACK_VOICES)
 
