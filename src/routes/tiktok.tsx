@@ -50,7 +50,9 @@ function TikTokDashboard() {
   const [radarBusy, setRadarBusy] = useState(false);
   const [radarError, setRadarError] = useState<string | null>(null);
   const [cloneUrl, setCloneUrl] = useState("");
+  const [sourceCard, setSourceCard] = useState<DiscoveryCard | null>(null);
   const [intensity, setIntensity] = useState("auto");
+
 
   async function loadRadar(e: React.FormEvent) {
     e.preventDefault();
@@ -69,17 +71,25 @@ function TikTokDashboard() {
     }
   }
 
-  function clone(url: string, sourceCard?: DiscoveryCard) {
+  /** Nada roda direto: o link só é carregado no formulário para conferência. */
+  function pick(url: string, card?: DiscoveryCard) {
     setCloneUrl(url);
+    setSourceCard(card ?? null);
+  }
+
+  function clone() {
+    const url = cloneUrl.trim();
+    if (!url) return;
     run(() =>
       apiPostJson<Job>("/api/tiktok/clone", {
         url,
         nicho,
         intensity,
-        ...(sourceCard ? { source_card: sourceCard } : {}),
+        ...(sourceCard && sourceCard.url === url ? { source_card: sourceCard } : {}),
       }),
     );
   }
+
 
   return (
     <ToolShell
@@ -145,11 +155,11 @@ function TikTokDashboard() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => clone(t.url)}
+                      onClick={() => pick(t.url)}
                       disabled={busy}
                       className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
                     >
-                      Clonar 1:1
+                      Usar este viral
                     </button>
                   </li>
                 ))}
@@ -160,7 +170,7 @@ function TikTokDashboard() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (cloneUrl.trim()) clone(cloneUrl.trim());
+              clone();
             }}
             className="space-y-4 rounded-xl border border-border bg-background/40 p-4"
           >
@@ -168,6 +178,7 @@ function TikTokDashboard() {
               {(id) => (
                 <TextInput
                   id={id}
+                  name="url"
                   type="url"
                   value={cloneUrl}
                   onChange={(e) => setCloneUrl(e.target.value)}
@@ -177,11 +188,12 @@ function TikTokDashboard() {
             </Field>
             <Field
               label="Nível de esterilização"
-              hint="Aplicado a qualquer clone, inclusive nos disparados pelo radar acima."
+              hint="Aplicado ao clone que você confirmar abaixo."
             >
               {(id) => (
                 <SelectInput
                   id={id}
+                  name="intensity"
                   value={intensity}
                   onChange={(e) => setIntensity(e.target.value)}
                 >
@@ -193,7 +205,12 @@ function TikTokDashboard() {
                 </SelectInput>
               )}
             </Field>
-            <JobSettingsGuard busy={busy} label="Clonar viral" busyLabel="Clonando…" />
+            <JobSettingsGuard
+              busy={busy}
+              disabled={!cloneUrl.trim()}
+              label="Clonar viral"
+              busyLabel="Clonando…"
+            />
           </form>
         </div>
       }
@@ -211,8 +228,8 @@ function TikTokDashboard() {
         <div className="space-y-6">
           <DiscoveryPanel
             defaultPlatform="tiktok"
-            actionLabel="Codificar 1:1"
-            onAction={(card: DiscoveryCard) => clone(card.url, card)}
+            actionLabel="Usar este vídeo"
+            onAction={(card: DiscoveryCard) => pick(card.url, card)}
             actionBusyUrl={busy ? cloneUrl : null}
           />
           <ToolHistory

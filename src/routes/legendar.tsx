@@ -9,6 +9,7 @@ import {
   Save,
   Search,
   Shield,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Type,
@@ -21,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel";
 import { Field, FileDrop, SelectInput, TextArea } from "@/components/form";
+import { JobSettingsGuard } from "@/components/JobSettingsGuard";
 import { MutationSelect } from "@/components/MutationSelect";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
@@ -79,6 +81,7 @@ type PanelId =
   | "animacao"
   | "cores"
   | "esterilizar"
+  | "exportar"
   | "jobs"
   | "historico";
 
@@ -90,6 +93,7 @@ const RAIL: { id: PanelId; label: string; icon: typeof Upload }[] = [
   { id: "animacao", label: "Animação", icon: Wand2 },
   { id: "cores", label: "Cores", icon: Palette },
   { id: "esterilizar", label: "Esterilizar", icon: Shield },
+  { id: "exportar", label: "Exportar", icon: ShieldCheck },
   { id: "jobs", label: "Job", icon: ImageIcon },
   { id: "historico", label: "Histórico", icon: Clock3 },
 ];
@@ -204,15 +208,12 @@ function Legendar() {
     return form;
   }
 
+  /** Nada roda direto: a mídia é carregada e a exportação exige confirmação. */
   function processCard(nextCard: DiscoveryCard) {
     setCard(nextCard);
     setFile(null);
-    const form = buildForm(new FormData());
-    form.set("url", nextCard.url);
-    form.set("source_card", JSON.stringify(nextCard));
     saveDraft();
-    setPanel("jobs");
-    run(() => apiPostForm<Job>("/api/legendar/run", form));
+    setPanel("exportar");
   }
 
   function exportVideo() {
@@ -230,6 +231,32 @@ function Legendar() {
     setPanel("jobs");
     run(() => apiPostForm<Job>("/api/legendar/run", form));
   }
+
+  /** Resumo legível do que vai para o servidor — usado pela trava de segurança. */
+  const exportEntries = useMemo(() => {
+    const source = file
+      ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`
+      : card
+        ? card.title
+        : "nenhuma mídia";
+    const words = transcript.trim() ? `${transcript.trim().split(/\s+/).length} palavras` : "vazio";
+    return [
+      { name: "source", label: "Mídia de origem", value: source },
+      { name: "preset", label: "Preset de legenda", value: preset?.label ?? style.preset },
+      { name: "aspect", label: "Formato", value: ASPECT_LABEL[style.aspect] ?? style.aspect },
+      { name: "position", label: "Posição", value: `${POSITION_LABEL[position]} · ${style.yPct}%` },
+      { name: "fontScale", label: "Tamanho da fonte", value: `${style.fontScale.toFixed(2)}x` },
+      { name: "wordsPerLine", label: "Palavras por linha", value: String(style.wordsPerLine) },
+      { name: "transcript", label: "Roteiro/legenda", value: words },
+      { name: "mutation", label: "Esterilização", value: mutation },
+    ];
+  }, [file, card, preset, style, position, transcript, mutation]);
+
+  const exportSignature = useMemo(
+    () => JSON.stringify([exportEntries]),
+    [exportEntries],
+  );
+
 
   const draftStamp = useMemo(
     () => (draft ? new Date(draft.savedAt).toLocaleString("pt-BR") : null),
@@ -311,7 +338,7 @@ function Legendar() {
           </span>
           <button
             type="button"
-            onClick={exportVideo}
+            onClick={() => setPanel("exportar")}
             disabled={busy}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60 sm:px-4"
           >
@@ -622,6 +649,29 @@ function Legendar() {
 
             {panel === "esterilizar" ? (
               <MutationSelect value={mutation} onChange={setMutation} />
+            ) : null}
+
+            {panel === "exportar" ? (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Confira o resumo e salve as configurações. A renderização só libera depois da
+                  conferência.
+                </p>
+                <JobSettingsGuard
+                  busy={busy}
+                  disabled={!file && !card}
+                  entries={exportEntries}
+                  signature={exportSignature}
+                  onStart={exportVideo}
+                  label="Exportar legendado"
+                  busyLabel="Renderizando…"
+                />
+                {!file && !card ? (
+                  <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+                    Envie um vídeo em Uploads ou escolha um na Pesquisa antes de exportar.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
 
             {panel === "jobs" ? (
