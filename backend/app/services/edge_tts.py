@@ -157,11 +157,37 @@ def split_text(text: str, limit: int = TEXT_CHUNK) -> list[str]:
     return [c for c in chunks if c]
 
 
+def _run_async(coro):
+    """Executa a corrotina em um loop próprio, sem depender do `asyncio.run`.
+
+    `asyncio.run` cria executores auxiliares que, durante o shutdown do
+    interpretador (reciclagem/restart do worker do Gunicorn), estouram
+    `cannot schedule new futures after interpreter shutdown` e derrubam jobs
+    longos de voz. Aqui o loop é criado, usado e fechado explicitamente na
+    própria thread do job.
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+    finally:
+        try:
+            loop.close()
+        finally:
+            asyncio.set_event_loop(None)
+
+
 async def _synth_one(text: str, voice: str, rate: str, dst_mp3: Path) -> None:
     module = _module()
     assert module is not None
     communicate = module.Communicate(text, voice, rate=rate)
     await communicate.save(str(dst_mp3))
+
+
+# Roteiros longos derrubam a conexão do Edge TTS de vez em quando; o bloco é
+# refeito em vez de matar o job inteiro.
+SYNTH_ATTEMPTS = 3
+
 
 
 def synthesize(
