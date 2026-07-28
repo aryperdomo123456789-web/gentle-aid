@@ -133,10 +133,121 @@ def _normalize(job: dict[str, Any]) -> dict[str, Any]:
     job.setdefault("meta", {})
     job.setdefault("progress", 0)
     job.setdefault("updated_at", job.get("finished_at") or job.get("created_at"))
+    job.setdefault("heartbeat_at", None)
+    job.setdefault("owner_pid", None)
+    job.setdefault("owner_host", None)
     job["tool_label"] = tool_label(job.get("tool") or "")
     job["duration_ms"] = _duration_ms(job)
     job["terminal"] = job.get("status") in TERMINAL_STATUSES
     return job
+
+
+# --- Detecção de job órfão (processo morreu no meio) -------------------------
+
+
+def _pid_alive(pid: Any) -> bool:
+    try:
+        os.kill(int(pid), 0)
+    except (TypeError, ValueError):
+        return False
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _is_orphan(job: dict[str, Any]) -> bool:
+    """Job não-terminal cujo processo dono não bate mais o coração."""
+    if job.get("status") in TERMINAL_STATUSES:
+        return False
+    owner_pid = job.get("owner_pid")
+    owner_host = job.get("owner_host")
+    if owner_host == _HOST and owner_pid == _PID:
+        return False  # é nosso: está vivo por definição
+    if owner_host == _HOST and owner_pid and _pid_alive(owner_pid):
+        return False  # outro worker do Gunicorn, ainda vivo
+    beat = _parse_iso(job.get("heartbeat_at")) or _parse_iso(job.get("updated_at"))
+    if not beat:
+        beat = _parse_iso(job.get("created_at"))
+    if not beat:
+        return False
+    age = (datetime.now(timezone.utc) - beat).total_seconds()
+    return age > STALE_AFTER_SECONDS
+
+
+def _write_job_file(job: dict[str, Any]) -> None:
+    try:
+        config.jobs_dir.mkdir(parents=True, exist_ok=True)
+        _job_file(job["job_id"]).write_text(
+            json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except (OSError, KeyError):
+        return
+
+
+def _heal(job: dict[str, Any]) -> dict[str, Any]:
+    """Converte job órfão em falha explícita — nunca deixa 'processando' eterno."""
+    if not _is_orphan(job):
+        return job
+    job["status"] = "error"
+    job["stage"] = "interrompido"
+    job["message"] = INTERRUPTED_MESSAGE
+    job["finished_at"] = job.get("finished_at") or _now()
+    job["updated_at"] = _now()
+    job["terminal"] = True
+    events = list(job.get("events") or [])
+    events.append(
+        {"ts": _now(), "level": "error", "stage": "interrompido", "message": INTERRUPTED_MESSAGE}
+    )
+    job["events"] = events[-MAX_EVENTS:]
+    lines = list(job.get("log") or [])
+    lines.append(f"[{_now()[11:19]}] ERROR     interrompido · {INTERRUPTED_MESSAGE}")
+    job["log"] = lines[-MAX_LOG_LINES:]
+    _write_job_file(job)
+    with _lock:
+        _jobs.pop(job["job_id"], None)
+    audit("interrupted", job.get("job_id") or "", job.get("tool") or "", "processo dono encerrado")
+    return job
+
+
+def reconcile_orphans() -> int:
+    """Roda no boot: fecha jobs que ficaram presos em `running` após restart."""
+    healed = 0
+    try:
+        files = list(config.jobs_dir.glob("*.json"))
+    except OSError:
+        return 0
+    for file in files:
+        try:
+            data = json.loads(file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not isinstance(data, dict) or not data.get("job_id"):
+            continue
+        data = _normalize(data)
+        if data.get("status") in TERMINAL_STATUSES:
+            continue
+        # No boot, qualquer job não-terminal sem dono vivo é órfão — mesmo recente.
+        owner_pid = data.get("owner_pid")
+        if data.get("owner_host") == _HOST and owner_pid and _pid_alive(owner_pid):
+            continue
+        data["heartbeat_at"] = data.get("heartbeat_at") or data.get("updated_at")
+        data["owner_pid"] = None
+        data["owner_host"] = None
+        data["status"] = "error"
+        data["stage"] = "interrompido"
+        data["message"] = INTERRUPTED_MESSAGE
+        data["finished_at"] = data.get("finished_at") or _now()
+        data["updated_at"] = _now()
+        data["terminal"] = True
+        _write_job_file(data)
+        audit("interrupted", data["job_id"], data.get("tool") or "", "reconciliação de boot")
+        healed += 1
+    return healed
+
 
 
 # --- Trilha de auditoria append-only ----------------------------------------
