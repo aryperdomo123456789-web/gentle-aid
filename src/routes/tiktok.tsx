@@ -6,6 +6,7 @@ import { Field, SelectInput, SubmitButton, TextInput } from "@/components/form";
 import { JobSettingsGuard } from "@/components/JobSettingsGuard";
 
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
+import { VideoFormatSelect } from "@/components/VideoFormatSelect";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
@@ -52,6 +53,8 @@ function TikTokDashboard() {
   const [cloneUrl, setCloneUrl] = useState("");
   const [sourceCard, setSourceCard] = useState<DiscoveryCard | null>(null);
   const [intensity, setIntensity] = useState("auto");
+  const [videoFormat, setVideoFormat] = useState("original");
+  const [formatFit, setFormatFit] = useState("cover");
 
 
   async function loadRadar(e: React.FormEvent) {
@@ -85,6 +88,8 @@ function TikTokDashboard() {
         url,
         nicho,
         intensity,
+        video_format: videoFormat,
+        format_fit: formatFit,
         ...(sourceCard && sourceCard.url === url ? { source_card: sourceCard } : {}),
       }),
     );
@@ -205,6 +210,13 @@ function TikTokDashboard() {
                 </SelectInput>
               )}
             </Field>
+            <VideoFormatSelect
+              value={videoFormat}
+              onChange={setVideoFormat}
+              fit={formatFit}
+              onFitChange={setFormatFit}
+              hint="O clone sai no formato escolhido: mantenha original para preservar o vertical do TikTok."
+            />
             <JobSettingsGuard
               busy={busy}
               disabled={!cloneUrl.trim()}
