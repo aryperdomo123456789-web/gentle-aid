@@ -13,6 +13,8 @@ import {
   Shield,
   Clapperboard,
   Film,
+  Radio,
+  Youtube,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -28,6 +30,8 @@ export const TOOLS: Tool[] = [
   { to: "/legendar", label: "Legendar", icon: Captions },
   { to: "/voice-conversion", label: "Voz V2V", icon: AudioLines },
   { to: "/canva-cleaner", label: "Limpeza Canva", icon: Sparkles },
+  { to: "/live-youtube", label: "Live YouTube", icon: Youtube },
+  { to: "/live-tiktok", label: "Live TikTok", icon: Radio },
   { to: "/radar", label: "Radar Global", icon: Radar },
   { to: "/historico", label: "Central de Jobs", icon: History },
   { to: "/apis", label: "Central de APIs", icon: KeyRound },

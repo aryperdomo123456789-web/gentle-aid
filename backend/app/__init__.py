@@ -15,6 +15,7 @@ from .blueprints.canva_cleaner import bp as canva_bp
 from .blueprints.discover import bp as discover_bp
 from .blueprints.jobs import bp as jobs_bp
 from .blueprints.legendar import bp as legendar_bp
+from .blueprints.live import bp as live_bp
 from .blueprints.radar import bp as radar_bp
 from .blueprints.recap import bp as recap_bp
 from .blueprints.studio import bp as studio_bp
@@ -73,6 +74,13 @@ def create_app(config: Config | None = None) -> Flask:
     if orphans:
         app.logger.warning("Jobs interrompidos por reinício reconciliados: %s", orphans)
 
+    # Lives que ficaram marcadas como "no ar" após restart do serviço.
+    from .services import streamer as streamer_service
+
+    lives = streamer_service.reconcile()
+    if lives:
+        app.logger.warning("Sessões de live reconciliadas após reinício: %s", lives)
+
     for signal_name in ("SIGTERM", "SIGINT"):
         try:
             import signal as _signal
@@ -104,6 +112,7 @@ def create_app(config: Config | None = None) -> Flask:
         studio_bp,
         discover_bp,
         recap_bp,
+        live_bp,
     ):
         app.register_blueprint(bp)
 
