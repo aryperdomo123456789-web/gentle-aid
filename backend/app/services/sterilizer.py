@@ -27,7 +27,7 @@ import json
 import random
 import subprocess
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -49,6 +49,119 @@ _LEVEL_ALIASES = {
     "agressiva": "agressiva",
     "extrema": "extrema",
 }
+
+# --------------------------------------------------------------------------
+# Formatos finais de vídeo — o operador escolhe em toda ferramenta que
+# baixa/recodifica mídia. "original" mantém a proporção da fonte.
+# --------------------------------------------------------------------------
+VIDEO_FORMATS: dict[str, tuple[int, int]] = {
+    "9:16": (1080, 1920),
+    "4:5": (1080, 1350),
+    "1:1": (1080, 1080),
+    "16:9": (1920, 1080),
+    "4:3": (1440, 1080),
+}
+DEFAULT_FORMAT = "original"
+_FORMAT_ALIASES = {
+    "": "original",
+    "original": "original",
+    "auto": "original",
+    "fonte": "original",
+    "mesmo": "original",
+    "vertical": "9:16",
+    "9x16": "9:16",
+    "9:16": "9:16",
+    "1080x1920": "9:16",
+    "reels": "9:16",
+    "shorts": "9:16",
+    "tiktok": "9:16",
+    "4:5": "4:5",
+    "4x5": "4:5",
+    "feed": "4:5",
+    "quadrado": "1:1",
+    "square": "1:1",
+    "1:1": "1:1",
+    "1x1": "1:1",
+    "horizontal": "16:9",
+    "16:9": "16:9",
+    "16x9": "16:9",
+    "youtube": "16:9",
+    "1920x1080": "16:9",
+    "4:3": "4:3",
+    "4x3": "4:3",
+}
+FORMAT_FITS = ("cover", "contain")
+DEFAULT_FIT = "cover"
+
+
+def normalize_format(value: str | None) -> str:
+    """Aceita apelidos ('vertical', 'shorts', '9x16') e devolve a chave canônica."""
+    raw = str(value or "").strip().lower()
+    normalized = unicodedata.normalize("NFKD", raw)
+    normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    normalized = re.sub(r"\s+", "", normalized)
+    return _FORMAT_ALIASES.get(normalized, DEFAULT_FORMAT)
+
+
+def normalize_fit(value: str | None) -> str:
+    raw = str(value or "").strip().lower()
+    if raw in {"contain", "conter", "barras", "pad", "encaixar"}:
+        return "contain"
+    return DEFAULT_FIT
+
+
+def format_resolution(fmt: str) -> tuple[int, int] | None:
+    return VIDEO_FORMATS.get(fmt)
+
+
+def _orientation_of(width: int, height: int) -> str:
+    if not width or not height:
+        return "unknown"
+    if width > height * 1.05:
+        return "landscape"
+    if height > width * 1.05:
+        return "portrait"
+    return "square"
+
+
+def format_output_size(fmt: str, info: Probe) -> tuple[int, int]:
+    """Resolução final do formato escolhido, sem inflar fontes pequenas."""
+    target = format_resolution(fmt)
+    if not target:
+        return (_even(info.width), _even(info.height))
+    w, h = target
+    if info.width and info.height:
+        source_max = max(info.width, info.height)
+        target_max = max(w, h)
+        if source_max < target_max:
+            factor = source_max / target_max
+            w = _even(int(w * factor))
+            h = _even(int(h * factor))
+    return (_even(w), _even(h))
+
+
+def build_format_filters(fmt: str, info: Probe, fit: str = DEFAULT_FIT) -> list[str]:
+    """Reenquadra para o formato escolhido pelo operador.
+
+    - `cover`  → preenche a tela e corta o excedente (sem barras).
+    - `contain`→ encaixa o quadro inteiro com barras pretas.
+    """
+    target = format_resolution(fmt)
+    if not target or not info.has_video:
+        return []
+    w, h = format_output_size(fmt, info)
+    if fit == "contain":
+        return [
+            f"scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos",
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black",
+            "setsar=1",
+        ]
+    return [
+        f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos",
+        f"crop={w}:{h}",
+        "setsar=1",
+    ]
+
 
 # Identidades falsas plausíveis para o campo encoder/handler.
 _FAKE_ENCODERS = (
@@ -137,6 +250,10 @@ class SterilizationReport:
     output_size_bytes: int = 0
     output_video_codec: str = ""
     audit_summary: str = ""
+    video_format: str = "original"
+    format_fit: str = "cover"
+    output_width: int = 0
+    output_height: int = 0
 
     @property
     def unique(self) -> bool:
@@ -169,6 +286,10 @@ class SterilizationReport:
             "output_size_bytes": self.output_size_bytes,
             "output_video_codec": self.output_video_codec,
             "audit_summary": self.audit_summary,
+            "video_format": self.video_format,
+            "format_fit": self.format_fit,
+            "output_width": self.output_width,
+            "output_height": self.output_height,
         }
 
 
@@ -414,13 +535,31 @@ def build_command(
     extra_video_filters: list[str] | None = None,
     extra_audio_filters: list[str] | None = None,
     audio_only: bool = False,
+    video_format: str = DEFAULT_FORMAT,
+    format_fit: str = DEFAULT_FIT,
 ) -> tuple[list[str], SterilizationReport]:
     identity = _fake_identity(rng)
     suffix = dst.suffix.lower()
     mp4_family = suffix in {".mp4", ".mov", ".m4a", ".m4v"}
     # Saída só de áudio (ferramenta de voz): nenhum filtro/encoder de vídeo.
     keep_video = info.has_video and not audio_only
-    vf = [] if audio_only else list(extra_video_filters or []) + build_video_filters(level, info, rng)
+    format_filters = [] if audio_only else build_format_filters(video_format, info, format_fit)
+    # A mutação precisa enxergar a grade JÁ reenquadrada, senão o crop/rescale
+    # dela devolveria o vídeo para a proporção da fonte.
+    mutation_info = info
+    if format_filters:
+        w, h = format_output_size(video_format, info)
+        mutation_info = replace(info, width=w, height=h, orientation=_orientation_of(w, h))
+    vf = (
+        []
+        if audio_only
+        # Reenquadra ANTES dos filtros extras (legenda queimada precisa cair
+        # sobre a tela final, senão o corte comeria o texto).
+        else format_filters
+        + list(extra_video_filters or [])
+        + build_video_filters(level, mutation_info, rng)
+    )
+
 
     speed_filter = next((f for f in vf if f.startswith("setpts=PTS/")), "")
     speed = float(speed_filter.split("/")[-1]) if speed_filter else 1.0
@@ -548,6 +687,8 @@ def build_command(
         source_bitrate=info.bit_rate,
         source_size_bytes=src.stat().st_size if src.exists() else 0,
         source_video_codec=info.video_codec,
+        video_format=video_format,
+        format_fit=format_fit,
     )
     return cmd, report
 
@@ -582,6 +723,8 @@ def sterilize(
     extra_video_filters: list[str] | None = None,
     extra_audio_filters: list[str] | None = None,
     audio_only: bool = False,
+    video_format: str = DEFAULT_FORMAT,
+    format_fit: str = DEFAULT_FIT,
     max_attempts: int = 3,
     runner=None,
 ) -> SterilizationReport:
@@ -590,6 +733,8 @@ def sterilize(
 
     execute = runner or media.run
     level = normalize_level(level) or DEFAULT_LEVEL
+    video_format = normalize_format(video_format)
+    format_fit = normalize_fit(format_fit)
 
     info = probe(src)
     level = resolve_level(level, info)
@@ -610,6 +755,8 @@ def sterilize(
             extra_video_filters=extra_video_filters,
             extra_audio_filters=extra_audio_filters,
             audio_only=audio_only,
+            video_format=video_format,
+            format_fit=format_fit,
         )
         report.md5_before = before["md5"]
         report.attempts = attempt
@@ -651,12 +798,19 @@ def sterilize(
         report.output_bitrate = out_info.bit_rate
         report.output_size_bytes = dst.stat().st_size if dst.exists() else 0
         report.output_video_codec = out_info.video_codec
+        report.output_width = out_info.width
+        report.output_height = out_info.height
         report.steps = [
             "Metadados de origem destruídos (container, streams, capítulos)",
             f"Identidade forjada: {report.identity['encoder']} @ {report.identity['creation_time']}",
             f"Mutação estrutural nível '{level}' ({len(report.video_filters)} filtro(s) de vídeo)",
             f"Áudio reescrito ({len(report.audio_filters)} filtro(s)) e re-encodado em AAC 48 kHz",
             f"Bitrate randômico {report.bitrate} + GOP variável",
+            (
+                "Formato final mantido igual ao da fonte"
+                if video_format == "original"
+                else f"Reenquadrado para {video_format} ({format_fit}) → {out_info.width}x{out_info.height}"
+            ),
             f"Hash final inédito: MD5 {report.md5_after[:12]}…",
         ]
         if report.unique:

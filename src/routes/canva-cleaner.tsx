@@ -6,6 +6,7 @@ import { Field, FileDrop, SelectInput } from "@/components/form";
 import { JobSettingsGuard } from "@/components/JobSettingsGuard";
 
 import { MutationSelect } from "@/components/MutationSelect";
+import { VideoFormatSelect } from "@/components/VideoFormatSelect";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
@@ -104,6 +105,8 @@ function CanvaCleaner() {
             </Field>
             <MutationSelect defaultValue="auto" label="Nível de esterilização" hint="" />
           </div>
+
+          <VideoFormatSelect hint="Recodifica e entrega no formato final que você escolher — ideal para reaproveitar a mesma arte em várias redes." />
 
           <p className="rounded-xl border border-border bg-background/40 p-3 text-xs text-muted-foreground">
             A remoção total de metadados (ISO, encoder, Canva, GPS, XMP) é sempre aplicada e não

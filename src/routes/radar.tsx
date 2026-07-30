@@ -3,6 +3,7 @@ import { RefreshCw, Radar as RadarIcon, Sparkles, Activity } from "lucide-react"
 
 import { Field, SelectInput, TextInput } from "@/components/form";
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
+import { VIDEO_FORMATS } from "@/components/VideoFormatSelect";
 import { TopNav } from "@/components/TopNav";
 import { ClonePipeline } from "@/features/radar/components/ClonePipeline";
 import { ForecastPanel } from "@/features/radar/components/ForecastPanel";
@@ -170,6 +171,21 @@ function RadarGlobal() {
                   {MUTATION_LEVELS.map((l) => (
                     <option key={l.value} value={l.value}>
                       {l.label}
+                    </option>
+                  ))}
+                </SelectInput>
+              </label>
+              <label className="flex w-full items-center gap-2 text-xs text-muted-foreground sm:w-auto">
+                Formato
+                <SelectInput
+                  aria-label="Formato final do clone"
+                  value={radar.cloneFormat}
+                  onChange={(e) => radar.setCloneFormat(e.target.value)}
+                  className="h-9 w-full text-xs sm:w-44"
+                >
+                  {VIDEO_FORMATS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
                     </option>
                   ))}
                 </SelectInput>

@@ -190,6 +190,8 @@ def burn_ass(
     *,
     job_id: str,
     mutation: str = DEFAULT_LEVEL,
+    video_format: str = "original",
+    format_fit: str = "cover",
 ) -> SterilizationReport:
     """Queima um ASS animado e esteriliza na mesma passada."""
     return sterilize(
@@ -197,6 +199,8 @@ def burn_ass(
         dst,
         job_id=job_id,
         level=mutation,
+        video_format=video_format,
+        format_fit=format_fit,
         extra_video_filters=[ass_filter(ass)],
     )
 

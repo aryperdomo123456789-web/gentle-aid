@@ -6,6 +6,7 @@ import { Field, SelectInput, TextArea, TextInput } from "@/components/form";
 import { JobSettingsGuard } from "@/components/JobSettingsGuard";
 
 import { MUTATION_LEVELS } from "@/components/MutationSelect";
+import { VideoFormatSelect } from "@/components/VideoFormatSelect";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
 import { ToolShell } from "@/components/ToolShell";
@@ -51,6 +52,8 @@ function YoutubeBypass() {
   const [nicho, setNicho] = useState(NICHOS[0]);
   const [keyword, setKeyword] = useState("");
   const [intensity, setIntensity] = useState("auto");
+  const [videoFormat, setVideoFormat] = useState("original");
+  const [formatFit, setFormatFit] = useState("cover");
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
   const [pickedCard, setPickedCard] = useState<DiscoveryCard | null>(null);
 
@@ -76,6 +79,8 @@ function YoutubeBypass() {
         nicho,
         keyword: keyword.trim(),
         intensity,
+        video_format: videoFormat,
+        format_fit: formatFit,
         ...(pickedCard && urls.includes(pickedCard.url) ? { source_card: pickedCard } : {}),
       }),
     );
@@ -145,6 +150,14 @@ function YoutubeBypass() {
               </SelectInput>
             )}
           </Field>
+
+          <VideoFormatSelect
+            value={videoFormat}
+            onChange={setVideoFormat}
+            fit={formatFit}
+            onFitChange={setFormatFit}
+            hint="Entregue no formato certo para cada rede: vertical para Shorts/Reels, horizontal para YouTube."
+          />
 
           <JobSettingsGuard
             busy={busy}

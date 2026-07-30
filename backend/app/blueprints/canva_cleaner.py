@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 
 from ..services import ingest, jobs, media
 from ..services.delivery import deliver
-from ..services.sterilizer import normalize_level
+from ..services.sterilizer import normalize_fit, normalize_format, normalize_level
 from ..services.validation import VIDEO_EXT, ValidationError, output_path, parse_json_object, save_upload
 
 bp = Blueprint("canva_cleaner", __name__, url_prefix="/api/canva-cleaner")
@@ -32,12 +32,16 @@ def run_job():
     except ValidationError as exc:
         return jsonify(error=str(exc)), 400
 
+    video_format = normalize_format(request.form.get("video_format"))
+    format_fit = normalize_fit(request.form.get("format_fit"))
     source_url = (request.form.get("url") or "").strip()
     job = jobs.create_job(
         "canva",
         meta={
             "mutation": mutation,
             "bitrate": bitrate,
+            "video_format": video_format,
+            "format_fit": format_fit,
             "url": source_url,
             **({"source_card": source_card} if source_card else {}),
         },
@@ -53,16 +57,32 @@ def run_job():
         jobs.fail(job["job_id"], "Envie um arquivo ou selecione um vídeo na pesquisa.")
         return jsonify(error="Envie um arquivo ou selecione um vídeo na pesquisa."), 400
 
-    jobs.submit(job["job_id"], lambda jid: _work(jid, src, mutation, bitrate, source_url))
+    jobs.submit(job["job_id"], lambda jid: _work(jid, src, mutation, bitrate, source_url, video_format, format_fit))
     return jsonify(job), 202
 
 
-def _work(job_id: str, src: Path | None, mutation: str, bitrate: str, source_url: str = "") -> None:
+def _work(
+    job_id: str,
+    src: Path | None,
+    mutation: str,
+    bitrate: str,
+    source_url: str = "",
+    video_format: str = "original",
+    format_fit: str = "cover",
+) -> None:
     src = ingest.resolve_source(src, source_url, job_id)
     jobs.stage(job_id, "esterilizando", "Destruindo metadados ISO/Canva e recodificando em H.264/AAC.", progress=20)
 
     dst = output_path("canva", job_id, "_clean.mp4")
-    report = media.sterilize(src, dst, job_id=job_id, level=mutation, bitrate=bitrate)
+    report = media.sterilize(
+        src,
+        dst,
+        job_id=job_id,
+        level=mutation,
+        bitrate=bitrate,
+        video_format=video_format,
+        format_fit=format_fit,
+    )
     src.unlink(missing_ok=True)
 
     deliver(job_id, dst, report, message="Vídeo esterilizado: virgem, único e sem rastro de origem.")

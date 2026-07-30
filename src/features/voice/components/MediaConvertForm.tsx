@@ -6,6 +6,7 @@ import { JobSettingsGuard } from "@/components/JobSettingsGuard";
 
 import { LinkInspector, type InspectedCard } from "@/components/LinkInspector";
 import { MutationSelect } from "@/components/MutationSelect";
+import { VideoFormatSelect } from "@/components/VideoFormatSelect";
 import { AudioFormatField, MEDIA_ACCEPT, MEDIA_HINT } from "./AudioFormatField";
 
 type Props = {
@@ -99,6 +100,8 @@ export function MediaConvertForm({
           </SelectInput>
         )}
       </Field>
+
+      <VideoFormatSelect hint="Válido quando a saída mantém o vídeo — define a proporção final." />
 
       <MutationSelect
         defaultValue="auto"

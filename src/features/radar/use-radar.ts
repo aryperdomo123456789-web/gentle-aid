@@ -19,6 +19,7 @@ export function useRadar() {
   const [forecasting, setForecasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cloneLevel, setCloneLevel] = useState("auto");
+  const [cloneFormat, setCloneFormat] = useState("original");
   const [cloneTarget, setCloneTarget] = useState<RadarVideo | null>(null);
   const [watchTarget, setWatchTarget] = useState<RadarVideo | null>(null);
   const cloner = useJobRunner("radar");
@@ -68,10 +69,11 @@ export function useRadar() {
           embed_url: video.embed_url ?? null,
           thumbnail: video.thumbnail ?? null,
           views_label: video.views_human,
-        }),
+        },
+        { video_format: cloneFormat, format_fit: "cover" }),
       );
     },
-    [cloneLevel, cloner],
+    [cloneFormat, cloneLevel, cloner],
   );
 
 
@@ -132,6 +134,8 @@ export function useRadar() {
     forecasting,
     error,
     cloneLevel,
+    cloneFormat,
+    setCloneFormat,
     setCloneLevel,
     cloneTarget,
     watchTarget,

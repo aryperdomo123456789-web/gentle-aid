@@ -8,7 +8,12 @@ from flask import Blueprint, jsonify, request
 
 from ..services import beatsync, captions, ingest, jobs, media, transcribe
 from ..services.delivery import deliver
-from ..services.sterilizer import normalize_level
+from ..services.sterilizer import (
+    format_output_size,
+    normalize_fit,
+    normalize_format,
+    normalize_level,
+)
 from ..services.validation import (
     VIDEO_EXT,
     ValidationError,
@@ -83,9 +88,10 @@ def run_job():
     }
 
     source_url = (request.form.get("url") or "").strip()
-    aspect = (request.form.get("aspect") or "auto").strip().lower()
-    if aspect not in ("auto", "9:16", "16:9", "1:1"):
-        aspect = "auto"
+    # Formato final escolhido pelo operador (auto = mantém a proporção da fonte).
+    video_format = normalize_format(request.form.get("video_format") or request.form.get("aspect"))
+    format_fit = normalize_fit(request.form.get("format_fit"))
+    aspect = video_format
     job = jobs.create_job(
         "legendar",
         meta={
@@ -95,6 +101,8 @@ def run_job():
             "animation": animation if animation != "auto" else preset["animation"],
             "mutation": mutation,
             "aspect": aspect,
+            "video_format": video_format,
+            "format_fit": format_fit,
             "beat_sync": request.form.get("beat_sync") in ("1", "true", "on"),
             "url": source_url,
             **({"source_card": source_card} if source_card else {}),
@@ -115,7 +123,9 @@ def run_job():
 
     jobs.submit(
         job["job_id"],
-        lambda jid: _work(jid, src, srt_text, style_opts, mutation, source_url),
+        lambda jid: _work(
+            jid, src, srt_text, style_opts, mutation, source_url, video_format, format_fit
+        ),
     )
     return jsonify(job), 202
 
@@ -127,6 +137,8 @@ def _work(
     opts: dict,
     mutation: str,
     source_url: str = "",
+    video_format: str = "original",
+    format_fit: str = "cover",
 ) -> None:
     src = ingest.resolve_source(src, source_url, job_id)
     jobs.stage(job_id, "preparando", "Origem resolvida — analisando o vídeo.", progress=15)
@@ -134,6 +146,9 @@ def _work(
     info = media.probe(src)
     width = info.width or 1080
     height = info.height or 1920
+    # A legenda é desenhada já na grade do formato final escolhido.
+    if video_format != "original":
+        width, height = format_output_size(video_format, info)
     max_words = int(opts["words_per_line"])
 
     lines: list[captions.Line] = []
@@ -209,7 +224,15 @@ def _work(
         f"Queimando {len(lines)} bloco(s) no preset '{opts['preset']}' + esterilização '{mutation}'.",
         progress=55,
     )
-    report = media.burn_ass(src, ass_path, dst, job_id=job_id, mutation=mutation)
+    report = media.burn_ass(
+        src,
+        ass_path,
+        dst,
+        job_id=job_id,
+        mutation=mutation,
+        video_format=video_format,
+        format_fit=format_fit,
+    )
     src.unlink(missing_ok=True)
 
     deliver(job_id, dst, report, message="Vídeo legendado e entregue virgem, sem rastro de origem.")

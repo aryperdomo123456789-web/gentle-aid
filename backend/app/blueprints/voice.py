@@ -33,7 +33,7 @@ from ..services import (
 )
 
 from ..services.delivery import deliver
-from ..services.sterilizer import LEVELS, normalize_level
+from ..services.sterilizer import LEVELS, normalize_fit, normalize_format, normalize_level
 from ..services.validation import (
     AUDIO_EXT,
     VIDEO_EXT,
@@ -436,6 +436,14 @@ def _common_params() -> tuple[str, str, str]:
     return fmt, (mutation or "leve"), preserve
 
 
+def _format_params() -> tuple[str, str]:
+    """Formato final do vídeo escolhido pelo operador (só afeta saída com imagem)."""
+    return (
+        normalize_format(request.form.get("video_format")),
+        normalize_fit(request.form.get("format_fit")),
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Conversão de narrador (vídeo ou áudio)
 # --------------------------------------------------------------------------- #
@@ -468,6 +476,7 @@ def convert():
 
     try:
         fmt, mutation, preserve = _common_params()
+        video_format, format_fit = _format_params()
         source_card = parse_json_object(request.form.get("source_card"), field="source_card")
     except ValidationError as exc:
         return jsonify(error=str(exc)), 400
@@ -483,6 +492,8 @@ def convert():
             "timing": preserve,
             "mutation": mutation,
             "keep_video": keep_video,
+            "video_format": video_format,
+            "format_fit": format_fit,
             **({"source_card": source_card} if source_card else {}),
         },
     )
@@ -506,7 +517,7 @@ def convert():
         job["job_id"],
         lambda jid: _work_convert(
             jid, src, engine, target, realistic_voice, fmt, mutation, preserve, source_url, keep_video,
-            settings, persona,
+            settings, persona, video_format, format_fit,
         ),
     )
     return jsonify(job), 202
@@ -626,6 +637,8 @@ def _work_convert(
     keep_video: bool,
     settings: Settings,
     persona: "voice_forge.Persona | None" = None,
+    video_format: str = "original",
+    format_fit: str = "cover",
 ) -> None:
     src = ingest.resolve_source(src, source_url, job_id)
     info = media.probe(src)
@@ -646,6 +659,7 @@ def _work_convert(
             dst = output_path("voice", job_id, ".mp4")
             report = media.sterilize(
                 src, dst, job_id=job_id, level=mutation, extra_audio_filters=chain,
+                video_format=video_format, format_fit=format_fit,
             )
             message = f"Narração reescrita com a voz própria '{persona.name}' e vídeo esterilizado."
         else:
@@ -696,7 +710,8 @@ def _work_convert(
             voice_engine.swap_video_audio(src, converted, muxed, job_id)
             dst = output_path("voice", job_id, ".mp4")
             report = media.sterilize(
-                muxed, dst, job_id=job_id, level=mutation, extra_audio_filters=finish
+                muxed, dst, job_id=job_id, level=mutation, extra_audio_filters=finish,
+                video_format=video_format, format_fit=format_fit,
             )
             message = "Narrador trocado, vídeo remuxado e arquivo esterilizado."
         else:
@@ -809,6 +824,7 @@ def dub():
 
     try:
         fmt, mutation, _timing = _common_params()
+        video_format, format_fit = _format_params()
         source_card = parse_json_object(request.form.get("source_card"), field="source_card")
     except ValidationError as exc:
         return jsonify(error=str(exc)), 400
@@ -826,6 +842,8 @@ def dub():
             "mutation": mutation,
             "target_lang": target_lang,
             "keep_video": keep_video,
+            "video_format": video_format,
+            "format_fit": format_fit,
             **({"source_card": source_card} if source_card else {}),
         },
     )
@@ -848,7 +866,7 @@ def dub():
         job["job_id"],
         lambda jid: _work_dub(
             jid, src, source_url, engine, voice_id, persona, fmt, mutation,
-            keep_video, keep_ambience, target_lang, source_lang,
+            keep_video, keep_ambience, target_lang, source_lang, video_format, format_fit,
         ),
     )
     return jsonify(job), 202
@@ -867,6 +885,8 @@ def _work_dub(
     keep_ambience: float,
     target_lang: str,
     source_lang: str | None,
+    video_format: str = "original",
+    format_fit: str = "cover",
 ) -> None:
     src = ingest.resolve_source(src, source_url, job_id)
     info = media.probe(src)
@@ -919,7 +939,14 @@ def _work_dub(
             muxed = work_dir / f"{job_id}_dubmux.mp4"
             dubbing.mix_with_background(src, track, muxed, keep_ambience=keep_ambience, job_id=job_id)
             dst = output_path("voice", job_id, ".mp4")
-            report = media.sterilize(muxed, dst, job_id=job_id, level=mutation)
+            report = media.sterilize(
+                muxed,
+                dst,
+                job_id=job_id,
+                level=mutation,
+                video_format=video_format,
+                format_fit=format_fit,
+            )
             message = f"Vídeo dublado com a voz '{voice_label}', sincronizado e esterilizado."
         else:
             dst = output_path("voice", job_id, FORMATS[fmt])
