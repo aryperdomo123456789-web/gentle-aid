@@ -80,7 +80,7 @@ export function JobMediaPreview({ job }: { job: Job }) {
     <div className="space-y-4">
       <div
         className={`mx-auto overflow-hidden rounded-2xl border border-border bg-black/90 ${previewAspectClass(orientation)}`}
-        style={{ width: "100%", maxWidth: "32rem" }}
+        style={{ width: "100%", maxWidth: previewMaxWidth(orientation) }}
       >
         {playable ? (
           playableIsVideo ? (
