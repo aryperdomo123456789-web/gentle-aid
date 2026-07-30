@@ -553,8 +553,10 @@ def build_command(
     vf = (
         []
         if audio_only
-        else list(extra_video_filters or [])
-        + format_filters
+        # Reenquadra ANTES dos filtros extras (legenda queimada precisa cair
+        # sobre a tela final, senão o corte comeria o texto).
+        else format_filters
+        + list(extra_video_filters or [])
         + build_video_filters(level, mutation_info, rng)
     )
 

@@ -8,7 +8,12 @@ from flask import Blueprint, jsonify, request
 
 from ..services import beatsync, captions, ingest, jobs, media, transcribe
 from ..services.delivery import deliver
-from ..services.sterilizer import normalize_fit, normalize_format, normalize_level
+from ..services.sterilizer import (
+    _format_output_size as format_output_size,
+    normalize_fit,
+    normalize_format,
+    normalize_level,
+)
 from ..services.validation import (
     VIDEO_EXT,
     ValidationError,
@@ -141,6 +146,9 @@ def _work(
     info = media.probe(src)
     width = info.width or 1080
     height = info.height or 1920
+    # A legenda é desenhada já na grade do formato final escolhido.
+    if video_format != "original":
+        width, height = format_output_size(video_format, info)
     max_words = int(opts["words_per_line"])
 
     lines: list[captions.Line] = []
