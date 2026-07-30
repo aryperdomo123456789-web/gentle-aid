@@ -15,6 +15,7 @@ import { Route as RecapRouteImport } from './routes/recap'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LiveYoutubeRouteImport } from './routes/live-youtube'
+import { Route as LiveTiktokRouteImport } from './routes/live-tiktok'
 import { Route as LegendarRouteImport } from './routes/legendar'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as EstudioRouteImport } from './routes/estudio'
@@ -52,6 +53,11 @@ const LoginRoute = LoginRouteImport.update({
 const LiveYoutubeRoute = LiveYoutubeRouteImport.update({
   id: '/live-youtube',
   path: '/live-youtube',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveTiktokRoute = LiveTiktokRouteImport.update({
+  id: '/live-tiktok',
+  path: '/live-tiktok',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LegendarRoute = LegendarRouteImport.update({
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
+  '/live-tiktok': typeof LiveTiktokRoute
   '/live-youtube': typeof LiveYoutubeRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
   '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
+  '/live-tiktok': typeof LiveTiktokRoute
   '/live-youtube': typeof LiveYoutubeRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
+  '/live-tiktok': typeof LiveTiktokRoute
   '/live-youtube': typeof LiveYoutubeRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
@@ -154,6 +163,7 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/historico'
     | '/legendar'
+    | '/live-tiktok'
     | '/live-youtube'
     | '/login'
     | '/radar'
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/historico'
     | '/legendar'
+    | '/live-tiktok'
     | '/live-youtube'
     | '/login'
     | '/radar'
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/historico'
     | '/legendar'
+    | '/live-tiktok'
     | '/live-youtube'
     | '/login'
     | '/radar'
@@ -203,6 +215,7 @@ export interface RootRouteChildren {
   EstudioRoute: typeof EstudioRoute
   HistoricoRoute: typeof HistoricoRouteWithChildren
   LegendarRoute: typeof LegendarRoute
+  LiveTiktokRoute: typeof LiveTiktokRoute
   LiveYoutubeRoute: typeof LiveYoutubeRoute
   LoginRoute: typeof LoginRoute
   RadarRoute: typeof RadarRoute
@@ -253,6 +266,13 @@ declare module '@tanstack/react-router' {
       path: '/live-youtube'
       fullPath: '/live-youtube'
       preLoaderRoute: typeof LiveYoutubeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live-tiktok': {
+      id: '/live-tiktok'
+      path: '/live-tiktok'
+      fullPath: '/live-tiktok'
+      preLoaderRoute: typeof LiveTiktokRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/legendar': {
@@ -334,6 +354,7 @@ const rootRouteChildren: RootRouteChildren = {
   EstudioRoute: EstudioRoute,
   HistoricoRoute: HistoricoRouteWithChildren,
   LegendarRoute: LegendarRoute,
+  LiveTiktokRoute: LiveTiktokRoute,
   LiveYoutubeRoute: LiveYoutubeRoute,
   LoginRoute: LoginRoute,
   RadarRoute: RadarRoute,
