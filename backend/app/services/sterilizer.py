@@ -526,13 +526,20 @@ def build_command(
     # Saída só de áudio (ferramenta de voz): nenhum filtro/encoder de vídeo.
     keep_video = info.has_video and not audio_only
     format_filters = [] if audio_only else build_format_filters(video_format, info, format_fit)
+    # A mutação precisa enxergar a grade JÁ reenquadrada, senão o crop/rescale
+    # dela devolveria o vídeo para a proporção da fonte.
+    mutation_info = info
+    if format_filters:
+        w, h = _format_output_size(video_format, info)
+        mutation_info = replace(info, width=w, height=h, orientation=_orientation_of(w, h))
     vf = (
         []
         if audio_only
         else list(extra_video_filters or [])
         + format_filters
-        + build_video_filters(level, info, rng)
+        + build_video_filters(level, mutation_info, rng)
     )
+
 
     speed_filter = next((f for f in vf if f.startswith("setpts=PTS/")), "")
     speed = float(speed_filter.split("/")[-1]) if speed_filter else 1.0
