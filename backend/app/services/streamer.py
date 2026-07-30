@@ -541,6 +541,28 @@ def _supervise(
     _stop_file(platform).unlink(missing_ok=True)
 
 
+def iter_output(stream) -> "Any":
+    """Itera linhas do FFmpeg tratando '\\r' — o progresso (-stats) não usa '\\n'."""
+    buffer = ""
+    while True:
+        chunk = stream.read(256)
+        if not chunk:
+            if buffer.strip():
+                yield buffer.strip()
+            return
+        buffer += chunk
+        while True:
+            index = min(
+                (i for i in (buffer.find("\r"), buffer.find("\n")) if i >= 0),
+                default=-1,
+            )
+            if index < 0:
+                break
+            line, buffer = buffer[:index].strip(), buffer[index + 1 :]
+            if line:
+                yield line
+
+
 def _pump(platform: str, proc: subprocess.Popen) -> None:
     """Lê a saída do FFmpeg, alimenta métricas e obedece ao pedido de parada."""
     stream = proc.stdout
@@ -549,10 +571,7 @@ def _pump(platform: str, proc: subprocess.Popen) -> None:
 
     last_metric = 0.0
     if stream is not None:
-        for raw in iter(stream.readline, ""):
-            line = raw.strip()
-            if not line:
-                continue
+        for line in iter_output(stream):
             stats = parse_stats(line)
             now = time.monotonic()
             if stats:
