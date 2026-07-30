@@ -367,6 +367,26 @@ PROVIDERS: list[dict[str, Any]] = [
         "format_hint": "Chave em pixabay.com/api/docs (precisa estar logado). Gratuita.",
         "test": {"url": "https://pixabay.com/api/videos/?q=city&per_page=3", "auth": "query", "param": "key"},
     },
+    {
+        "id": "youtube_live",
+        "name": "YouTube Live (stream key)",
+        "category": "Transmissão ao vivo",
+        "env": "YOUTUBE_STREAM_KEY",
+        "docs": "https://support.google.com/youtube/answer/2907883",
+        "usage": "Chave RTMP usada pela Estação de Live 24/7 para transmitir a playlist em loop no YouTube.",
+        "format_hint": "YouTube Studio → Transmitir ao vivo → Configurações do stream → Chave da transmissão.",
+        "remediation": "Se a live não conecta, gere uma chave nova no YouTube Studio e cole aqui.",
+    },
+    {
+        "id": "tiktok_live",
+        "name": "TikTok LIVE (stream key)",
+        "category": "Transmissão ao vivo",
+        "env": "TIKTOK_STREAM_KEY",
+        "docs": "https://www.tiktok.com/live/creator-hub",
+        "usage": "Chave RTMP usada pela Estação de Live 24/7 para transmitir a playlist em loop no TikTok.",
+        "format_hint": "Só aparece em contas com acesso a LIVE por software (TikTok LIVE Studio / OBS).",
+        "remediation": "O TikTok regenera a chave a cada live nova — atualize aqui antes de reiniciar a transmissão.",
+    },
 
 
 ]
