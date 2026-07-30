@@ -82,7 +82,7 @@ _threads: dict[str, threading.Thread] = {}
 _STATS_RE = re.compile(
     r"frame=\s*(?P<frame>\d+).*?fps=\s*(?P<fps>[\d.]+).*?"
     r"(?:size|Lsize)=\s*(?P<size>\S+).*?time=\s*(?P<time>[\d:.]+).*?"
-    r"bitrate=\s*(?P<bitrate>[\d.]+\S*)",
+    r"bitrate=\s*(?P<bitrate>\S+)",
     re.S,
 )
 _DROP_RE = re.compile(r"drop=\s*(\d+)")
