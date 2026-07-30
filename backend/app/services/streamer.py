@@ -478,8 +478,7 @@ def _supervise(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
+                bufsize=0,
             )
         except FileNotFoundError:
             state = _read_state(platform) or state
@@ -545,7 +544,11 @@ def iter_output(stream) -> "Any":
     """Itera linhas do FFmpeg tratando '\\r' — o progresso (-stats) não usa '\\n'."""
     buffer = ""
     while True:
-        chunk = stream.read(256)
+        try:
+            raw = os.read(stream.fileno(), 4096)
+        except OSError:
+            raw = b""
+        chunk = raw.decode("utf-8", "replace")
         if not chunk:
             if buffer.strip():
                 yield buffer.strip()

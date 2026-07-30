@@ -70,11 +70,11 @@ def test_loop_runs(tmp: Path) -> None:
     cmd[cmd.index("-f", cmd.index("-c:a")) :] = ["-f", "null", "-"]
     cmd.remove("-re")  # laboratório: sem throttle, para o teste ser rápido
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0)
     frames, deadline = 0, time.monotonic() + 20
     stats_seen = None
-    for line in proc.stdout:  # type: ignore[union-attr]
-        stats = streamer.parse_stats(line.strip())
+    for line in streamer.iter_output(proc.stdout):
+        stats = streamer.parse_stats(line)
         if stats:
             stats_seen = stats
             frames = stats["frames"]
