@@ -55,7 +55,7 @@ def test_command(tmp: Path) -> None:
         playlist=playlist, rtmp_target="rtmp://exemplo/live/KEY", preset=preset, overlay=overlay
     )
     assert "-stream_loop" in cmd and cmd[cmd.index("-stream_loop") + 1] == "-1"
-    assert "-re" in cmd and cmd[-2] == "flv"
+    assert "-re" in cmd and cmd[cmd.index("-f", cmd.index("-c:a")) + 1] == "flv"
     assert cmd[cmd.index("-g") + 1] == "60"
     assert "drawtext" in cmd[cmd.index("-vf") + 1]
     print(f"  {OK} playlist + comando (loop infinito, tempo real, GOP 2s, overlay)")
@@ -80,7 +80,7 @@ def test_loop_runs(tmp: Path) -> None:
             frames = stats["frames"]
         if frames > 30 * 8 or time.monotonic() > deadline:
             break
-    proc.terminate()
+    proc.kill()
     proc.wait(timeout=10)
 
     assert frames > 30 * 7, f"loop parou cedo demais ({frames} frames)"
