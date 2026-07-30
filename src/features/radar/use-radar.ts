@@ -69,10 +69,11 @@ export function useRadar() {
           embed_url: video.embed_url ?? null,
           thumbnail: video.thumbnail ?? null,
           views_label: video.views_human,
-        }),
+        },
+        { video_format: cloneFormat, format_fit: "cover" }),
       );
     },
-    [cloneLevel, cloner],
+    [cloneFormat, cloneLevel, cloner],
   );
 
 
@@ -133,6 +134,8 @@ export function useRadar() {
     forecasting,
     error,
     cloneLevel,
+    cloneFormat,
+    setCloneFormat,
     setCloneLevel,
     cloneTarget,
     watchTarget,
