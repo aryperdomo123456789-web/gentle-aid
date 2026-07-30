@@ -30,10 +30,17 @@ export async function fetchRadarSnapshot(params: {
 }
 
 /** Clona um viral do radar reaproveitando o pipeline de esterilização do TikTok. */
-export function cloneRadarVideo(url: string, intensity: string, source_card?: unknown) {
+export function cloneRadarVideo(
+  url: string,
+  intensity: string,
+  source_card?: unknown,
+  format?: { video_format: string; format_fit: string },
+) {
   return apiPostJson<Job>("/api/tiktok/clone", {
     url,
     intensity,
+    video_format: format?.video_format ?? "original",
+    format_fit: format?.format_fit ?? "cover",
     ...(source_card ? { source_card } : {}),
   });
 }

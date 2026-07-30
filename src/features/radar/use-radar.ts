@@ -19,6 +19,7 @@ export function useRadar() {
   const [forecasting, setForecasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cloneLevel, setCloneLevel] = useState("auto");
+  const [cloneFormat, setCloneFormat] = useState("original");
   const [cloneTarget, setCloneTarget] = useState<RadarVideo | null>(null);
   const [watchTarget, setWatchTarget] = useState<RadarVideo | null>(null);
   const cloner = useJobRunner("radar");
