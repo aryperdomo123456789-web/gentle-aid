@@ -14,6 +14,7 @@ import { Route as TiktokRouteImport } from './routes/tiktok'
 import { Route as RecapRouteImport } from './routes/recap'
 import { Route as RadarRouteImport } from './routes/radar'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LiveYoutubeRouteImport } from './routes/live-youtube'
 import { Route as LegendarRouteImport } from './routes/legendar'
 import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as EstudioRouteImport } from './routes/estudio'
@@ -46,6 +47,11 @@ const RadarRoute = RadarRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveYoutubeRoute = LiveYoutubeRouteImport.update({
+  id: '/live-youtube',
+  path: '/live-youtube',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LegendarRoute = LegendarRouteImport.update({
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
+  '/live-youtube': typeof LiveYoutubeRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
   '/recap': typeof RecapRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
+  '/live-youtube': typeof LiveYoutubeRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
   '/recap': typeof RecapRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/estudio': typeof EstudioRoute
   '/historico': typeof HistoricoRouteWithChildren
   '/legendar': typeof LegendarRoute
+  '/live-youtube': typeof LiveYoutubeRoute
   '/login': typeof LoginRoute
   '/radar': typeof RadarRoute
   '/recap': typeof RecapRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/historico'
     | '/legendar'
+    | '/live-youtube'
     | '/login'
     | '/radar'
     | '/recap'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/historico'
     | '/legendar'
+    | '/live-youtube'
     | '/login'
     | '/radar'
     | '/recap'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/historico'
     | '/legendar'
+    | '/live-youtube'
     | '/login'
     | '/radar'
     | '/recap'
@@ -191,6 +203,7 @@ export interface RootRouteChildren {
   EstudioRoute: typeof EstudioRoute
   HistoricoRoute: typeof HistoricoRouteWithChildren
   LegendarRoute: typeof LegendarRoute
+  LiveYoutubeRoute: typeof LiveYoutubeRoute
   LoginRoute: typeof LoginRoute
   RadarRoute: typeof RadarRoute
   RecapRoute: typeof RecapRoute
@@ -233,6 +246,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live-youtube': {
+      id: '/live-youtube'
+      path: '/live-youtube'
+      fullPath: '/live-youtube'
+      preLoaderRoute: typeof LiveYoutubeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/legendar': {
@@ -314,6 +334,7 @@ const rootRouteChildren: RootRouteChildren = {
   EstudioRoute: EstudioRoute,
   HistoricoRoute: HistoricoRouteWithChildren,
   LegendarRoute: LegendarRoute,
+  LiveYoutubeRoute: LiveYoutubeRoute,
   LoginRoute: LoginRoute,
   RadarRoute: RadarRoute,
   RecapRoute: RecapRoute,
