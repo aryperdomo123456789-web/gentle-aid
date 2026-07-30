@@ -232,6 +232,10 @@ class SterilizationReport:
     output_size_bytes: int = 0
     output_video_codec: str = ""
     audit_summary: str = ""
+    video_format: str = "original"
+    format_fit: str = "cover"
+    output_width: int = 0
+    output_height: int = 0
 
     @property
     def unique(self) -> bool:
@@ -264,6 +268,10 @@ class SterilizationReport:
             "output_size_bytes": self.output_size_bytes,
             "output_video_codec": self.output_video_codec,
             "audit_summary": self.audit_summary,
+            "video_format": self.video_format,
+            "format_fit": self.format_fit,
+            "output_width": self.output_width,
+            "output_height": self.output_height,
         }
 
 
@@ -509,13 +517,22 @@ def build_command(
     extra_video_filters: list[str] | None = None,
     extra_audio_filters: list[str] | None = None,
     audio_only: bool = False,
+    video_format: str = DEFAULT_FORMAT,
+    format_fit: str = DEFAULT_FIT,
 ) -> tuple[list[str], SterilizationReport]:
     identity = _fake_identity(rng)
     suffix = dst.suffix.lower()
     mp4_family = suffix in {".mp4", ".mov", ".m4a", ".m4v"}
     # Saída só de áudio (ferramenta de voz): nenhum filtro/encoder de vídeo.
     keep_video = info.has_video and not audio_only
-    vf = [] if audio_only else list(extra_video_filters or []) + build_video_filters(level, info, rng)
+    format_filters = [] if audio_only else build_format_filters(video_format, info, format_fit)
+    vf = (
+        []
+        if audio_only
+        else list(extra_video_filters or [])
+        + format_filters
+        + build_video_filters(level, info, rng)
+    )
 
     speed_filter = next((f for f in vf if f.startswith("setpts=PTS/")), "")
     speed = float(speed_filter.split("/")[-1]) if speed_filter else 1.0
@@ -643,6 +660,8 @@ def build_command(
         source_bitrate=info.bit_rate,
         source_size_bytes=src.stat().st_size if src.exists() else 0,
         source_video_codec=info.video_codec,
+        video_format=video_format,
+        format_fit=format_fit,
     )
     return cmd, report
 
@@ -677,6 +696,8 @@ def sterilize(
     extra_video_filters: list[str] | None = None,
     extra_audio_filters: list[str] | None = None,
     audio_only: bool = False,
+    video_format: str = DEFAULT_FORMAT,
+    format_fit: str = DEFAULT_FIT,
     max_attempts: int = 3,
     runner=None,
 ) -> SterilizationReport:
@@ -685,6 +706,8 @@ def sterilize(
 
     execute = runner or media.run
     level = normalize_level(level) or DEFAULT_LEVEL
+    video_format = normalize_format(video_format)
+    format_fit = normalize_fit(format_fit)
 
     info = probe(src)
     level = resolve_level(level, info)
@@ -705,6 +728,8 @@ def sterilize(
             extra_video_filters=extra_video_filters,
             extra_audio_filters=extra_audio_filters,
             audio_only=audio_only,
+            video_format=video_format,
+            format_fit=format_fit,
         )
         report.md5_before = before["md5"]
         report.attempts = attempt
@@ -746,12 +771,19 @@ def sterilize(
         report.output_bitrate = out_info.bit_rate
         report.output_size_bytes = dst.stat().st_size if dst.exists() else 0
         report.output_video_codec = out_info.video_codec
+        report.output_width = out_info.width
+        report.output_height = out_info.height
         report.steps = [
             "Metadados de origem destruídos (container, streams, capítulos)",
             f"Identidade forjada: {report.identity['encoder']} @ {report.identity['creation_time']}",
             f"Mutação estrutural nível '{level}' ({len(report.video_filters)} filtro(s) de vídeo)",
             f"Áudio reescrito ({len(report.audio_filters)} filtro(s)) e re-encodado em AAC 48 kHz",
             f"Bitrate randômico {report.bitrate} + GOP variável",
+            (
+                "Formato final mantido igual ao da fonte"
+                if video_format == "original"
+                else f"Reenquadrado para {video_format} ({format_fit}) → {out_info.width}x{out_info.height}"
+            ),
             f"Hash final inédito: MD5 {report.md5_after[:12]}…",
         ]
         if report.unique:
