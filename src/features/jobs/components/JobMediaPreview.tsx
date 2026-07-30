@@ -39,13 +39,30 @@ function getSourcePlayableUrl(job: Job): string | null {
 }
 
 function getOrientation(job: Job): "portrait" | "landscape" | "square" | "unknown" {
-  return job.sterilization?.source_orientation ?? "unknown";
+  const detected = job.sterilization?.source_orientation;
+  if (detected && detected !== "unknown") return detected;
+  const w = job.sterilization?.source_width;
+  const h = job.sterilization?.source_height;
+  if (w && h) {
+    if (h > w * 1.05) return "portrait";
+    if (w > h * 1.05) return "landscape";
+    return "square";
+  }
+  return "unknown";
 }
 
+/** A moldura acompanha a proporção real da mídia — nada de forçar quadrado. */
 function previewAspectClass(orientation: ReturnType<typeof getOrientation>): string {
-  void orientation;
-  return "aspect-square";
+  if (orientation === "portrait") return "aspect-[9/16]";
+  if (orientation === "landscape") return "aspect-video";
+  if (orientation === "square") return "aspect-square";
+  return "aspect-video";
 }
+
+function previewMaxWidth(orientation: ReturnType<typeof getOrientation>): string {
+  return orientation === "portrait" ? "22rem" : "32rem";
+}
+
 
 function isVideoAsset(url: string): boolean {
   return /\.(mp4|webm|mkv|mov)(?:$|\?)/i.test(url);
@@ -63,7 +80,7 @@ export function JobMediaPreview({ job }: { job: Job }) {
     <div className="space-y-4">
       <div
         className={`mx-auto overflow-hidden rounded-2xl border border-border bg-black/90 ${previewAspectClass(orientation)}`}
-        style={{ width: "100%", maxWidth: "32rem" }}
+        style={{ width: "100%", maxWidth: previewMaxWidth(orientation) }}
       >
         {playable ? (
           playableIsVideo ? (
