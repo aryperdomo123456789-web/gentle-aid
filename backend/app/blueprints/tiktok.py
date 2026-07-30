@@ -5,7 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 
 from ..config import config
-from ..services import jobs, media, trends as trends_service
+from ..services import discovery, jobs, media, trends as trends_service
 from ..services.delivery import deliver
 from ..services.sterilizer import normalize_level
 from ..services.validation import (
