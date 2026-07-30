@@ -66,17 +66,38 @@ def clone():
             **({"source_card": source_card} if source_card else {}),
         },
     )
-    jobs.submit(job["job_id"], lambda jid: _work(jid, url, level))
+    jobs.submit(job["job_id"], lambda jid: _work(jid, url, level, bool(source_card)))
     return jsonify(job), 202
 
 
-def _work(job_id: str, url: str, level: str) -> None:
+def _enrich_source_card(job_id: str, url: str) -> None:
+    """Quando o clone vem sem card (radar, link colado), busca os dados reais."""
+    try:
+        card = discovery.inspect(url, with_captions=False).get("card")
+    except Exception as exc:  # noqa: BLE001
+        jobs.log(job_id, f"Metadados da origem indisponíveis: {exc}", level="warn")
+        return
+    if not isinstance(card, dict):
+        return
+    job = jobs.get(job_id) or {}
+    meta = dict(job.get("meta") or {})
+    meta["source_card"] = card
+    jobs.update(job_id, meta=meta)
+    jobs.log(job_id, "Metadados da origem anexados (legenda, curtidas, views).")
+
+
+def _work(job_id: str, url: str, level: str, has_card: bool = False) -> None:
+    if not has_card:
+        jobs.stage(job_id, "lendo origem", "Coletando métricas e legenda do vídeo.", progress=5)
+        _enrich_source_card(job_id, url)
+
     raw = config.uploads_dir / f"{job_id}_src.mp4"
     jobs.stage(job_id, "baixando", f"Extraindo mídia de {url}.", progress=10)
     media.run(
         [config.ytdlp_bin, "-f", "b[ext=mp4]/b", "--no-playlist", "-o", str(raw), url],
         job_id=job_id,
     )
+
 
     dst = output_path("tiktok", job_id, "_clone.mp4")
     jobs.stage(job_id, "esterilizando", f"Clonando 1:1 e esterilizando (nível {level}).", progress=50)
