@@ -50,6 +50,101 @@ _LEVEL_ALIASES = {
     "extrema": "extrema",
 }
 
+# --------------------------------------------------------------------------
+# Formatos finais de vídeo — o operador escolhe em toda ferramenta que
+# baixa/recodifica mídia. "original" mantém a proporção da fonte.
+# --------------------------------------------------------------------------
+VIDEO_FORMATS: dict[str, tuple[int, int]] = {
+    "9:16": (1080, 1920),
+    "4:5": (1080, 1350),
+    "1:1": (1080, 1080),
+    "16:9": (1920, 1080),
+    "4:3": (1440, 1080),
+}
+DEFAULT_FORMAT = "original"
+_FORMAT_ALIASES = {
+    "": "original",
+    "original": "original",
+    "auto": "original",
+    "fonte": "original",
+    "mesmo": "original",
+    "vertical": "9:16",
+    "9x16": "9:16",
+    "9:16": "9:16",
+    "1080x1920": "9:16",
+    "reels": "9:16",
+    "shorts": "9:16",
+    "tiktok": "9:16",
+    "4:5": "4:5",
+    "4x5": "4:5",
+    "feed": "4:5",
+    "quadrado": "1:1",
+    "square": "1:1",
+    "1:1": "1:1",
+    "1x1": "1:1",
+    "horizontal": "16:9",
+    "16:9": "16:9",
+    "16x9": "16:9",
+    "youtube": "16:9",
+    "1920x1080": "16:9",
+    "4:3": "4:3",
+    "4x3": "4:3",
+}
+FORMAT_FITS = ("cover", "contain")
+DEFAULT_FIT = "cover"
+
+
+def normalize_format(value: str | None) -> str:
+    """Aceita apelidos ('vertical', 'shorts', '9x16') e devolve a chave canônica."""
+    raw = str(value or "").strip().lower()
+    normalized = unicodedata.normalize("NFKD", raw)
+    normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    normalized = re.sub(r"\s+", "", normalized)
+    return _FORMAT_ALIASES.get(normalized, DEFAULT_FORMAT)
+
+
+def normalize_fit(value: str | None) -> str:
+    raw = str(value or "").strip().lower()
+    if raw in {"contain", "conter", "barras", "pad", "encaixar"}:
+        return "contain"
+    return DEFAULT_FIT
+
+
+def format_resolution(fmt: str) -> tuple[int, int] | None:
+    return VIDEO_FORMATS.get(fmt)
+
+
+def build_format_filters(fmt: str, info: Probe, fit: str = DEFAULT_FIT) -> list[str]:
+    """Reenquadra para o formato escolhido pelo operador.
+
+    - `cover`  → preenche a tela e corta o excedente (sem barras).
+    - `contain`→ encaixa o quadro inteiro com barras pretas.
+    """
+    target = format_resolution(fmt)
+    if not target or not info.has_video:
+        return []
+    w, h = target
+    # Fonte menor que o alvo: mantém a altura real para não inflar o arquivo.
+    if info.width and info.height:
+        source_max = max(info.width, info.height)
+        target_max = max(w, h)
+        if source_max < target_max:
+            factor = source_max / target_max
+            w = _even(int(w * factor))
+            h = _even(int(h * factor))
+    if fit == "contain":
+        return [
+            f"scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos",
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black",
+            "setsar=1",
+        ]
+    return [
+        f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos",
+        f"crop={w}:{h}",
+        "setsar=1",
+    ]
+
+
 # Identidades falsas plausíveis para o campo encoder/handler.
 _FAKE_ENCODERS = (
     "Lavf58.76.100",
