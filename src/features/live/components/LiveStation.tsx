@@ -73,6 +73,9 @@ export function LiveStation({
             {warning}
           </p>
 
+          <LiveGuide title={guideTitle} steps={steps} />
+
+
           <PlaylistPicker
             library={station.library}
             selected={selected}
