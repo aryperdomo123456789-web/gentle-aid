@@ -27,7 +27,7 @@ import json
 import random
 import subprocess
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -114,6 +114,32 @@ def format_resolution(fmt: str) -> tuple[int, int] | None:
     return VIDEO_FORMATS.get(fmt)
 
 
+def _orientation_of(width: int, height: int) -> str:
+    if not width or not height:
+        return "unknown"
+    if width > height * 1.05:
+        return "landscape"
+    if height > width * 1.05:
+        return "portrait"
+    return "square"
+
+
+def _format_output_size(fmt: str, info: Probe) -> tuple[int, int]:
+    """Resolução final do formato escolhido, sem inflar fontes pequenas."""
+    target = format_resolution(fmt)
+    if not target:
+        return (_even(info.width), _even(info.height))
+    w, h = target
+    if info.width and info.height:
+        source_max = max(info.width, info.height)
+        target_max = max(w, h)
+        if source_max < target_max:
+            factor = source_max / target_max
+            w = _even(int(w * factor))
+            h = _even(int(h * factor))
+    return (_even(w), _even(h))
+
+
 def build_format_filters(fmt: str, info: Probe, fit: str = DEFAULT_FIT) -> list[str]:
     """Reenquadra para o formato escolhido pelo operador.
 
@@ -123,15 +149,7 @@ def build_format_filters(fmt: str, info: Probe, fit: str = DEFAULT_FIT) -> list[
     target = format_resolution(fmt)
     if not target or not info.has_video:
         return []
-    w, h = target
-    # Fonte menor que o alvo: mantém a altura real para não inflar o arquivo.
-    if info.width and info.height:
-        source_max = max(info.width, info.height)
-        target_max = max(w, h)
-        if source_max < target_max:
-            factor = source_max / target_max
-            w = _even(int(w * factor))
-            h = _even(int(h * factor))
+    w, h = _format_output_size(fmt, info)
     if fit == "contain":
         return [
             f"scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos",
