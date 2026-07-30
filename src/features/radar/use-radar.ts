@@ -57,10 +57,23 @@ export function useRadar() {
   const cloneVideo = useCallback(
     (video: RadarVideo) => {
       setCloneTarget(video);
-      void cloner.run(() => cloneRadarVideo(video.url, cloneLevel));
+      // Leva o card do radar junto: título, autor, views, thumb e player.
+      void cloner.run(() =>
+        cloneRadarVideo(video.url, cloneLevel, {
+          title: video.title,
+          desc: video.title,
+          author: video.author,
+          platform: video.source,
+          url: video.url,
+          embed_url: video.embed_url ?? null,
+          thumbnail: video.thumbnail ?? null,
+          views_label: video.views_human,
+        }),
+      );
     },
     [cloneLevel, cloner],
   );
+
 
   const closeClone = useCallback(() => {
     cloner.reset();
