@@ -124,7 +124,7 @@ def _orientation_of(width: int, height: int) -> str:
     return "square"
 
 
-def _format_output_size(fmt: str, info: Probe) -> tuple[int, int]:
+def format_output_size(fmt: str, info: Probe) -> tuple[int, int]:
     """Resolução final do formato escolhido, sem inflar fontes pequenas."""
     target = format_resolution(fmt)
     if not target:
@@ -149,7 +149,7 @@ def build_format_filters(fmt: str, info: Probe, fit: str = DEFAULT_FIT) -> list[
     target = format_resolution(fmt)
     if not target or not info.has_video:
         return []
-    w, h = _format_output_size(fmt, info)
+    w, h = format_output_size(fmt, info)
     if fit == "contain":
         return [
             f"scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos",
@@ -548,7 +548,7 @@ def build_command(
     # dela devolveria o vídeo para a proporção da fonte.
     mutation_info = info
     if format_filters:
-        w, h = _format_output_size(video_format, info)
+        w, h = format_output_size(video_format, info)
         mutation_info = replace(info, width=w, height=h, orientation=_orientation_of(w, h))
     vf = (
         []

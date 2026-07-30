@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request
 from ..services import beatsync, captions, ingest, jobs, media, transcribe
 from ..services.delivery import deliver
 from ..services.sterilizer import (
-    _format_output_size as format_output_size,
+    format_output_size,
     normalize_fit,
     normalize_format,
     normalize_level,
