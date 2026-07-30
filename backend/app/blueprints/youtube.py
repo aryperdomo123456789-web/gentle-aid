@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request
 from ..config import config
 from ..services import jobs, media
 from ..services.delivery import deliver
-from ..services.sterilizer import normalize_level
+from ..services.sterilizer import normalize_fit, normalize_format, normalize_level
 from ..services.validation import (
     YOUTUBE_RE,
     ValidationError,
@@ -50,6 +50,9 @@ def bypass():
     if intensity is None:
         intensity = "media"
 
+    video_format = normalize_format(payload.get("video_format"))
+    format_fit = normalize_fit(payload.get("format_fit"))
+
     job = jobs.create_job(
         "youtube",
         meta={
@@ -57,14 +60,22 @@ def bypass():
             "nicho": nicho,
             "keyword": keyword,
             "intensity": intensity,
+            "video_format": video_format,
+            "format_fit": format_fit,
             **({"source_card": source_card} if source_card else {}),
         },
     )
-    jobs.submit(job["job_id"], lambda jid: _work(jid, urls, intensity))
+    jobs.submit(job["job_id"], lambda jid: _work(jid, urls, intensity, video_format, format_fit))
     return jsonify(job), 202
 
 
-def _work(job_id: str, urls: list[str], intensity: str) -> None:
+def _work(
+    job_id: str,
+    urls: list[str],
+    intensity: str,
+    video_format: str = "original",
+    format_fit: str = "cover",
+) -> None:
     outputs: list[dict] = []
     total = len(urls)
     last_report = None
@@ -91,7 +102,14 @@ def _work(job_id: str, urls: list[str], intensity: str) -> None:
 
         dst = output_path("youtube", job_id, f"_{index}_bypass.mp4")
         jobs.stage(job_id, "esterilizando", f"[{index}/{total}] Esterilizando com mutação '{intensity}'.")
-        report = media.sterilize(raw, dst, job_id=job_id, level=intensity)
+        report = media.sterilize(
+            raw,
+            dst,
+            job_id=job_id,
+            level=intensity,
+            video_format=video_format,
+            format_fit=format_fit,
+        )
         raw.unlink(missing_ok=True)
 
         outputs.append(

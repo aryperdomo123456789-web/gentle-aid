@@ -7,7 +7,7 @@ from flask import Blueprint, jsonify, request
 from ..config import config
 from ..services import discovery, jobs, media, trends as trends_service
 from ..services.delivery import deliver
-from ..services.sterilizer import normalize_level
+from ..services.sterilizer import normalize_fit, normalize_format, normalize_level
 from ..services.validation import (
     TIKTOK_RE,
     ValidationError,
@@ -54,6 +54,8 @@ def clone():
     if level is None:
         level = "media"
 
+    video_format = normalize_format(payload.get("video_format"))
+    format_fit = normalize_fit(payload.get("format_fit"))
     source_card = payload.get("source_card")
     if source_card is not None and not isinstance(source_card, dict):
         return jsonify(error="Campo 'source_card' deve ser um objeto JSON."), 400
@@ -63,6 +65,8 @@ def clone():
         meta={
             "url": url,
             "intensity": level,
+            "video_format": video_format,
+            "format_fit": format_fit,
             **({"source_card": source_card} if source_card else {}),
         },
     )
@@ -101,7 +105,14 @@ def _work(job_id: str, url: str, level: str, has_card: bool = False) -> None:
 
     dst = output_path("tiktok", job_id, "_clone.mp4")
     jobs.stage(job_id, "esterilizando", f"Clonando 1:1 e esterilizando (nível {level}).", progress=50)
-    report = media.sterilize(raw, dst, job_id=job_id, level=level)
+    report = media.sterilize(
+        raw,
+        dst,
+        job_id=job_id,
+        level=level,
+        video_format=video_format,
+        format_fit=format_fit,
+    )
     raw.unlink(missing_ok=True)
 
     deliver(job_id, dst, report, message="Clone pronto: arquivo virgem e sem rastro do original.")
