@@ -6,6 +6,7 @@ import { JobSettingsGuard } from "@/components/JobSettingsGuard";
 import { ToolShell } from "@/components/ToolShell";
 import { Link } from "@tanstack/react-router";
 
+import { LiveGuide, type LiveGuideStep } from "./LiveGuide";
 import { LiveLog } from "./LiveLog";
 import { PlaylistPicker } from "./PlaylistPicker";
 import { StreamHealth } from "./StreamHealth";
@@ -25,6 +26,8 @@ export function LiveStation({
   subtitle,
   warning,
   keyHelp,
+  guideTitle,
+  steps,
 }: {
   platform: LivePlatform;
   badge: string;
@@ -32,6 +35,8 @@ export function LiveStation({
   subtitle: string;
   warning: string;
   keyHelp: string;
+  guideTitle: string;
+  steps: LiveGuideStep[];
 }) {
   const station = useLiveStation(platform);
   const [selected, setSelected] = useState<string[]>([]);
