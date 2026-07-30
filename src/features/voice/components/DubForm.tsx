@@ -6,6 +6,7 @@ import { JobSettingsGuard } from "@/components/JobSettingsGuard";
 
 import { LinkInspector, type InspectedCard } from "@/components/LinkInspector";
 import { MutationSelect } from "@/components/MutationSelect";
+import { VideoFormatSelect } from "@/components/VideoFormatSelect";
 import { AudioFormatField, MEDIA_ACCEPT, MEDIA_HINT } from "./AudioFormatField";
 
 type Props = {
@@ -130,6 +131,8 @@ export function DubForm({
         </Field>
         <AudioFormatField />
       </div>
+
+      <VideoFormatSelect hint="Só afeta a entrega em vídeo: escolha a proporção final da dublagem." />
 
       <MutationSelect
         defaultValue="auto"

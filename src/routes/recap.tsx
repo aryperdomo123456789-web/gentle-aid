@@ -6,6 +6,7 @@ import { DiscoveryPanel, type DiscoveryCard } from "@/components/DiscoveryPanel"
 import { Field, FileDrop, SelectInput, TextArea, TextInput } from "@/components/form";
 import { JobSettingsGuard } from "@/components/JobSettingsGuard";
 import { MutationSelect } from "@/components/MutationSelect";
+import { VideoFormatSelect } from "@/components/VideoFormatSelect";
 import { ToolShell } from "@/components/ToolShell";
 import { StatusPanel } from "@/features/jobs/components/StatusPanel";
 import { ToolHistory } from "@/features/jobs/components/ToolHistory";
@@ -400,6 +401,7 @@ function RecapPage() {
               )}
             </Field>
             <MutationSelect defaultValue="auto" label="Nível de esterilização" hint="" />
+            <VideoFormatSelect hint="Formato de entrega do recap narrado." />
           </div>
 
           <label className="flex items-start gap-3 rounded-xl border border-border bg-background/40 p-3 text-sm">
