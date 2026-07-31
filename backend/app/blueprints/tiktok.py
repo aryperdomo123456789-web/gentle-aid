@@ -70,7 +70,10 @@ def clone():
             **({"source_card": source_card} if source_card else {}),
         },
     )
-    jobs.submit(job["job_id"], lambda jid: _work(jid, url, level, bool(source_card)))
+    jobs.submit(
+        job["job_id"],
+        lambda jid: _work(jid, url, level, bool(source_card), video_format, format_fit),
+    )
     return jsonify(job), 202
 
 
@@ -90,7 +93,14 @@ def _enrich_source_card(job_id: str, url: str) -> None:
     jobs.log(job_id, "Metadados da origem anexados (legenda, curtidas, views).")
 
 
-def _work(job_id: str, url: str, level: str, has_card: bool = False) -> None:
+def _work(
+    job_id: str,
+    url: str,
+    level: str,
+    has_card: bool = False,
+    video_format: str = "original",
+    format_fit: str = "cover",
+) -> None:
     if not has_card:
         jobs.stage(job_id, "lendo origem", "Coletando métricas e legenda do vídeo.", progress=5)
         _enrich_source_card(job_id, url)
