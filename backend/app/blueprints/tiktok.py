@@ -70,7 +70,10 @@ def clone():
             **({"source_card": source_card} if source_card else {}),
         },
     )
-    jobs.submit(job["job_id"], lambda jid: _work(jid, url, level, bool(source_card)))
+    jobs.submit(
+        job["job_id"],
+        lambda jid: _work(jid, url, level, bool(source_card), video_format, format_fit),
+    )
     return jsonify(job), 202
 
 
