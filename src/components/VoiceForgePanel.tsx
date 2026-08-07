@@ -43,7 +43,10 @@ const BLANK: Persona = {
   tempo: 1,
   rate: 0,
   notes: "",
+  engine: "edge",
+  type: "custom",
 };
+
 
 const SLIDERS: Array<{
   key: keyof Persona;

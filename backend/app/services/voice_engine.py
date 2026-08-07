@@ -257,7 +257,22 @@ def _multipart(fields: dict[str, str], file_field: str, file_path: Path) -> tupl
 # --------------------------------------------------------------------------- #
 # Speech-to-Speech (troca o narrador, mantém a narrativa)
 # --------------------------------------------------------------------------- #
+def _persona_to_settings(persona_id: str) -> Settings:
+    """Extrai settings da ElevenLabs a partir de metadados da persona se existirem."""
+    persona = voice_forge.get(persona_id)
+    if not persona or not persona.metadata:
+        return Settings()
+    
+    meta = persona.metadata
+    return Settings(
+        stability=float(meta.get("stability", 0.5)),
+        similarity_boost=float(meta.get("similarity_boost", 0.85)),
+        style=float(meta.get("style", 0.0)),
+        speaker_boost=bool(meta.get("use_speaker_boost", True))
+    )
+
 def speech_to_speech(
+
     src: Path,
     dst_wav: Path,
     *,
