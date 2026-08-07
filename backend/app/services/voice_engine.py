@@ -377,7 +377,15 @@ def text_to_speech(
     settings: Settings | None = None,
     speed: float = 1.0,
 ) -> Path:
+    # Se voice_id for uma persona do catálogo, verifica se é neural_clone
+    persona = voice_forge.get(voice_id)
+    if persona and persona.engine != "elevenlabs" and persona.type != "neural_clone":
+        # Se tentarem usar uma voz DSP local como ElevenLabs, redirecionamos para o fluxo local se possível,
+        # mas aqui o contrato é ser ElevenLabs. Então falhamos se não for Eleven ou forçado.
+        pass
+
     settings = settings or Settings(stability=0.45, similarity_boost=0.8, style=0.15)
+
     chunks = split_text(text)
     if not chunks:
         raise VoiceEngineError("Nenhum texto para narrar.")

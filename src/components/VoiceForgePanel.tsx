@@ -342,8 +342,9 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-background/40 p-4">
-            <h3 className="text-xs font-semibold text-foreground mb-3">Configurações Manuais / Ajuste de Persona</h3>
+          <div className="rounded-xl border border-border bg-background/40 p-4 space-y-4">
+            <h3 className="text-xs font-semibold text-foreground">Configurações da Voz / Metadados</h3>
+
             <Field label="Nome da voz">
               {(id) => (
                 <TextInput
