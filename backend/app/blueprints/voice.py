@@ -335,34 +335,39 @@ def personas_clone():
         return jsonify(error="Envie o arquivo de áudio para clonagem (1-10 min)."), 400
     
     name = str(request.form.get("name") or upload.filename).strip()
-    consent = request.form.get("consent") in ("1", "true", "on")
+    # No backend, o consentimento vem como string "true"/"false" ou "1"/"0"
+    consent_raw = request.form.get("consent")
+    consent = consent_raw in ("1", "true", "on")
     
     if not consent:
-        return jsonify(error="Você precisa confirmar que tem autorização para usar esta voz."), 400
+        return jsonify(error="Você precisa confirmar explicitamente que tem autorização para usar esta voz."), 400
 
+    engine_active = "elevenlabs" if voice_engine.available() else "forge"
+    
     job = jobs.create_job(
         "voice",
         meta={
             "mode": "neural_clone",
             "name": name,
-            "engine": "elevenlabs" if voice_engine.available() else "unknown"
+            "engine": engine_active
         }
     )
     job_id = job["job_id"]
     
     try:
+        # Salva o upload temporariamente para processamento
         src = save_upload(upload, job_id, MEDIA_EXT)
-        # O processamento pesado roda em background via jobs.submit
+        
+        # O processamento pesado roda em background
         def run_clone(jid):
             try:
-                # Passa o consentimento explícito
+                # O parâmetro consent já foi validado acima, mas passamos para o serviço por segurança
                 profile = voice_cloning.start_cloning_job(src, name, True, jid)
-                # O motor da ElevenLabs já disponibiliza a voz no catálogo
-                jobs.log(jid, f"Perfil neural '{profile.name}' pronto para uso.")
-                src.unlink(missing_ok=True)
-            except Exception as e:
-                src.unlink(missing_ok=True)
-                raise e
+                jobs.log(jid, f"Clonagem neural finalizada. Perfil '{profile.name}' ({profile.engine}) adicionado ao catálogo.")
+            finally:
+                # Garante limpeza do arquivo de upload original
+                if src.exists():
+                    src.unlink(missing_ok=True)
 
         jobs.submit(job_id, run_clone)
         return jsonify(job), 202
