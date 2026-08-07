@@ -28,6 +28,7 @@ from ..services import (
     media,
     script_doctor,
     transcribe,
+    voice_cloning,
     voice_engine,
     voice_forge,
 )
@@ -325,6 +326,24 @@ def personas_delete(persona_id: str):
         return jsonify(error="Voz não encontrada."), 404
     return jsonify(ok=True)
 
+
+@bp.post("/personas/clone")
+def personas_clone():
+    """Clona uma voz a partir de um arquivo de áudio (DNA acústico)."""
+    upload = request.files.get("media") or request.files.get("audio") or request.files.get("video")
+    if not upload or not upload.filename:
+        return jsonify(error="Envie o arquivo de áudio para clonagem (1-10 min)."), 400
+    
+    name = str(request.form.get("name") or upload.filename).strip()
+    job_id = f"clone-{int(time.time())}"
+    
+    try:
+        src = save_upload(upload, job_id, MEDIA_EXT)
+        persona = voice_cloning.clone_to_persona(src, name, job_id=None)
+        src.unlink(missing_ok=True)
+        return jsonify(persona=persona.dict(), ok=True), 201
+    except Exception as exc:
+        return jsonify(error=str(exc)), 400
 
 @bp.post("/personas/variants")
 def personas_variants():
