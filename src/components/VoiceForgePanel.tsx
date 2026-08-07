@@ -202,11 +202,12 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
   return (
     <section className="rounded-2xl border border-border bg-card/60 p-5">
       <header className="mb-4">
-        <h2 className="text-sm font-semibold text-foreground">Voice Forge · crie a sua própria voz</h2>
+        <h2 className="text-sm font-semibold text-foreground">Voice Forge · Clonagem e Personalização</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          O motor gratuito gera a fala base e o Forge aplica uma assinatura acústica exclusiva por cima —
-          altura, formantes, timbre, sopro e ambiência. O resultado não soa como a voz padrão de nenhum
-          provedor e fica igual em todos os vídeos do canal.
+          Sim, este sistema permite clonar sua voz! O motor aplica uma assinatura acústica exclusiva 
+          sobre a fala base. Dica: envie um áudio seu de 1 a 10 minutos na aba "Converter" para 
+          extrair o timbre, ou use os controles abaixo para esculpir uma persona do zero que soe 
+          exatamente como você quer.
         </p>
       </header>
 
