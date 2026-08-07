@@ -24,6 +24,7 @@ import { Route as CanvaCleanerRouteImport } from './routes/canva-cleaner'
 import { Route as ApisRouteImport } from './routes/apis'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as HistoricoJobIdRouteImport } from './routes/historico.$jobId'
+import { Route as ApiHubChavesRouteImport } from './routes/api-hub/chaves'
 
 const VoiceConversionRoute = VoiceConversionRouteImport.update({
   id: '/voice-conversion',
@@ -100,6 +101,11 @@ const HistoricoJobIdRoute = HistoricoJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => HistoricoRoute,
 } as any)
+const ApiHubChavesRoute = ApiHubChavesRouteImport.update({
+  id: '/api-hub/chaves',
+  path: '/api-hub/chaves',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
+  '/api-hub/chaves': typeof ApiHubChavesRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
 }
 export interface FileRoutesByTo {
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
+  '/api-hub/chaves': typeof ApiHubChavesRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
 }
 export interface FileRoutesById {
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
   '/voice-conversion': typeof VoiceConversionRoute
+  '/api-hub/chaves': typeof ApiHubChavesRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
 }
 export interface FileRouteTypes {
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/recap'
     | '/tiktok'
     | '/voice-conversion'
+    | '/api-hub/chaves'
     | '/historico/$jobId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/recap'
     | '/tiktok'
     | '/voice-conversion'
+    | '/api-hub/chaves'
     | '/historico/$jobId'
   id:
     | '__root__'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/recap'
     | '/tiktok'
     | '/voice-conversion'
+    | '/api-hub/chaves'
     | '/historico/$jobId'
   fileRoutesById: FileRoutesById
 }
@@ -222,6 +234,7 @@ export interface RootRouteChildren {
   RecapRoute: typeof RecapRoute
   TiktokRoute: typeof TiktokRoute
   VoiceConversionRoute: typeof VoiceConversionRoute
+  ApiHubChavesRoute: typeof ApiHubChavesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -331,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HistoricoJobIdRouteImport
       parentRoute: typeof HistoricoRoute
     }
+    '/api-hub/chaves': {
+      id: '/api-hub/chaves'
+      path: '/api-hub/chaves'
+      fullPath: '/api-hub/chaves'
+      preLoaderRoute: typeof ApiHubChavesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -361,7 +381,18 @@ const rootRouteChildren: RootRouteChildren = {
   RecapRoute: RecapRoute,
   TiktokRoute: TiktokRoute,
   VoiceConversionRoute: VoiceConversionRoute,
+  ApiHubChavesRoute: ApiHubChavesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

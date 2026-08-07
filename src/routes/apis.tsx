@@ -1,5 +1,6 @@
 import { Activity, CircleAlert, DownloadCloud, KeyRound, Loader2, RefreshCw, Wrench } from "lucide-react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { TopNav } from "@/components/TopNav";
@@ -218,6 +219,13 @@ function ApisPage() {
               )}
               Testar todas
             </button>
+            <Link
+              to="/api-hub/chaves"
+              className="inline-flex items-center gap-2 rounded-xl border border-primary/50 bg-primary/10 px-4 py-2.5 text-sm font-semibold transition-colors hover:border-primary"
+            >
+              <KeyRound className="size-4" aria-hidden="true" />
+              Chaves de Acesso
+            </Link>
           </div>
         </div>
 
