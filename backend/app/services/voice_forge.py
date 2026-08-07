@@ -182,9 +182,10 @@ def _from_dict(raw: dict) -> Persona:
     clean = {k: v for k, v in raw.items() if k in allowed}
     clean.setdefault("id", slugify(clean.get("name") or "forge"))
     clean.setdefault("name", clean["id"])
-    if clean.get("engine") == "elevenlabs":
+    if clean.get("engine") == "elevenlabs" or clean.get("type") == "neural_clone":
         return Persona(**clean) # Pula normalização DSP para neurais
     return Persona(**clean).normalized()
+
 
 
 
