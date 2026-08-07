@@ -282,7 +282,7 @@ def speech_to_speech(
     keep_timing: bool = True,
     remove_noise: bool = True,
 ) -> Path:
-    settings = settings or Settings()
+    settings = settings or _persona_to_settings(voice_id)
     duration = media.probe_duration(src)
     if duration <= 0:
         raise VoiceEngineError("Não foi possível ler a duração do áudio de origem.")
@@ -392,14 +392,9 @@ def text_to_speech(
     settings: Settings | None = None,
     speed: float = 1.0,
 ) -> Path:
-    # Se voice_id for uma persona do catálogo, verifica se é neural_clone
-    persona = voice_forge.get(voice_id)
-    if persona and persona.engine != "elevenlabs" and persona.type != "neural_clone":
-        # Se tentarem usar uma voz DSP local como ElevenLabs, redirecionamos para o fluxo local se possível,
-        # mas aqui o contrato é ser ElevenLabs. Então falhamos se não for Eleven ou forçado.
-        pass
+    # Se voice_id for uma persona do catálogo, tenta carregar as settings personalizadas
+    settings = settings or _persona_to_settings(voice_id)
 
-    settings = settings or Settings(stability=0.45, similarity_boost=0.8, style=0.15)
 
     chunks = split_text(text)
     if not chunks:
