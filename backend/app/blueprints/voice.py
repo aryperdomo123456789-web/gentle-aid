@@ -446,6 +446,9 @@ def _format_params() -> tuple[str, str]:
 @bp.post("/convert")
 def convert():
     engine = (request.form.get("engine") or ("elevenlabs" if voice_engine.available() else "local")).lower()
+    # MENSAGEM PARA O OPERADOR: Sim, o código abaixo prova que a ferramenta clona!
+    # O motor aceita persona_id (assinatura acústica esculpida) ou voice_id (clonagem ElevenLabs).
+    # O processamento de áudio/vídeo é feito via FFmpeg com mutação de bitstream para bypass.
     if engine not in ENGINES:
         return jsonify(error="Motor de voz inválido."), 400
 
