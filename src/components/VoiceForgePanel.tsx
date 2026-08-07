@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-
 import { Field, SelectInput, TextArea, TextInput } from "@/components/form";
-import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError } from "@/lib/api";
+import { apiDelete, apiGet, apiPostJson, downloadUrl, friendlyError, type Job } from "@/lib/api";
+import { useJobRunner } from "@/hooks/use-job-runner";
 
 export type Persona = {
   id: string;
@@ -74,6 +74,8 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
   const [variantAudio, setVariantAudio] = useState<Record<string, string>>({});
   const [variantBusy, setVariantBusy] = useState<string>("");
   const [cloneFile, setCloneFile] = useState<File | null>(null);
+  const [consent, setConsent] = useState(false);
+  const { job, run, cancel, remove: removeJob } = useJobRunner("voice:clone");
 
 
   async function load() {
@@ -202,25 +204,35 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
       setError("Selecione um arquivo de áudio para clonar.");
       return;
     }
-    setBusy("clone");
+    if (!consent) {
+      setError("Você precisa confirmar a autorização de uso da voz.");
+      return;
+    }
+    
     setError(null);
     setNotice(null);
-    try {
+    
+    await run(async () => {
       const form = new FormData();
       form.append("media", cloneFile);
       form.append("name", draft.name || cloneFile.name);
-      
-      const res = await apiPostJson<{ persona: Persona; ok: boolean }>("/api/voice/personas/clone", form);
-      setDraft(res.persona);
-      setNotice(`DNA acústico extraído! Voz “${res.persona.name}” clonada e salva.`);
-      await load();
-      setCloneFile(null);
-    } catch (err) {
-      setError(friendlyError(err));
-    } finally {
-      setBusy("");
-    }
+      form.append("consent", "true");
+      return apiPostJson<Job>("/api/voice/personas/clone", form);
+    });
+    
+    setCloneFile(null);
+    setConsent(false);
   }
+
+  // Monitorar conclusão do job de clonagem para atualizar a lista
+  useEffect(() => {
+    if (job?.status === "done") {
+      setNotice("Clonagem neural concluída com sucesso!");
+      void load();
+    } else if (job?.status === "error") {
+      setError(job.message || "Falha na clonagem neural.");
+    }
+  }, [job?.status, job?.message]);
 
   const baseVoices = data?.base_voices ?? [];
 
@@ -248,25 +260,63 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
                 🧬
               </span>
-              Clonagem Neural (1-10 min)
+              Clonagem Neural Real (Motor ElevenLabs)
             </h3>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="flex-1">
-                <input
-                  type="file"
-                  accept="audio/*,video/*"
-                  onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
-                  className="w-full text-xs text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/20 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/30"
-                />
+            <div className="space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="audio/*,video/*"
+                    onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/20 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/30"
+                  />
+                  <p className="mt-1 text-[10px] text-muted-foreground">Recomendado: 1-10 minutos de áudio limpo.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void clone()}
+                  disabled={!!job && job.status === "running" || !cloneFile || !consent}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {job?.status === "running" ? "Clonando..." : "Iniciar Clonagem Neural"}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => void clone()}
-                disabled={busy !== "" || !cloneFile}
-                className="rounded-lg bg-primary/20 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/30 disabled:opacity-50"
-              >
-                {busy === "clone" ? "Clonando DNA..." : "Clonar voz agora"}
-              </button>
+
+              <label className="flex items-start gap-2 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className="mt-0.5 rounded border-primary/30 bg-primary/10 text-primary focus:ring-primary/50" 
+                />
+                <span className="text-[10px] text-muted-foreground leading-tight group-hover:text-foreground transition-colors">
+                  Confirmo que tenho autorização legal para clonar esta voz e que o uso respeita os termos de serviço.
+                </span>
+              </label>
+
+              {job && (
+                <div className="mt-2 space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-primary font-medium">{job.stage || "Processando..."}</span>
+                    <span className="text-muted-foreground">{job.progress}%</span>
+                  </div>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-primary/10">
+                    <div 
+                      className="h-full bg-primary transition-all duration-500" 
+                      style={{ width: `${job.progress}%` }}
+                    />
+                  </div>
+                  {job.status === "running" && (
+                    <button 
+                      onClick={() => void cancel()}
+                      className="text-[9px] text-destructive hover:underline"
+                    >
+                      Cancelar processo
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
