@@ -242,7 +242,8 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
       <header className="mb-4">
         <h2 className="text-sm font-semibold text-foreground">🧬 Estúdio de Clonagem Neural</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Crie personas exclusivas via assinatura acústica ou extraia timbres reais de áudios (1-10 min).
+          Crie personas exclusivas via assinatura acústica ou extraia identidades vocais reais via Clonagem Neural (1-10 min).
+
         </p>
       </header>
 
@@ -260,7 +261,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-xs text-primary animate-pulse">
                 🧬
               </span>
-              Motor de Clonagem Neural Ativo
+              Motor Neural Profissional (ElevenLabs)
             </h3>
             <div className="space-y-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -286,7 +287,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
                   disabled={!!job && job.status === "running" || !cloneFile || !consent}
                   className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                 >
-                  {job?.status === "running" ? "Clonando..." : "Iniciar Clonagem Neural"}
+                  {job?.status === "running" ? "Processando DNA..." : "Clonar Voz (Neural Real)"}
                 </button>
               </div>
 
@@ -298,7 +299,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
                   className="mt-0.5 rounded border-primary/30 bg-primary/10 text-primary focus:ring-primary/50" 
                 />
                 <span className="text-[10px] text-muted-foreground leading-tight group-hover:text-foreground transition-colors">
-                  Confirmo que tenho autorização legal para clonar esta voz e que o uso respeita os termos de serviço.
+                  Confirmo que tenho autorização legal e que este é um áudio real para clonagem neural definitiva.
                 </span>
               </label>
 

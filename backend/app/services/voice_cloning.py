@@ -15,7 +15,7 @@ from typing import Optional
 from ..config import config
 from . import media, jobs, voice_engine, voice_forge
 from .cloning_providers.elevenlabs import ElevenLabsCloningProvider
-from .cloning_providers.local import LocalCloningProvider
+# Removido LocalCloningProvider para garantir que apenas clonagem neural real seja usada
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +25,11 @@ MAX_DURATION = 600.0  # 10 minutos
 STORAGE_DIR = config.storage_dir / "neural_clones"
 
 def get_provider():
-    """Retorna o provedor ativo. ElevenLabs se disponível, caso contrário Local (DSP)."""
+    """Retorna o provedor ativo. ElevenLabs se disponível, caso contrário falha (sem motor neural fake)."""
     if voice_engine.available():
         return ElevenLabsCloningProvider()
-    return LocalCloningProvider()
+    return None
+
 
 def extract_dna(audio_path: Path, job_id: str | None = None) -> dict:
     """Extração auxiliar de metadados acústicos para o provedor local."""
@@ -54,17 +55,23 @@ def validate_audio(path: Path) -> dict:
     if not info.has_audio:
         raise ValueError("O arquivo não contém uma trilha de áudio válida.")
     
+    # Validação rigorosa de 1 a 10 minutos
     if info.duration < MIN_DURATION:
-        raise ValueError(f"Áudio muito curto ({info.duration:.1f}s). Envie pelo menos 1 minuto.")
+        raise ValueError(f"Áudio insuficiente para clonagem neural ({info.duration:.1f}s). Envie pelo menos 1 minuto (60s).")
     
     if info.duration > MAX_DURATION:
-        raise ValueError(f"Áudio muito longo ({info.duration:.1f}s). O limite é 10 minutos.")
+        raise ValueError(f"Áudio muito longo ({info.duration:.1f}s). O limite para precisão neural é 10 minutos.")
     
+    # Validação de qualidade (amostragem mínima)
+    if info.sample_rate < 16000:
+        raise ValueError(f"Qualidade de áudio muito baixa ({info.sample_rate}Hz). Use pelo menos 16kHz.")
+
     return {
         "duration": info.duration,
         "sample_rate": info.sample_rate,
         "channels": info.channels
     }
+
 
 def preprocess_audio(src: Path, job_id: str) -> Path:
     """Limpa e normaliza o áudio antes de enviar para o motor neural."""
@@ -105,35 +112,29 @@ def start_cloning_job(audio_path: Path, name: str, consent: bool, job_id: str):
         clean_audio = preprocess_audio(audio_path, job_id)
         
         # 3. Envio para o Provedor Neural
-        engine_name = "ElevenLabs" if isinstance(provider, ElevenLabsCloningProvider) else "Local (DSP)"
-        jobs.stage(job_id, "clonando", f"Enviando amostra para o motor neural {engine_name}...", progress=40)
+        jobs.stage(job_id, "clonando", "Enviando amostra para o motor neural ElevenLabs...", progress=40)
         profile = provider.clone_voice(clean_audio, name, job_id)
         
         # 4. Finalização e Persistência da Persona
         jobs.stage(job_id, "finalizando", "Sincronizando perfil com o catálogo local...", progress=90)
         
-        if profile.engine == "elevenlabs":
-            # Para ElevenLabs, a voz já existe na nuvem, mas queremos garantir que o catálogo local saiba dela
-            # (opcional dependendo de como voice_engine.list_voices() se comporta)
-            pass
-        elif profile.engine == "forge":
-            # Para motor local (DSP), precisamos salvar a Persona explicitamente
-            is_fem = profile.metadata.get("pitch", 0) > 0.5
-            base_voice = "pt-BR-ThalitaNeural" if is_fem else "pt-BR-AntonioNeural"
-            
-            persona_data = {
-                "name": profile.name,
-                "base_voice": base_voice,
-                "engine": "forge",
-                "notes": profile.notes,
-                **profile.metadata
-            }
-            
-            # Garante campos obrigatórios do catálogo Voice Forge
-            persona_data.setdefault("pitch", -1.5)
-            persona_data.setdefault("formant", 0.95)
-            
-            voice_forge.save(persona_data)
+        # Registra a voz no banco de personas para persistência fora do Git
+        # ElevenLabs vozes aparecem via voice_engine.list_voices(), mas salvamos metadados extras no cofre local
+        persona_data = {
+            "id": profile.id,
+            "name": profile.name,
+            "engine": "elevenlabs",
+            "type": "neural_clone",
+            "source_audio_duration": info["duration"],
+            "notes": profile.notes,
+            "metadata": profile.metadata,
+            "created_at": profile.created_at,
+            "status": "active"
+        }
+        
+        # Salva no catálogo do Voice Forge para que apareça unificado
+        voice_forge.save(persona_data)
+
 
         jobs.log(job_id, f"Clonagem concluída com sucesso via motor {engine_name}!")
         jobs.update(job_id, progress=100)
