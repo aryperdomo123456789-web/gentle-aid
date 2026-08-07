@@ -96,6 +96,15 @@ function YoutubeBypass() {
             Cole links de Shorts ou vídeos longos, escolha o nicho e dispare o bypass em lote:
             download, re-encode H.264/AAC, remoção de metadados e micro-mutações temporais.
           </p>
+          <div className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs text-foreground sm:flex-row sm:items-center sm:gap-4">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+              🧬
+            </span>
+            <span>
+              <strong>Clonagem Neural Ativa:</strong> O sistema agora permite extrair DNA acústico de vozes
+              (1-10 min) para narrações indetectáveis.
+            </span>
+          </div>
           <Link
             to="/voice-conversion"
             className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-primary/30 bg-primary/5 p-4 transition-all hover:border-primary/60 hover:bg-primary/10"

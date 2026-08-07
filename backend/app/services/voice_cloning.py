@@ -109,18 +109,33 @@ def start_cloning_job(audio_path: Path, name: str, consent: bool, job_id: str):
         jobs.stage(job_id, "clonando", f"Enviando amostra para o motor neural {engine_name}...", progress=40)
         profile = provider.clone_voice(clean_audio, name, job_id)
         
-        # 4. Finalização e Persistência da Persona se for motor local
-        if profile.engine == "forge":
+        # 4. Finalização e Persistência da Persona
+        jobs.stage(job_id, "finalizando", "Sincronizando perfil com o catálogo local...", progress=90)
+        
+        if profile.engine == "elevenlabs":
+            # Para ElevenLabs, a voz já existe na nuvem, mas queremos garantir que o catálogo local saiba dela
+            # (opcional dependendo de como voice_engine.list_voices() se comporta)
+            pass
+        elif profile.engine == "forge":
+            # Para motor local (DSP), precisamos salvar a Persona explicitamente
             is_fem = profile.metadata.get("pitch", 0) > 0.5
             base_voice = "pt-BR-ThalitaNeural" if is_fem else "pt-BR-AntonioNeural"
-            voice_forge.save({
+            
+            persona_data = {
                 "name": profile.name,
                 "base_voice": base_voice,
                 "engine": "forge",
+                "notes": profile.notes,
                 **profile.metadata
-            })
+            }
+            
+            # Garante campos obrigatórios do catálogo Voice Forge
+            persona_data.setdefault("pitch", -1.5)
+            persona_data.setdefault("formant", 0.95)
+            
+            voice_forge.save(persona_data)
 
-        jobs.log(job_id, f"Clonagem concluída! Nome da Voz: {profile.name}")
+        jobs.log(job_id, f"Clonagem concluída com sucesso via motor {engine_name}!")
         jobs.update(job_id, progress=100)
         
         # Limpeza
