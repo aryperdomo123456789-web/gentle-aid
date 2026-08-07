@@ -102,24 +102,10 @@ function YoutubeBypass() {
           >
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" x2="12" y1="19" y2="22" />
-                </svg>
+                <span className="text-lg">🧬</span>
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <h4 className="text-sm font-bold text-foreground">Novo: Clonagem Neural de Voz</h4>
+                <h4 className="text-sm font-bold text-foreground">Novo: Clonagem Neural de Voz (Realidade 🧬)</h4>
                 <p className="text-[11px] text-muted-foreground line-clamp-2">
                   Extração de DNA acústico (1-10 min) para criar personas únicas e indetectáveis.
                 </p>
