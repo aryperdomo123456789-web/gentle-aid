@@ -86,7 +86,7 @@ function VoiceStudio() {
     <ToolShell
       badge="Ferramenta 4 · Estúdio de Voz"
       title="Estúdio de Clonagem e Conversão de Voz"
-      subtitle="Ferramenta de Clonagem Ativa: Envie um áudio de 1 a 10 minutos para criar um perfil personalizado. O motor processa a assinatura acústica e cria sua persona única para dublagem e narração realista."
+      subtitle="Clonagem ativa: envie áudio de 1-10 min para criar seu perfil de voz exclusivo para dublagem e narração."
       left={
         <div className="space-y-5">
           <VoiceModeTabs mode={mode} onChange={studio.setMode} />
