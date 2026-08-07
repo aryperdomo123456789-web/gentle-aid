@@ -257,7 +257,22 @@ def _multipart(fields: dict[str, str], file_field: str, file_path: Path) -> tupl
 # --------------------------------------------------------------------------- #
 # Speech-to-Speech (troca o narrador, mantém a narrativa)
 # --------------------------------------------------------------------------- #
+def _persona_to_settings(persona_id: str) -> Settings:
+    """Extrai settings da ElevenLabs a partir de metadados da persona se existirem."""
+    persona = voice_forge.get(persona_id)
+    if not persona or not persona.metadata:
+        return Settings()
+    
+    meta = persona.metadata
+    return Settings(
+        stability=float(meta.get("stability", 0.5)),
+        similarity_boost=float(meta.get("similarity_boost", 0.85)),
+        style=float(meta.get("style", 0.0)),
+        speaker_boost=bool(meta.get("use_speaker_boost", True))
+    )
+
 def speech_to_speech(
+
     src: Path,
     dst_wav: Path,
     *,
@@ -267,7 +282,7 @@ def speech_to_speech(
     keep_timing: bool = True,
     remove_noise: bool = True,
 ) -> Path:
-    settings = settings or Settings()
+    settings = settings or _persona_to_settings(voice_id)
     duration = media.probe_duration(src)
     if duration <= 0:
         raise VoiceEngineError("Não foi possível ler a duração do áudio de origem.")
@@ -377,7 +392,10 @@ def text_to_speech(
     settings: Settings | None = None,
     speed: float = 1.0,
 ) -> Path:
-    settings = settings or Settings(stability=0.45, similarity_boost=0.8, style=0.15)
+    # Se voice_id for uma persona do catálogo, tenta carregar as settings personalizadas
+    settings = settings or _persona_to_settings(voice_id)
+
+
     chunks = split_text(text)
     if not chunks:
         raise VoiceEngineError("Nenhum texto para narrar.")

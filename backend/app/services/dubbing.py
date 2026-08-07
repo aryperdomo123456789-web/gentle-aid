@@ -349,10 +349,11 @@ def build_track(
 
 def apply_persona(src: Path, dst: Path, persona, job_id: str) -> Path:
     """Aplica a assinatura acústica se for voz DSP (Edge). Neurais já saem prontas."""
-    if persona.engine == "elevenlabs":
+    if persona.engine == "elevenlabs" or persona.type == "neural_clone":
         # Clonagem neural real não precisa de DSP local, já é a voz do dono.
         src.replace(dst)
         return dst
+
         
     chain = voice_forge.filter_chain(persona, preserve_duration=True)
     media.run(

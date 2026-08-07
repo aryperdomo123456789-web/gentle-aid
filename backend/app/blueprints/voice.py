@@ -157,11 +157,17 @@ def preview():
 
     try:
         if engine == "elevenlabs":
-            voice_id = str(payload.get("voice_id") or "").strip()
+            voice_id = str(payload.get("voice_id") or payload.get("persona_id") or "").strip()
             if not voice_engine.available():
                 return jsonify(error="Cadastre a chave ElevenLabs em /apis para testar as vozes realistas."), 400
             if not voice_id:
-                return jsonify(error="Escolha uma voz realista."), 400
+                return jsonify(error="Escolha uma voz realista ou clone."), 400
+            
+            # Se for uma persona local, verifica se é neural
+            persona = voice_forge.get(voice_id)
+            if persona and persona.engine == "elevenlabs":
+                voice_id = persona.id
+
             wav = output_path("voice", job_id, ".raw.wav")
             voice_engine.text_to_speech(text, wav, voice_id=voice_id, job_id=job_id)
             media.run(
@@ -184,8 +190,17 @@ def preview():
             persona = voice_forge.get(str(payload.get("persona_id") or "").strip())
             if persona is None:
                 return jsonify(error="Escolha (ou crie) uma voz própria no Forge."), 400
-            edge_tts.synthesize(text, raw, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate)
-            chain = voice_forge.filter_chain(persona, preserve_duration=False)
+            
+            # Se a persona do Forge for na verdade um clone neural ElevenLabs
+            if persona.engine == "elevenlabs" or persona.type == "neural_clone":
+                if not voice_engine.available():
+                    return jsonify(error="Esta voz requer ElevenLabs. Configure a chave em /apis."), 400
+                voice_engine.text_to_speech(text, raw, voice_id=persona.id, job_id=job_id)
+                chain = ["anull"]
+            else:
+                edge_tts.synthesize(text, raw, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate)
+                chain = voice_forge.filter_chain(persona, preserve_duration=False)
+            
             label = persona.name
         else:
             target = str(payload.get("target_voice") or "masc_grave")
@@ -209,6 +224,7 @@ def preview():
         return jsonify(url=public_url(dst), engine=engine, voice=label)
     except (EdgeTTSError, VoiceEngineError, RuntimeError) as exc:
         return jsonify(error=str(exc)), 400
+
 
 
 

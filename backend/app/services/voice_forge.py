@@ -182,9 +182,10 @@ def _from_dict(raw: dict) -> Persona:
     clean = {k: v for k, v in raw.items() if k in allowed}
     clean.setdefault("id", slugify(clean.get("name") or "forge"))
     clean.setdefault("name", clean["id"])
-    if clean.get("engine") == "elevenlabs":
+    if clean.get("engine") == "elevenlabs" or clean.get("type") == "neural_clone":
         return Persona(**clean) # Pula normalização DSP para neurais
     return Persona(**clean).normalized()
+
 
 
 
@@ -393,10 +394,11 @@ def dna(persona_id: str) -> list[float]:
 def filter_chain(persona: Persona, *, preserve_duration: bool = True) -> list[str]:
     """Cadeia FFmpeg que transforma a voz base na persona.
     
-    Ignorado para motores neurais (ElevenLabs).
+    Ignorado para motores neurais reais (ElevenLabs / neural_clone).
     """
-    if persona.engine == "elevenlabs":
+    if persona.engine == "elevenlabs" or persona.type == "neural_clone":
         return ["anull"]
+
 
     persona = persona.normalized()
 

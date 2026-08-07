@@ -43,7 +43,10 @@ const BLANK: Persona = {
   tempo: 1,
   rate: 0,
   notes: "",
+  engine: "edge",
+  type: "custom",
 };
+
 
 const SLIDERS: Array<{
   key: keyof Persona;
@@ -342,8 +345,9 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-background/40 p-4">
-            <h3 className="text-xs font-semibold text-foreground mb-3">Configurações Manuais / Ajuste de Persona</h3>
+          <div className="rounded-xl border border-border bg-background/40 p-4 space-y-4">
+            <h3 className="text-xs font-semibold text-foreground">Configurações da Voz / Metadados</h3>
+
             <Field label="Nome da voz">
               {(id) => (
                 <TextInput
@@ -574,21 +578,34 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
                 draft.id === persona.id ? "border-primary bg-primary/10" : "border-border bg-background/40"
               }`}
             >
-              <button
-                type="button"
-                onClick={() => setDraft({ ...BLANK, ...persona })}
-                className="block w-full text-left font-semibold text-foreground"
-              >
-                {persona.name}
-              </button>
-              <p className="mt-1 text-[11px] text-muted-foreground">{persona.notes || persona.base_voice}</p>
-              <button
-                type="button"
-                onClick={() => void remove(persona.id)}
-                className="mt-2 text-[11px] text-destructive hover:underline"
-              >
-                Remover
-              </button>
+              <div className="flex items-start justify-between">
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...BLANK, ...persona })}
+                  className="block flex-1 text-left font-semibold text-foreground"
+                >
+                  {persona.name}
+                  {persona.type === "neural_clone" && (
+                    <span className="ml-2 rounded-md bg-primary/20 px-1 py-0.5 text-[9px] uppercase text-primary">
+                      Neural
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void remove(persona.id)}
+                  title="Remover voz"
+                  className="text-[11px] text-muted-foreground hover:text-destructive"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground line-clamp-2">
+                {persona.type === "neural_clone" 
+                  ? `Motor: ${persona.engine || 'ElevenLabs'} · 🧬 Clone Real`
+                  : persona.notes || persona.base_voice}
+              </p>
+
             </div>
           ))}
           {(data?.personas ?? []).length === 0 ? (
