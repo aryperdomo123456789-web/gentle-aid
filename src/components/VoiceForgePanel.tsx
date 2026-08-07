@@ -17,7 +17,10 @@ export type Persona = {
   tempo: number;
   rate: number;
   notes?: string;
+  engine?: string;
+  type?: string;
 };
+
 
 type BaseVoice = { id: string; name: string; labels?: string };
 type PersonasResponse = {
