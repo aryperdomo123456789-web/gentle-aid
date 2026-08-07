@@ -65,7 +65,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
   const [draft, setDraft] = useState<Persona>(BLANK);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState("");
-  const [busy, setBusy] = useState<"" | "preview" | "save" | "variants" | "bulk">("");
+  const [busy, setBusy] = useState<"" | "preview" | "save" | "variants" | "bulk" | "clone">("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [variants, setVariants] = useState<Persona[]>([]);
@@ -73,6 +73,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
   const [variantIntensity, setVariantIntensity] = useState(0.6);
   const [variantAudio, setVariantAudio] = useState<Record<string, string>>({});
   const [variantBusy, setVariantBusy] = useState<string>("");
+  const [cloneFile, setCloneFile] = useState<File | null>(null);
 
 
   async function load() {
@@ -196,6 +197,31 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
     }
   }
 
+  async function clone() {
+    if (!cloneFile) {
+      setError("Selecione um arquivo de áudio para clonar.");
+      return;
+    }
+    setBusy("clone");
+    setError(null);
+    setNotice(null);
+    try {
+      const form = new FormData();
+      form.append("media", cloneFile);
+      form.append("name", draft.name || cloneFile.name);
+      
+      const res = await apiPostJson<{ persona: Persona; ok: boolean }>("/api/voice/personas/clone", form);
+      setDraft(res.persona);
+      setNotice(`DNA acústico extraído! Voz “${res.persona.name}” clonada e salva.`);
+      await load();
+      setCloneFile(null);
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setBusy("");
+    }
+  }
+
   const baseVoices = data?.base_voices ?? [];
 
 
@@ -217,6 +243,33 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div className="space-y-4">
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <h3 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                🧬
+              </span>
+              Clonagem Neural (1-10 min)
+            </h3>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <input
+                  type="file"
+                  accept="audio/*,video/*"
+                  onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/20 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/30"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void clone()}
+                disabled={busy !== "" || !cloneFile}
+                className="rounded-lg bg-primary/20 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/30 disabled:opacity-50"
+              >
+                {busy === "clone" ? "Clonando DNA..." : "Clonar voz agora"}
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Nome da voz">
               {(id) => (
