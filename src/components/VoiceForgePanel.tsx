@@ -268,7 +268,14 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
                   <input
                     type="file"
                     accept="audio/*,video/*"
-                    onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setCloneFile(file);
+                      if (file && !draft.name) {
+                        // Sugere o nome do arquivo como nome da voz
+                        set("name", file.name.split('.')[0]);
+                      }
+                    }}
                     className="w-full text-xs text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/20 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/30"
                   />
                   <p className="mt-1 text-[10px] text-muted-foreground">Recomendado: 1-10 minutos de áudio limpo.</p>

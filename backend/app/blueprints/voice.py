@@ -355,7 +355,8 @@ def personas_clone():
         # O processamento pesado roda em background via jobs.submit
         def run_clone(jid):
             try:
-                profile = voice_cloning.start_cloning_job(src, name, consent, jid)
+                # Passa o consentimento explícito
+                profile = voice_cloning.start_cloning_job(src, name, True, jid)
                 # O motor da ElevenLabs já disponibiliza a voz no catálogo
                 jobs.log(jid, f"Perfil neural '{profile.name}' pronto para uso.")
                 src.unlink(missing_ok=True)
