@@ -118,13 +118,13 @@ function YoutubeBypass() {
                   <line x1="12" x2="12" y1="19" y2="22" />
                 </svg>
               </div>
-              <div>
+              <div className="flex-1 min-w-0 text-left">
                 <h4 className="text-sm font-bold text-foreground">Novo: Estúdio de Clonagem de Voz</h4>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground truncate">
                   Crie sua própria persona única e narre vídeos automaticamente com IA.
                 </p>
               </div>
-              <div className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-background/50 text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background/50 text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="16"
