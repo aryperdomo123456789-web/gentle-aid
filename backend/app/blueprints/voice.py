@@ -343,7 +343,8 @@ def personas_clone():
         return jsonify(error="Você precisa confirmar explicitamente que tem autorização para usar esta voz."), 400
 
     if not voice_engine.available():
-        return jsonify(error="Motor de clonagem neural (ElevenLabs) não configurado. Adicione a chave API em /apis."), 400
+        return jsonify(error="Motor de clonagem neural real (ElevenLabs) não configurado no servidor. Adicione sua API Key na aba de APIs para clonar vozes de verdade."), 400
+
 
     engine_active = "elevenlabs"
     

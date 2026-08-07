@@ -80,6 +80,11 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
   const [consent, setConsent] = useState(false);
   const { job, run, cancel, remove: removeJob } = useJobRunner("voice:clone");
 
+  const removeVariant = (id: string) => {
+    setVariants(prev => prev.filter(v => v.id !== id));
+  };
+
+
 
   async function load() {
     try {
@@ -267,6 +272,12 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
               Motor Neural Profissional (ElevenLabs)
             </h3>
             <div className="space-y-3">
+              {!data?.forge_ready && (
+                <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-[10px] text-red-200">
+                  Atenção: A ElevenLabs (Neural Real) requer chave API ativa em /apis. Se não configurada, o motor neural real não iniciará.
+                </p>
+              )}
+
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="flex-1">
                   <input
