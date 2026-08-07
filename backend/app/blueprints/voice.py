@@ -329,19 +329,42 @@ def personas_delete(persona_id: str):
 
 @bp.post("/personas/clone")
 def personas_clone():
-    """Clona uma voz a partir de um arquivo de áudio (DNA acústico)."""
+    """Clona uma voz a partir de um arquivo de áudio usando motor neural real."""
     upload = request.files.get("media") or request.files.get("audio") or request.files.get("video")
     if not upload or not upload.filename:
         return jsonify(error="Envie o arquivo de áudio para clonagem (1-10 min)."), 400
     
     name = str(request.form.get("name") or upload.filename).strip()
-    job_id = f"clone-{int(time.time())}"
+    consent = request.form.get("consent") in ("1", "true", "on")
+    
+    if not consent:
+        return jsonify(error="Você precisa confirmar que tem autorização para usar esta voz."), 400
+
+    job = jobs.create_job(
+        "voice",
+        meta={
+            "mode": "neural_clone",
+            "name": name,
+            "engine": "elevenlabs" if voice_engine.available() else "unknown"
+        }
+    )
+    job_id = job["job_id"]
     
     try:
         src = save_upload(upload, job_id, MEDIA_EXT)
-        persona = voice_cloning.clone_to_persona(src, name, job_id=None)
-        src.unlink(missing_ok=True)
-        return jsonify(persona=persona.dict(), ok=True), 201
+        # O processamento pesado roda em background via jobs.submit
+        def run_clone(jid):
+            try:
+                profile = voice_cloning.start_cloning_job(src, name, consent, jid)
+                # O motor da ElevenLabs já disponibiliza a voz no catálogo
+                jobs.log(jid, f"Perfil neural '{profile.name}' pronto para uso.")
+                src.unlink(missing_ok=True)
+            except Exception as e:
+                src.unlink(missing_ok=True)
+                raise e
+
+        jobs.submit(job_id, run_clone)
+        return jsonify(job), 202
     except Exception as exc:
         return jsonify(error=str(exc)), 400
 
