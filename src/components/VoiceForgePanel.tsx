@@ -17,7 +17,10 @@ export type Persona = {
   tempo: number;
   rate: number;
   notes?: string;
+  engine?: string;
+  type?: string;
 };
+
 
 type BaseVoice = { id: string; name: string; labels?: string };
 type PersonasResponse = {
@@ -76,6 +79,11 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
   const [cloneFile, setCloneFile] = useState<File | null>(null);
   const [consent, setConsent] = useState(false);
   const { job, run, cancel, remove: removeJob } = useJobRunner("voice:clone");
+
+  const removeVariant = (id: string) => {
+    setVariants(prev => prev.filter(v => v.id !== id));
+  };
+
 
 
   async function load() {
@@ -242,7 +250,8 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
       <header className="mb-4">
         <h2 className="text-sm font-semibold text-foreground">🧬 Estúdio de Clonagem Neural</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Crie personas exclusivas via assinatura acústica ou extraia timbres reais de áudios (1-10 min).
+          Crie personas exclusivas via assinatura acústica ou extraia identidades vocais reais via Clonagem Neural (1-10 min).
+
         </p>
       </header>
 
@@ -260,9 +269,15 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-xs text-primary animate-pulse">
                 🧬
               </span>
-              Motor de Clonagem Neural Ativo
+              Motor Neural Profissional (ElevenLabs)
             </h3>
             <div className="space-y-3">
+              {!data?.forge_ready && (
+                <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-[10px] text-red-200">
+                  Atenção: A ElevenLabs (Neural Real) requer chave API ativa em /apis. Se não configurada, o motor neural real não iniciará.
+                </p>
+              )}
+
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="flex-1">
                   <input
@@ -286,7 +301,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
                   disabled={!!job && job.status === "running" || !cloneFile || !consent}
                   className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                 >
-                  {job?.status === "running" ? "Clonando..." : "Iniciar Clonagem Neural"}
+                  {job?.status === "running" ? "Processando DNA..." : "Clonar Voz (Neural Real)"}
                 </button>
               </div>
 
@@ -298,7 +313,7 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
                   className="mt-0.5 rounded border-primary/30 bg-primary/10 text-primary focus:ring-primary/50" 
                 />
                 <span className="text-[10px] text-muted-foreground leading-tight group-hover:text-foreground transition-colors">
-                  Confirmo que tenho autorização legal para clonar esta voz e que o uso respeita os termos de serviço.
+                  Confirmo que tenho autorização legal e que este é um áudio real para clonagem neural definitiva.
                 </span>
               </label>
 
@@ -431,111 +446,114 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
 
           {previewUrl ? <audio controls src={previewUrl} className="w-full" /> : null}
 
-          <div className="rounded-xl border border-border bg-background/40 p-4">
-            <h3 className="text-xs font-semibold text-foreground">
-              Fábrica de modelos · varie a mesma voz
-            </h3>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Gera vários modelos (grave, jovem, locutor, íntimo, cinematográfico…) a partir da voz
-              acima. Ouça cada um e salve só os que servirem para o canal.
-            </p>
+          {draft.engine !== "elevenlabs" && (
+            <div className="rounded-xl border border-border bg-background/40 p-4">
+              <h3 className="text-xs font-semibold text-foreground">
+                Fábrica de modelos · varie a mesma voz
+              </h3>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Gera vários modelos (grave, jovem, locutor, íntimo, cinematográfico…) a partir da voz
+                acima. Ouça cada um e salve só os que servirem para o canal.
+              </p>
 
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="block text-xs">
-                <span className="flex items-center justify-between text-muted-foreground">
-                  <span>Quantidade de modelos</span>
-                  <span className="font-mono text-foreground">{variantCount}</span>
-                </span>
-                <input
-                  type="range"
-                  min={2}
-                  max={16}
-                  step={1}
-                  value={variantCount}
-                  onChange={(e) => setVariantCount(Number(e.target.value))}
-                  className="mt-2 w-full accent-primary"
-                />
-              </label>
-              <label className="block text-xs">
-                <span className="flex items-center justify-between text-muted-foreground">
-                  <span>Intensidade da variação</span>
-                  <span className="font-mono text-foreground">{variantIntensity.toFixed(2)}</span>
-                </span>
-                <input
-                  type="range"
-                  min={0.15}
-                  max={1.2}
-                  step={0.05}
-                  value={variantIntensity}
-                  onChange={(e) => setVariantIntensity(Number(e.target.value))}
-                  className="mt-2 w-full accent-primary"
-                />
-              </label>
-            </div>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block text-xs">
+                  <span className="flex items-center justify-between text-muted-foreground">
+                    <span>Quantidade de modelos</span>
+                    <span className="font-mono text-foreground">{variantCount}</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={2}
+                    max={16}
+                    step={1}
+                    value={variantCount}
+                    onChange={(e) => setVariantCount(Number(e.target.value))}
+                    className="mt-2 w-full accent-primary"
+                  />
+                </label>
+                <label className="block text-xs">
+                  <span className="flex items-center justify-between text-muted-foreground">
+                    <span>Intensidade da variação</span>
+                    <span className="font-mono text-foreground">{variantIntensity.toFixed(2)}</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0.05}
+                    max={1.5}
+                    step={0.05}
+                    value={variantIntensity}
+                    onChange={(e) => setVariantIntensity(Number(e.target.value))}
+                    className="mt-2 w-full accent-primary"
+                  />
+                </label>
+              </div>
 
-            <div className="mt-3 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => void makeVariants()}
-                disabled={busy !== ""}
-                className="rounded-xl border border-border bg-background/60 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary disabled:opacity-50"
-              >
-                {busy === "variants" ? "Gerando modelos…" : "Gerar modelos"}
-              </button>
-              {variants.length ? (
+              <div className="mt-3 flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={() => void saveVariants(variants)}
+                  onClick={() => void makeVariants()}
                   disabled={busy !== ""}
-                  className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="rounded-xl border border-border bg-background/60 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary disabled:opacity-50"
                 >
-                  {busy === "bulk" ? "Salvando…" : `Salvar os ${variants.length} modelos`}
+                  {busy === "variants" ? "Gerando modelos…" : "Gerar modelos"}
                 </button>
+                {variants.length ? (
+                  <button
+                    type="button"
+                    onClick={() => void saveVariants(variants)}
+                    disabled={busy !== ""}
+                    className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    {busy === "bulk" ? "Salvando…" : `Salvar os ${variants.length} modelos`}
+                  </button>
+                ) : null}
+              </div>
+
+              {variants.length ? (
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {variants.map((variant) => (
+                    <div key={variant.id} className="rounded-xl border border-border bg-card/50 p-3">
+                      <p className="text-xs font-semibold text-foreground">{variant.name}</p>
+                      <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                        {variant.base_voice} · pitch {Number(variant.pitch).toFixed(1)} · form{" "}
+                        {Number(variant.formant).toFixed(2)} · ar {Number(variant.breath).toFixed(2)}
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void previewVariant(variant)}
+                          disabled={variantBusy !== "" || !(data?.forge_ready ?? false)}
+                          className="rounded-lg border border-border px-2 py-1 text-[11px] text-foreground hover:border-primary disabled:opacity-50"
+                        >
+                          {variantBusy === variant.id ? "Gerando…" : "Ouvir"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void saveVariants([variant])}
+                          disabled={busy !== ""}
+                          className="rounded-lg border border-border px-2 py-1 text-[11px] text-foreground hover:border-primary disabled:opacity-50"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDraft({ ...BLANK, ...variant, id: "" })}
+                          className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                        >
+                          Editar
+                        </button>
+                      </div>
+                      {variantAudio[variant.id] ? (
+                        <audio controls src={variantAudio[variant.id]} className="mt-2 w-full" />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               ) : null}
             </div>
+          )}
 
-            {variants.length ? (
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {variants.map((variant) => (
-                  <div key={variant.id} className="rounded-xl border border-border bg-card/50 p-3">
-                    <p className="text-xs font-semibold text-foreground">{variant.name}</p>
-                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                      {variant.base_voice} · pitch {Number(variant.pitch).toFixed(1)} · form{" "}
-                      {Number(variant.formant).toFixed(2)} · ar {Number(variant.breath).toFixed(2)}
-                    </p>
-                    <div className="mt-2 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void previewVariant(variant)}
-                        disabled={variantBusy !== "" || !(data?.forge_ready ?? false)}
-                        className="rounded-lg border border-border px-2 py-1 text-[11px] text-foreground hover:border-primary disabled:opacity-50"
-                      >
-                        {variantBusy === variant.id ? "Gerando…" : "Ouvir"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void saveVariants([variant])}
-                        disabled={busy !== ""}
-                        className="rounded-lg border border-border px-2 py-1 text-[11px] text-foreground hover:border-primary disabled:opacity-50"
-                      >
-                        Salvar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDraft({ ...BLANK, ...variant, id: "" })}
-                        className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-                      >
-                        Editar
-                      </button>
-                    </div>
-                    {variantAudio[variant.id] ? (
-                      <audio controls src={variantAudio[variant.id]} className="mt-2 w-full" />
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
 
           {error ? (
             <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">

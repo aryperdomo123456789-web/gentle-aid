@@ -342,16 +342,22 @@ def personas_clone():
     if not consent:
         return jsonify(error="Você precisa confirmar explicitamente que tem autorização para usar esta voz."), 400
 
-    engine_active = "elevenlabs" if voice_engine.available() else "forge"
+    if not voice_engine.available():
+        return jsonify(error="Motor de clonagem neural real (ElevenLabs) não configurado no servidor. Adicione sua API Key na aba de APIs para clonar vozes de verdade."), 400
+
+
+    engine_active = "elevenlabs"
     
     job = jobs.create_job(
         "voice",
         meta={
             "mode": "neural_clone",
             "name": name,
-            "engine": engine_active
+            "engine": engine_active,
+            "consent": True
         }
     )
+
     job_id = job["job_id"]
     
     try:
