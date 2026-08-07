@@ -357,7 +357,9 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-border bg-background/40 p-4 space-y-4">
+            <h3 className="text-xs font-semibold text-foreground">Configurações Manuais / Ajuste de Persona</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {SLIDERS.map((slider) => (
               <label key={String(slider.key)} className="block text-xs">
                 <span className="flex items-center justify-between text-muted-foreground">
@@ -391,7 +393,8 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
                 onChange={(e) => setPreviewText(e.target.value)}
               />
             )}
-          </Field>
+            </Field>
+          </div>
 
           <div className="flex flex-wrap gap-3">
             <button
