@@ -87,8 +87,19 @@ def start_cloning_job(audio_path: Path, name: str, consent: bool, job_id: str):
         jobs.stage(job_id, "clonando", "Enviando amostra para o motor neural ElevenLabs...", progress=40)
         profile = provider.clone_voice(clean_audio, name, job_id)
         
-        # 4. Finalização
-        jobs.log(job_id, f"Clonagem concluída! ID da Voz: {profile.id}")
+        # 4. Finalização e Persistência da Persona se for motor local
+        if profile.engine == "forge":
+            is_fem = profile.metadata.get("pitch", 0) > 0.5
+            base_voice = "pt-BR-ThalitaNeural" if is_fem else "pt-BR-AntonioNeural"
+            voice_forge.save({
+                "name": profile.name,
+                "base_voice": base_voice,
+                "engine": "forge",
+                **profile.metadata
+            })
+
+        jobs.log(job_id, f"Clonagem concluída! Nome da Voz: {profile.name}")
+
         jobs.update(job_id, progress=100)
         
         # Limpeza
