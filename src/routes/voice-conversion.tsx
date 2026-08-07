@@ -86,7 +86,7 @@ function VoiceStudio() {
     <ToolShell
       badge="Ferramenta 4 · Estúdio de Voz"
       title="Estúdio de Clonagem e Conversão de Voz"
-      subtitle="Link do YouTube/TikTok, upload ou roteiro: a IA cria sua persona única ou dubla com vozes realistas em qualquer idioma, preservando o timing."
+      subtitle="Envie um áudio de 1 a 10 minutos (ou use link do YT/TikTok) para o sistema clonar sua voz e criar um perfil personalizado. A IA cria sua persona única ou dubla com vozes realistas em qualquer idioma, preservando o timing."
       left={
         <div className="space-y-5">
           <VoiceModeTabs mode={mode} onChange={studio.setMode} />
