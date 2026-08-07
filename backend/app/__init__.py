@@ -16,6 +16,7 @@ from .blueprints.discover import bp as discover_bp
 from .blueprints.jobs import bp as jobs_bp
 from .blueprints.legendar import bp as legendar_bp
 from .blueprints.live import bp as live_bp
+from .blueprints.release_keys import bp as release_keys_bp
 from .blueprints.radar import bp as radar_bp
 from .blueprints.recap import bp as recap_bp
 from .blueprints.studio import bp as studio_bp
@@ -62,42 +63,44 @@ def create_app(config: Config | None = None) -> Flask:
     # O autofill completo pode varrer árvores grandes e atrasar o boot.
     # Ele fica disponível como fluxo explícito na Central de APIs e, se o
     # operador quiser, pode ser habilitado no boot via variável de ambiente.
-    from .services import api_keys, jobs as jobs_service
+    from .services import api_keys, jobs as jobs_service, release_keys as release_keys_service
 
-    api_keys.autofill_once()
+    with app.app_context():
+        api_keys.autofill_once()
+        release_keys_service.migrate()
 
-    # Jobs longos: qualquer tarefa que ficou presa em "processando" porque o
-    # processo anterior morreu (deploy, restart, crash, reciclagem do Gunicorn)
-    # é fechada como falha explícita no boot, em vez de mentir para a Central
-    # de Jobs e travar o polling do frontend.
-    orphans = jobs_service.reconcile_orphans()
-    if orphans:
-        app.logger.warning("Jobs interrompidos por reinício reconciliados: %s", orphans)
+        # Jobs longos: qualquer tarefa que ficou presa em "processando" porque o
+        # processo anterior morreu (deploy, restart, crash, reciclagem do Gunicorn)
+        # é fechada como falha explícita no boot, em vez de mentir para a Central
+        # de Jobs e travar o polling do frontend.
+        orphans = jobs_service.reconcile_orphans()
+        if orphans:
+            app.logger.warning("Jobs interrompidos por reinício reconciliados: %s", orphans)
 
-    # Lives que ficaram marcadas como "no ar" após restart do serviço.
-    from .services import streamer as streamer_service
+        # Lives que ficaram marcadas como "no ar" após restart do serviço.
+        from .services import streamer as streamer_service
 
-    lives = streamer_service.reconcile()
-    if lives:
-        app.logger.warning("Sessões de live reconciliadas após reinício: %s", lives)
+        lives = streamer_service.reconcile()
+        if lives:
+            app.logger.warning("Sessões de live reconciliadas após reinício: %s", lives)
 
-    for signal_name in ("SIGTERM", "SIGINT"):
-        try:
-            import signal as _signal
+        for signal_name in ("SIGTERM", "SIGINT"):
+            try:
+                import signal as _signal
 
-            sig = getattr(_signal, signal_name, None)
-            if sig is not None:
-                previous = _signal.getsignal(sig)
+                sig = getattr(_signal, signal_name, None)
+                if sig is not None:
+                    previous = _signal.getsignal(sig)
 
-                def _handler(signum, frame, _previous=previous):
-                    jobs_service.shutdown()
-                    if callable(_previous):
-                        _previous(signum, frame)
+                    def _handler(signum, frame, _previous=previous):
+                        jobs_service.shutdown()
+                        if callable(_previous):
+                            _previous(signum, frame)
 
-                _signal.signal(sig, _handler)
-        except (ValueError, OSError, RuntimeError):
-            # Threads secundárias não podem registrar sinal — segue sem o hook.
-            pass
+                    _signal.signal(sig, _handler)
+            except (ValueError, OSError, RuntimeError):
+                # Threads secundárias não podem registrar sinal — segue sem o hook.
+                pass
 
     for bp in (
         auth_bp,
@@ -108,6 +111,7 @@ def create_app(config: Config | None = None) -> Flask:
         canva_bp,
         jobs_bp,
         apis_bp,
+        release_keys_bp,
         radar_bp,
         studio_bp,
         discover_bp,

@@ -8,6 +8,7 @@ import {
   History,
   Radar,
   KeyRound,
+  ShieldCheck,
   UserCog,
   LogOut,
   Shield,
@@ -35,6 +36,7 @@ export const TOOLS: Tool[] = [
   { to: "/radar", label: "Radar Global", icon: Radar },
   { to: "/historico", label: "Central de Jobs", icon: History },
   { to: "/apis", label: "Central de APIs", icon: KeyRound },
+  { to: "/api-hub/chaves", label: "Chaves de Acesso", icon: ShieldCheck },
 ];
 
 export function TopNav() {
