@@ -1,16 +1,11 @@
-"""Voice Forge — criação de vozes próprias a partir de um motor base.
+"""Voice Forge — criação e gerenciamento de vozes próprias.
 
-Ideia central (o pedido do operador): pegar um motor de TTS gratuito (Edge TTS)
-ou o áudio já convertido e aplicar uma **assinatura acústica própria** por cima —
-deslocamento de pitch, reposicionamento de formantes, curva de timbre, sopro e
-ambiência. O resultado deixa de soar como a voz padrão da Microsoft e passa a ser
-uma persona exclusiva do projeto, reprodutível e catalogada.
+Gerencia dois tipos de vozes:
+1. **Modelos DSP**: assinaturas acústicas aplicadas sobre motores de TTS básicos.
+2. **Clones Neurais**: vozes de alta fidelidade criadas via motor neural profissional (ElevenLabs).
 
-A persona é determinística: o mesmo `persona_id` gera sempre a mesma cadeia de
-filtros (o "DNA" vem de um hash estável do id + seed), então a voz é consistente
-entre um vídeo e outro. Duas personas nunca compartilham o mesmo micro-ajuste.
-
-Armazenamento: JSON simples em `storage/_config/voice_personas.json`.
+As vozes clonadas são integradas ao catálogo permanente e podem ser usadas em 
+todos os fluxos de TTS, Conversão e Dublagem do sistema.
 """
 
 from __future__ import annotations

@@ -105,9 +105,9 @@ function YoutubeBypass() {
                 <span className="text-lg">🧬</span>
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <h4 className="text-sm font-bold text-foreground">Novo: Clonagem Neural de Voz (Realidade 🧬)</h4>
+                <h4 className="text-sm font-bold text-foreground">Novo: Clonagem Neural de Voz Real</h4>
                 <p className="text-[11px] text-muted-foreground line-clamp-2">
-                  Extração de DNA acústico (1-10 min) para criar personas únicas e indetectáveis.
+                  Motor neural profissional (1-10 min) para criar vozes indetectáveis de alta fidelidade.
                 </p>
               </div>
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background/50 text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">

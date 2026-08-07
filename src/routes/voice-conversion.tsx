@@ -86,7 +86,7 @@ function VoiceStudio() {
     <ToolShell
       badge="Ferramenta 4 · Estúdio de Voz"
       title="Clonagem Neural e Estúdio de Voz"
-      subtitle="Clonagem ativa: motor de extração de DNA acústico para áudios de 1-10 min. Crie sua persona única agora."
+      subtitle="Clonagem neural profissional: motor de extração de DNA acústico para áudios de 1-10 min. Crie sua persona única e indetectável agora."
       left={
         <div className="space-y-5">
           <VoiceModeTabs mode={mode} onChange={studio.setMode} />
