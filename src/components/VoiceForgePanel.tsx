@@ -539,7 +539,6 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
               ) : null}
             </div>
           )}
-          )}
 
 
           {error ? (
