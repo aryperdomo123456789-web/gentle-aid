@@ -7,15 +7,13 @@ export type Engine = "elevenlabs" | "forge" | "local";
 export type RealisticVoice = { id: string; name: string; labels?: string };
 export type LocalVoice = { id: string; name: string };
 
-export const TEST_SCRIPT = `Testando a voz deste canal, do começo ao fim, sem cortes.
+export const TEST_SCRIPT = `Testando a voz do Ecossistema Viral, do começo ao fim, sem cortes.
 
-Presta atenção no que vou te contar agora, porque isso muda completamente a forma como você enxerga o próximo vídeo que aparecer na sua tela. Em dois mil e vinte e quatro, mais de setenta por cento do conteúdo que viralizou não tinha nada de especial na imagem: o que segurava a pessoa era a voz. O tom, a pausa, a respiração no lugar certo.
+Hoje existem várias ferramentas e bibliotecas excelentes (tanto pagas quanto locais e gratuitas) para fazer a clonagem da sua própria voz e gerar conteúdo de alto impacto. Opções como ElevenLabs lideram o mercado em nuvem, enquanto o Voice Forge local permite criar personas exclusivas sem custo por caractere, garantindo que sua marca tenha um timbre único.
 
-Repara na diferença: uma frase curta prende. Uma frase longa, bem construída, com vírgulas no lugar certo, conduz a pessoa por dentro da história até ela esquecer que está assistindo a um vídeo de trinta segundos.
+Seja para dublagem multilíngue ou text-to-speech realista, o segredo da retenção está no tom, na pausa e na respiração no lugar certo. Com modelos como o Chiclete Persuasivo, você garante que o espectador não suba a tela nos primeiros 3 segundos.
 
-E tem os detalhes técnicos: números como 3, 17, 250 mil e 1,8 milhão; siglas como IA, CPU, TikTok e YouTube; perguntas — você faria isso? — e exclamações. Tudo isso precisa sair limpo, natural, sem parecer robô.
-
-Se você chegou até aqui e a voz continuou agradável, sem chiado e sem cansar o ouvido, é essa a voz do canal. Salva ela e vamos pro próximo.`;
+Se você ouviu este roteiro e a voz continuou agradável, natural e sem parecer robô, parabéns: sua persona está pronta para dominar o algoritmo. Salva ela e vamos pro próximo.`;
 
 const LOCAL_FALLBACK: LocalVoice[] = [
   { id: "masc_grave", name: "Masculino grave" },

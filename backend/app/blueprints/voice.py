@@ -66,26 +66,22 @@ MEDIA_EXT = AUDIO_EXT | VIDEO_EXT
 MAX_TTS_CHARS = 500000
 PREVIEW_TEXT = (
     "Essa é a minha voz. Um timbre exclusivo, construído do zero para este canal, "
-    "pronto para narrar qualquer conteúdo."
+    "pronto para narrar qualquer conteúdo de forma profissional e autêntica."
 )
 
 # Roteiro de teste pronto: longo o bastante para revelar respiração, ritmo,
 # graves, agudos, números, siglas e pontuação forte em uma única escuta.
 TEST_SCRIPT = (
-    "Testando a voz deste canal, do começo ao fim, sem cortes.\n\n"
-    "Presta atenção no que vou te contar agora, porque isso muda completamente a forma "
-    "como você enxerga o próximo vídeo que aparecer na sua tela. Em dois mil e vinte e "
-    "quatro, mais de setenta por cento do conteúdo que viralizou não tinha nada de "
-    "especial na imagem: o que segurava a pessoa era a voz. O tom, a pausa, a respiração "
-    "no lugar certo.\n\n"
-    "Repara na diferença: uma frase curta prende. Uma frase longa, bem construída, com "
-    "vírgulas no lugar certo, conduz a pessoa por dentro da história até ela esquecer que "
-    "está assistindo a um vídeo de trinta segundos.\n\n"
-    "E tem os detalhes técnicos: números como 3, 17, 250 mil e 1,8 milhão; siglas como "
-    "IA, CPU, TikTok e YouTube; perguntas — você faria isso? — e exclamações. Tudo isso "
-    "precisa sair limpo, natural, sem parecer robô.\n\n"
-    "Se você chegou até aqui e a voz continuou agradável, sem chiado e sem cansar o "
-    "ouvido, é essa a voz do canal. Salva ela e vamos pro próximo."
+    "Testando a voz do Ecossistema Viral, do começo ao fim, sem cortes.\n\n"
+    "Hoje existem várias ferramentas e bibliotecas excelentes (tanto pagas quanto locais e gratuitas) "
+    "para fazer a clonagem da sua própria voz e gerar conteúdo de alto impacto. "
+    "Opções como ElevenLabs lideram o mercado em nuvem, enquanto o Voice Forge local permite criar "
+    "personas exclusivas sem custo por caractere, garantindo que sua marca tenha um timbre único.\n\n"
+    "Seja para dublagem multilíngue ou text-to-speech realista, o segredo da retenção está no tom, "
+    "na pausa e na respiração no lugar certo. Com modelos como o Chiclete Persuasivo, você garante "
+    "que o espectador não suba a tela nos primeiros 3 segundos.\n\n"
+    "Se você ouviu este roteiro e a voz continuou agradável, natural e sem parecer robô, "
+    "parabéns: sua persona está pronta para dominar o algoritmo. Salva ela e vamos pro próximo."
 )
 
 
