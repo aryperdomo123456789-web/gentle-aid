@@ -240,9 +240,9 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
   return (
     <section className="rounded-2xl border border-border bg-card/60 p-5">
       <header className="mb-4">
-        <h2 className="text-sm font-semibold text-foreground">Voice Forge · Clonagem Ativa</h2>
+        <h2 className="text-sm font-semibold text-foreground">🧬 Estúdio de Clonagem Neural</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Crie personas exclusivas via assinatura acústica ou extraia timbres de áudios (1-10 min) na aba "Converter".
+          Crie personas exclusivas via assinatura acústica ou extraia timbres reais de áudios (1-10 min).
         </p>
       </header>
 
@@ -255,12 +255,12 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div className="space-y-4">
-          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-            <h3 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-2">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+          <div className="rounded-xl border border-primary/40 bg-primary/5 p-4 shadow-inner shadow-primary/5">
+            <h3 className="text-xs font-bold text-foreground mb-3 flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-xs text-primary animate-pulse">
                 🧬
               </span>
-              Clonagem Neural Real (Motor ElevenLabs)
+              Motor de Clonagem Neural Ativo
             </h3>
             <div className="space-y-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -327,7 +327,8 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-border bg-background/40 p-4">
+            <h3 className="text-xs font-semibold text-foreground mb-3">Configurações Manuais / Ajuste de Persona</h3>
             <Field label="Nome da voz">
               {(id) => (
                 <TextInput
