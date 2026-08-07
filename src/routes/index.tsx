@@ -121,7 +121,7 @@ function YoutubeBypass() {
               <div className="flex-1 min-w-0 text-left">
                 <h4 className="text-sm font-bold text-foreground">Novo: Estúdio de Clonagem de Voz</h4>
                 <p className="text-[11px] text-muted-foreground line-clamp-2">
-                  100% Confirmado via Código: O sistema clona vozes de 1 a 10 min. Crie sua própria persona única e narre vídeos automaticamente com IA.
+                  Motor de clonagem ativo: crie personas exclusivas e narre vídeos automaticamente.
                 </p>
               </div>
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background/50 text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">
