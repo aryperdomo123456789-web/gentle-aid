@@ -392,10 +392,14 @@ def dna(persona_id: str) -> list[float]:
 
 def filter_chain(persona: Persona, *, preserve_duration: bool = True) -> list[str]:
     """Cadeia FFmpeg que transforma a voz base na persona.
-
-    Ordem: pitch → formantes → corpo/calor/brilho → sopro → ambiência → normalização.
+    
+    Ignorado para motores neurais (ElevenLabs).
     """
+    if persona.engine == "elevenlabs":
+        return ["anull"]
+
     persona = persona.normalized()
+
     g = dna(persona.id)
 
     pitch = persona.pitch + g[0] * 0.35

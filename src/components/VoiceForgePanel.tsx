@@ -432,10 +432,12 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
 
           {previewUrl ? <audio controls src={previewUrl} className="w-full" /> : null}
 
+          {draft.engine !== "elevenlabs" && (
           <div className="rounded-xl border border-border bg-background/40 p-4">
             <h3 className="text-xs font-semibold text-foreground">
               Fábrica de modelos · varie a mesma voz
             </h3>
+
             <p className="mt-1 text-[11px] text-muted-foreground">
               Gera vários modelos (grave, jovem, locutor, íntimo, cinematográfico…) a partir da voz
               acima. Ouça cada um e salve só os que servirem para o canal.
@@ -460,6 +462,87 @@ export function VoiceForgePanel({ onChanged }: { onChanged?: (personas: Persona[
               <label className="block text-xs">
                 <span className="flex items-center justify-between text-muted-foreground">
                   <span>Intensidade da variação</span>
+                </span>
+                <input
+                  type="range"
+                  min={0.05}
+                  max={1.5}
+                  step={0.05}
+                  value={variantIntensity}
+                  onChange={(e) => setVariantIntensity(Number(e.target.value))}
+                  className="mt-2 w-full accent-primary"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void makeVariants()}
+                disabled={busy !== ""}
+                className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/20 disabled:opacity-50"
+              >
+                {busy === "variants" ? "Processando…" : "Gerar novos modelos"}
+              </button>
+              {variants.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void saveVariants(variants)}
+                  disabled={busy !== ""}
+                  className="rounded-lg bg-primary/20 px-3 py-1.5 text-[10px] font-bold text-primary hover:bg-primary/30 disabled:opacity-50"
+                >
+                  {busy === "bulk" ? "Salvando…" : `Salvar todos os ${variants.length}`}
+                </button>
+              )}
+            </div>
+
+            {variants.length > 0 && (
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {variants.map((v) => (
+                  <div
+                    key={v.id}
+                    className="flex flex-col gap-2 rounded-lg border border-border bg-card/40 p-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[10px] font-medium text-foreground">
+                        {v.name.split("·")[1]?.trim() || v.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void removeVariant(v.id)}
+                        className="text-[10px] text-muted-foreground hover:text-destructive"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => void previewVariant(v)}
+                        disabled={variantBusy === v.id}
+                        className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/20 text-primary hover:bg-primary/30 disabled:opacity-50"
+                      >
+                        {variantBusy === v.id ? "…" : "▶"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void saveVariants([v])}
+                        disabled={busy === "bulk"}
+                        className="h-6 flex-1 rounded-md bg-primary/10 text-[9px] font-bold text-primary hover:bg-primary/20 disabled:opacity-50"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                    {variantAudio[v.id] && (
+                      <audio src={variantAudio[v.id]} controls className="h-6 w-full" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          )}
+
                   <span className="font-mono text-foreground">{variantIntensity.toFixed(2)}</span>
                 </span>
                 <input

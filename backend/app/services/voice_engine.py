@@ -29,11 +29,15 @@ API_BASE = "https://api.elevenlabs.io/v1"
 STS_MODEL = "eleven_multilingual_sts_v2"
 TTS_MODEL = "eleven_multilingual_v2"
 
-# Fatia alvo de áudio enviada por requisição (segundos). Mantém latência baixa,
-# custo previsível e evita limites de payload da API.
-CHUNK_TARGET = 240.0
-CHUNK_MAX = 300.0
-TEXT_CHUNK = 2200
+# Motor neural primário: ElevenLabs.
+STS_MODEL = "eleven_multilingual_sts_v2"
+TTS_MODEL = "eleven_multilingual_v2"
+
+# CHUNK_TARGET (segundos) otimizado para latência e custo.
+CHUNK_TARGET = 180.0
+CHUNK_MAX = 240.0
+TEXT_CHUNK = 1800
+
 
 # Catálogo curado (usado como fallback quando a API não responde a lista).
 FALLBACK_VOICES = [
