@@ -85,8 +85,8 @@ function VoiceStudio() {
   return (
     <ToolShell
       badge="Ferramenta 4 · Estúdio de Voz"
-      title="Troca de narrador e narração realista"
-      subtitle="Link do YouTube/TikTok, upload ou roteiro: a IA escuta a narração original e dubla com a sua voz, no mesmo timing, de 10 segundos a 3 horas."
+      title="Estúdio de Clonagem e Conversão de Voz"
+      subtitle="Link do YouTube/TikTok, upload ou roteiro: a IA cria sua persona única ou dubla com vozes realistas em qualquer idioma, preservando o timing."
       left={
         <div className="space-y-5">
           <VoiceModeTabs mode={mode} onChange={studio.setMode} />
