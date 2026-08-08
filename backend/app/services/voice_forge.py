@@ -1,16 +1,11 @@
-"""Voice Forge — criação de vozes próprias a partir de um motor base.
+"""Voice Forge — criação e gerenciamento de vozes próprias.
 
-Ideia central (o pedido do operador): pegar um motor de TTS gratuito (Edge TTS)
-ou o áudio já convertido e aplicar uma **assinatura acústica própria** por cima —
-deslocamento de pitch, reposicionamento de formantes, curva de timbre, sopro e
-ambiência. O resultado deixa de soar como a voz padrão da Microsoft e passa a ser
-uma persona exclusiva do projeto, reprodutível e catalogada.
+Gerencia dois tipos de vozes:
+1. **Modelos DSP**: assinaturas acústicas aplicadas sobre motores de TTS básicos.
+2. **Clones Neurais**: vozes de alta fidelidade criadas via motor neural profissional (ElevenLabs).
 
-A persona é determinística: o mesmo `persona_id` gera sempre a mesma cadeia de
-filtros (o "DNA" vem de um hash estável do id + seed), então a voz é consistente
-entre um vídeo e outro. Duas personas nunca compartilham o mesmo micro-ajuste.
-
-Armazenamento: JSON simples em `storage/_config/voice_personas.json`.
+As vozes clonadas são integradas ao catálogo permanente e podem ser usadas em 
+todos os fluxos de TTS, Conversão e Dublagem do sistema.
 """
 
 from __future__ import annotations
@@ -51,7 +46,9 @@ class Persona:
     id: str
     name: str
     base_voice: str = "pt-BR-AntonioNeural"   # voz do motor Edge TTS usada como matéria-prima
-    engine: str = "edge"                       # edge | local (aplica só o DSP)
+    engine: str = "edge"                       # edge | elevenlabs
+    type: str = "custom"                       # custom | neural_clone
+
     pitch: float = -1.5
     formant: float = 0.95
     warmth: float = 2.0
@@ -62,6 +59,10 @@ class Persona:
     tempo: float = 1.0
     rate: int = 0                              # % de velocidade no Edge TTS
     notes: str = ""
+    source_audio_duration: float = 0.0
+    status: str = "ready"
+    metadata: dict = field(default_factory=dict)
+
     created_at: float = field(default_factory=time.time)
 
     def normalized(self) -> "Persona":
@@ -179,9 +180,13 @@ def _save_raw(data: dict[str, dict]) -> None:
 def _from_dict(raw: dict) -> Persona:
     allowed = {f for f in Persona.__dataclass_fields__}  # type: ignore[attr-defined]
     clean = {k: v for k, v in raw.items() if k in allowed}
-    clean.setdefault("id", "forge")
+    clean.setdefault("id", slugify(clean.get("name") or "forge"))
     clean.setdefault("name", clean["id"])
+    if clean.get("engine") == "elevenlabs" or clean.get("type") == "neural_clone":
+        return Persona(**clean) # Pula normalização DSP para neurais
     return Persona(**clean).normalized()
+
+
 
 
 def bootstrap() -> None:
@@ -252,8 +257,10 @@ def save(payload: dict) -> Persona:
     persona = _from_dict(payload)
     if not persona.name.strip():
         raise ValueError("Dê um nome para a voz.")
-    if not payload.get("id"):
-        persona.id = slugify(persona.name)
+    # Se já tem ID (ex: ElevenLabs voice_id), respeita. Se não, gera slug.
+    if not persona.id or persona.id.startswith("forge_") is False and persona.engine != "elevenlabs":
+         persona.id = slugify(persona.name)
+
     with _LOCK:
         data = _load_raw()
         if persona.id in data:
@@ -386,10 +393,15 @@ def dna(persona_id: str) -> list[float]:
 
 def filter_chain(persona: Persona, *, preserve_duration: bool = True) -> list[str]:
     """Cadeia FFmpeg que transforma a voz base na persona.
-
-    Ordem: pitch → formantes → corpo/calor/brilho → sopro → ambiência → normalização.
+    
+    Ignorado para motores neurais reais (ElevenLabs / neural_clone).
     """
+    if persona.engine == "elevenlabs" or persona.type == "neural_clone":
+        return ["anull"]
+
+
     persona = persona.normalized()
+
     g = dna(persona.id)
 
     pitch = persona.pitch + g[0] * 0.35

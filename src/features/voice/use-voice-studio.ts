@@ -20,7 +20,7 @@ export function useVoiceStudio() {
   const runner = useJobRunner("voice");
   const { busy, run } = runner;
 
-  const [mode, setMode] = useState<VoiceMode>("media");
+  const [mode, setMode] = useState<VoiceMode>("forge");
   const [catalog, setCatalog] = useState<VoiceCatalog | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
 

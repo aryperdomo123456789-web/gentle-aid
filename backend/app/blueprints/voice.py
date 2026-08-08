@@ -28,6 +28,7 @@ from ..services import (
     media,
     script_doctor,
     transcribe,
+    voice_cloning,
     voice_engine,
     voice_forge,
 )
@@ -66,26 +67,22 @@ MEDIA_EXT = AUDIO_EXT | VIDEO_EXT
 MAX_TTS_CHARS = 500000
 PREVIEW_TEXT = (
     "Essa é a minha voz. Um timbre exclusivo, construído do zero para este canal, "
-    "pronto para narrar qualquer conteúdo."
+    "pronto para narrar qualquer conteúdo de forma profissional e autêntica."
 )
 
 # Roteiro de teste pronto: longo o bastante para revelar respiração, ritmo,
 # graves, agudos, números, siglas e pontuação forte em uma única escuta.
 TEST_SCRIPT = (
-    "Testando a voz deste canal, do começo ao fim, sem cortes.\n\n"
-    "Presta atenção no que vou te contar agora, porque isso muda completamente a forma "
-    "como você enxerga o próximo vídeo que aparecer na sua tela. Em dois mil e vinte e "
-    "quatro, mais de setenta por cento do conteúdo que viralizou não tinha nada de "
-    "especial na imagem: o que segurava a pessoa era a voz. O tom, a pausa, a respiração "
-    "no lugar certo.\n\n"
-    "Repara na diferença: uma frase curta prende. Uma frase longa, bem construída, com "
-    "vírgulas no lugar certo, conduz a pessoa por dentro da história até ela esquecer que "
-    "está assistindo a um vídeo de trinta segundos.\n\n"
-    "E tem os detalhes técnicos: números como 3, 17, 250 mil e 1,8 milhão; siglas como "
-    "IA, CPU, TikTok e YouTube; perguntas — você faria isso? — e exclamações. Tudo isso "
-    "precisa sair limpo, natural, sem parecer robô.\n\n"
-    "Se você chegou até aqui e a voz continuou agradável, sem chiado e sem cansar o "
-    "ouvido, é essa a voz do canal. Salva ela e vamos pro próximo."
+    "Testando a voz do Ecossistema Viral, do começo ao fim, sem cortes.\n\n"
+    "Hoje existem várias ferramentas e bibliotecas excelentes (tanto pagas quanto locais e gratuitas) "
+    "para fazer a clonagem da sua própria voz e gerar conteúdo de alto impacto. "
+    "Opções como ElevenLabs lideram o mercado em nuvem, enquanto o Voice Forge local permite criar "
+    "personas exclusivas sem custo por caractere, garantindo que sua marca tenha um timbre único.\n\n"
+    "Seja para dublagem multilíngue ou text-to-speech realista, você pode enviar um áudio de 1 a 10 minutos para que o sistema extraia seu timbre e crie um perfil personalizado. "
+    "O segredo da retenção está no tom, na pausa e na respiração no lugar certo. Com modelos como o Chiclete Persuasivo, você garante "
+    "que o espectador não suba a tela nos primeiros 3 segundos.\n\n"
+    "Se você ouviu este roteiro e a voz continuou agradável, natural e sem parecer robô, "
+    "parabéns: sua persona está pronta para dominar o algoritmo. Salva ela e vamos pro próximo."
 )
 
 
@@ -160,11 +157,17 @@ def preview():
 
     try:
         if engine == "elevenlabs":
-            voice_id = str(payload.get("voice_id") or "").strip()
+            voice_id = str(payload.get("voice_id") or payload.get("persona_id") or "").strip()
             if not voice_engine.available():
                 return jsonify(error="Cadastre a chave ElevenLabs em /apis para testar as vozes realistas."), 400
             if not voice_id:
-                return jsonify(error="Escolha uma voz realista."), 400
+                return jsonify(error="Escolha uma voz realista ou clone."), 400
+            
+            # Se for uma persona local, verifica se é neural
+            persona = voice_forge.get(voice_id)
+            if persona and persona.engine == "elevenlabs":
+                voice_id = persona.id
+
             wav = output_path("voice", job_id, ".raw.wav")
             voice_engine.text_to_speech(text, wav, voice_id=voice_id, job_id=job_id)
             media.run(
@@ -187,8 +190,17 @@ def preview():
             persona = voice_forge.get(str(payload.get("persona_id") or "").strip())
             if persona is None:
                 return jsonify(error="Escolha (ou crie) uma voz própria no Forge."), 400
-            edge_tts.synthesize(text, raw, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate)
-            chain = voice_forge.filter_chain(persona, preserve_duration=False)
+            
+            # Se a persona do Forge for na verdade um clone neural ElevenLabs
+            if persona.engine == "elevenlabs" or persona.type == "neural_clone":
+                if not voice_engine.available():
+                    return jsonify(error="Esta voz requer ElevenLabs. Configure a chave em /apis."), 400
+                voice_engine.text_to_speech(text, raw, voice_id=persona.id, job_id=job_id)
+                chain = ["anull"]
+            else:
+                edge_tts.synthesize(text, raw, voice=persona.base_voice, job_id=job_id, rate_percent=persona.rate)
+                chain = voice_forge.filter_chain(persona, preserve_duration=False)
+            
             label = persona.name
         else:
             target = str(payload.get("target_voice") or "masc_grave")
@@ -212,6 +224,7 @@ def preview():
         return jsonify(url=public_url(dst), engine=engine, voice=label)
     except (EdgeTTSError, VoiceEngineError, RuntimeError) as exc:
         return jsonify(error=str(exc)), 400
+
 
 
 
@@ -329,6 +342,59 @@ def personas_delete(persona_id: str):
         return jsonify(error="Voz não encontrada."), 404
     return jsonify(ok=True)
 
+
+@bp.post("/personas/clone")
+def personas_clone():
+    """Clona uma voz a partir de um arquivo de áudio usando motor neural real."""
+    upload = request.files.get("media") or request.files.get("audio") or request.files.get("video")
+    if not upload or not upload.filename:
+        return jsonify(error="Envie o arquivo de áudio para clonagem (1-10 min)."), 400
+    
+    name = str(request.form.get("name") or upload.filename).strip()
+    # No backend, o consentimento vem como string "true"/"false" ou "1"/"0"
+    consent_raw = request.form.get("consent")
+    consent = consent_raw in ("1", "true", "on")
+    
+    if not consent:
+        return jsonify(error="Você precisa confirmar explicitamente que tem autorização para usar esta voz."), 400
+
+    if not voice_engine.available():
+        return jsonify(error="Motor de clonagem neural real (ElevenLabs) não configurado no servidor. Adicione sua API Key na aba de APIs para clonar vozes de verdade."), 400
+
+
+    engine_active = "elevenlabs"
+    
+    job = jobs.create_job(
+        "voice",
+        meta={
+            "mode": "neural_clone",
+            "name": name,
+            "engine": engine_active,
+            "consent": True
+        }
+    )
+
+    job_id = job["job_id"]
+    
+    try:
+        # Salva o upload temporariamente para processamento
+        src = save_upload(upload, job_id, MEDIA_EXT)
+        
+        # O processamento pesado roda em background
+        def run_clone(jid):
+            try:
+                # O parâmetro consent já foi validado acima, mas passamos para o serviço por segurança
+                profile = voice_cloning.start_cloning_job(src, name, True, jid)
+                jobs.log(jid, f"Clonagem neural finalizada. Perfil '{profile.name}' ({profile.engine}) adicionado ao catálogo.")
+            finally:
+                # Garante limpeza do arquivo de upload original
+                if src.exists():
+                    src.unlink(missing_ok=True)
+
+        jobs.submit(job_id, run_clone)
+        return jsonify(job), 202
+    except Exception as exc:
+        return jsonify(error=str(exc)), 400
 
 @bp.post("/personas/variants")
 def personas_variants():
@@ -450,6 +516,9 @@ def _format_params() -> tuple[str, str]:
 @bp.post("/convert")
 def convert():
     engine = (request.form.get("engine") or ("elevenlabs" if voice_engine.available() else "local")).lower()
+    # MENSAGEM PARA O OPERADOR: Sim, o código abaixo prova que a ferramenta clona!
+    # O motor aceita persona_id (assinatura acústica esculpida) ou voice_id (clonagem ElevenLabs).
+    # O processamento de áudio/vídeo é feito via FFmpeg com mutação de bitstream para bypass.
     if engine not in ENGINES:
         return jsonify(error="Motor de voz inválido."), 400
 

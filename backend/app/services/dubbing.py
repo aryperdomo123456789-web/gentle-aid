@@ -223,11 +223,18 @@ def _clean(text: str) -> str:
 
 
 def _synth(text: str, dst: Path, *, engine: str, voice: str, job_id: str) -> Path:
-    if engine == "elevenlabs":
+    # Se a persona for clonagem neural (ElevenLabs), sempre usa ElevenLabs independente da preferência global
+    persona = voice_forge.get(voice)
+    effective_engine = engine
+    if persona and persona.engine == "elevenlabs":
+        effective_engine = "elevenlabs"
+
+    if effective_engine == "elevenlabs":
         voice_engine.text_to_speech(text, dst, voice_id=voice, job_id=job_id)
     else:
         edge_tts.synthesize(text, dst, voice=voice, job_id=job_id)
     return dst
+
 
 
 def _fit(src: Path, dst: Path, target: float) -> float:
@@ -341,7 +348,13 @@ def build_track(
 
 
 def apply_persona(src: Path, dst: Path, persona, job_id: str) -> Path:
-    """Aplica a assinatura acústica da voz própria por cima da narração."""
+    """Aplica a assinatura acústica se for voz DSP (Edge). Neurais já saem prontas."""
+    if persona.engine == "elevenlabs" or persona.type == "neural_clone":
+        # Clonagem neural real não precisa de DSP local, já é a voz do dono.
+        src.replace(dst)
+        return dst
+
+        
     chain = voice_forge.filter_chain(persona, preserve_duration=True)
     media.run(
         [
@@ -353,6 +366,7 @@ def apply_persona(src: Path, dst: Path, persona, job_id: str) -> Path:
     )
     src.unlink(missing_ok=True)
     return dst
+
 
 
 def mix_with_background(video: Path, dub: Path, dst: Path, *, keep_ambience: float, job_id: str) -> Path:
