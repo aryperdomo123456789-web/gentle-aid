@@ -11,7 +11,7 @@ export function ToolShell({
   below,
 }: {
   title: string;
-  subtitle: string;
+  subtitle: ReactNode;
   badge?: string;
   left: ReactNode;
   right: ReactNode;

@@ -1,6 +1,6 @@
 # Plano especialista: clonagem neural de voz por upload de áudio
 
-Data: `2026-08-07`
+Data: `2026-08-08`
 
 ## Objetivo
 
@@ -55,17 +55,19 @@ O que isso significa na prática:
 
 ### No `main` do GitHub
 
-O `main` remoto traz uma evolução forte do estúdio de voz:
+O `main` remoto evoluiu o estúdio de voz para um fluxo muito mais próximo do
+que o produto precisa:
 
 - tela mais clara de **Estúdio de Clonagem e Conversão de Voz**;
 - painel `Voice Forge · Clonagem Ativa`;
 - lista de personas próprias;
 - seleção entre `Realista (ElevenLabs)`, `Minhas vozes (grátis)` e `Timbre local`;
-- preview de voz, cadastro de persona e geração de variantes.
+- preview de voz, cadastro de persona e geração de variantes;
+- integração com provider neural principal via ElevenLabs;
+- validação de amostras, jobs assíncronos e persistência do catálogo.
 
-Isso já aponta na direção certa de produto, mas ainda é mais um sistema de
-**catálogo de perfis de voz** do que um fluxo completo de **clonagem neural a
-partir do seu áudio**.
+Isso já aponta na direção certa de produto, mas ainda precisa ser fechado com
+mais consistência, testes e separação clara entre neural real e fallback.
 
 ## Direção do produto
 
