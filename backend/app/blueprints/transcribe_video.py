@@ -11,6 +11,7 @@ from flask import Blueprint, jsonify, request
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
+from ..config import config
 from ..services import ingest, jobs, media, transcribe
 from ..services.validation import YOUTUBE_RE, ValidationError, clean_text, output_path, public_url
 
@@ -31,7 +32,7 @@ def _is_youtube_url(url: str) -> bool:
 
 
 def _download_youtube_source(url: str, job_id: str) -> Path:
-    config_dir = ingest.config.uploads_dir  # type: ignore[attr-defined]
+    config_dir = config.uploads_dir
     config_dir.mkdir(parents=True, exist_ok=True)
     dest = config_dir / f"{job_id}_src.mp4"
     jobs.log(job_id, "Baixando mídia com o cliente Android do YouTube.")
@@ -68,7 +69,7 @@ def _download_youtube_source(url: str, job_id: str) -> Path:
     if candidates:
         latest = candidates[0]
         if latest != dest:
-          latest.replace(dest)
+            latest.replace(dest)
         jobs.update(
             job_id,
             source_kind="download",
