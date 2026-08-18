@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Download, Eye, RefreshCw, StopCircle, Trash2 } from "lucide-react";
+import { Copy, Download, Eye, RefreshCw, StopCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
@@ -171,6 +171,19 @@ export function ToolHistory({
                     Origem rastreada: {sourceLabel(job)}
                   </p>
                 ) : null}
+                {job.transcript_text?.trim() ? (
+                  <div className="mt-3 rounded-xl border border-border bg-background/50 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Transcrição
+                      </p>
+                      <CopyButton text={job.transcript_text.trim()} label="Copiar" />
+                    </div>
+                    <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-foreground">
+                      {job.transcript_text.trim()}
+                    </pre>
+                  </div>
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <StatusPill status={job.status} />
@@ -288,5 +301,30 @@ export function ToolHistory({
         }}
       />
     </section>
+  );
+}
+
+function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+    >
+      <Copy className="size-3.5" aria-hidden="true" />
+      {copied ? "Copiado" : label}
+    </button>
   );
 }

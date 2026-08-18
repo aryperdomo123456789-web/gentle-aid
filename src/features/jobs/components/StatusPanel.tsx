@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import {
   CheckCircle2,
   CircleAlert,
+  Copy,
   Download,
   ExternalLink,
   Loader2,
@@ -136,9 +137,12 @@ export function StatusPanel({
         <section className="rounded-xl border border-border bg-background/50 p-3">
           <header className="mb-2 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-foreground">Transcrição</h3>
-            <span className="rounded-full border border-border bg-background/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              texto gerado
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-border bg-background/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                texto gerado
+              </span>
+              <CopyButton text={transcriptText} />
+            </div>
           </header>
           <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
             {transcriptText}
@@ -220,6 +224,31 @@ export function StatusPanel({
         }}
       />
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+    >
+      <Copy className="size-3" aria-hidden="true" />
+      {copied ? "Copiado" : "Copiar"}
+    </button>
   );
 }
 

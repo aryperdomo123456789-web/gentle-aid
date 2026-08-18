@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Download, StopCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, Copy, Download, StopCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
@@ -192,9 +192,12 @@ function JobDetail() {
           <section className="panel mt-6 min-w-0 p-4 sm:p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Transcrição gerada</h2>
-              <span className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-                {job?.transcript_language ? `idioma ${job.transcript_language}` : "texto completo"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                  {job?.transcript_language ? `idioma ${job.transcript_language}` : "texto completo"}
+                </span>
+                <CopyButton text={transcriptText} />
+              </div>
             </div>
             <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-border bg-background/60 p-4 text-xs leading-5 text-muted-foreground">
               {transcriptText}
@@ -352,5 +355,30 @@ function Row({ label, value }: { label: string; value?: string | null }) {
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="min-w-0 break-words font-mono sm:truncate sm:text-right">{value}</dd>
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+    >
+      <Copy className="size-3.5" aria-hidden="true" />
+      {copied ? "Copiado" : "Copiar"}
+    </button>
   );
 }
