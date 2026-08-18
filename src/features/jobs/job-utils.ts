@@ -5,6 +5,7 @@ export const TOOL_LABEL: Record<string, string> = {
   youtube: "Desvio YouTube",
   tiktok: "Clone TikTok",
   legendar: "Legendas",
+  transcribe: "Transcrição",
   voice: "Voz V2V",
   canva: "Limpeza Canva",
 };

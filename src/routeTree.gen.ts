@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VoiceConversionRouteImport } from './routes/voice-conversion'
+import { Route as TranscreverRouteImport } from './routes/transcrever'
 import { Route as TiktokRouteImport } from './routes/tiktok'
 import { Route as RecapRouteImport } from './routes/recap'
 import { Route as RadarRouteImport } from './routes/radar'
@@ -29,6 +30,11 @@ import { Route as ApiHubChavesRouteImport } from './routes/api-hub/chaves'
 const VoiceConversionRoute = VoiceConversionRouteImport.update({
   id: '/voice-conversion',
   path: '/voice-conversion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TranscreverRoute = TranscreverRouteImport.update({
+  id: '/transcrever',
+  path: '/transcrever',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TiktokRoute = TiktokRouteImport.update({
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/radar': typeof RadarRoute
   '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
+  '/transcrever': typeof TranscreverRoute
   '/voice-conversion': typeof VoiceConversionRoute
   '/api-hub/chaves': typeof ApiHubChavesRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/radar': typeof RadarRoute
   '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
+  '/transcrever': typeof TranscreverRoute
   '/voice-conversion': typeof VoiceConversionRoute
   '/api-hub/chaves': typeof ApiHubChavesRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/radar': typeof RadarRoute
   '/recap': typeof RecapRoute
   '/tiktok': typeof TiktokRoute
+  '/transcrever': typeof TranscreverRoute
   '/voice-conversion': typeof VoiceConversionRoute
   '/api-hub/chaves': typeof ApiHubChavesRoute
   '/historico/$jobId': typeof HistoricoJobIdRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/recap'
     | '/tiktok'
+    | '/transcrever'
     | '/voice-conversion'
     | '/api-hub/chaves'
     | '/historico/$jobId'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/recap'
     | '/tiktok'
+    | '/transcrever'
     | '/voice-conversion'
     | '/api-hub/chaves'
     | '/historico/$jobId'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/recap'
     | '/tiktok'
+    | '/transcrever'
     | '/voice-conversion'
     | '/api-hub/chaves'
     | '/historico/$jobId'
@@ -233,6 +245,7 @@ export interface RootRouteChildren {
   RadarRoute: typeof RadarRoute
   RecapRoute: typeof RecapRoute
   TiktokRoute: typeof TiktokRoute
+  TranscreverRoute: typeof TranscreverRoute
   VoiceConversionRoute: typeof VoiceConversionRoute
   ApiHubChavesRoute: typeof ApiHubChavesRoute
 }
@@ -244,6 +257,13 @@ declare module '@tanstack/react-router' {
       path: '/voice-conversion'
       fullPath: '/voice-conversion'
       preLoaderRoute: typeof VoiceConversionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transcrever': {
+      id: '/transcrever'
+      path: '/transcrever'
+      fullPath: '/transcrever'
+      preLoaderRoute: typeof TranscreverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tiktok': {
@@ -380,6 +400,7 @@ const rootRouteChildren: RootRouteChildren = {
   RadarRoute: RadarRoute,
   RecapRoute: RecapRoute,
   TiktokRoute: TiktokRoute,
+  TranscreverRoute: TranscreverRoute,
   VoiceConversionRoute: VoiceConversionRoute,
   ApiHubChavesRoute: ApiHubChavesRoute,
 }

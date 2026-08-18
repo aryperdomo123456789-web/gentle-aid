@@ -85,6 +85,7 @@ function JobDetail() {
   const sourceCard = getSourceCard(job);
   const sourceSummary = getSourceSummary(job);
   const auditSummary = job?.audit_summary ?? job?.sterilization?.audit_summary ?? null;
+  const transcriptText = job?.transcript_text?.trim() || null;
 
   return (
     <div className="min-h-screen">
@@ -183,6 +184,20 @@ function JobDetail() {
             </div>
             <pre className="whitespace-pre-wrap break-words rounded-2xl border border-border bg-background/60 p-4 text-xs leading-5 text-muted-foreground">
               {auditSummary}
+            </pre>
+          </section>
+        ) : null}
+
+        {transcriptText ? (
+          <section className="panel mt-6 min-w-0 p-4 sm:p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold">Transcrição gerada</h2>
+              <span className="rounded-full border border-border bg-surface/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                {job?.transcript_language ? `idioma ${job.transcript_language}` : "texto completo"}
+              </span>
+            </div>
+            <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-border bg-background/60 p-4 text-xs leading-5 text-muted-foreground">
+              {transcriptText}
             </pre>
           </section>
         ) : null}

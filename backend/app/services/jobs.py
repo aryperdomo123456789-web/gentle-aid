@@ -67,6 +67,7 @@ TOOL_LABELS = {
     "youtube": "Desvio YouTube",
     "tiktok": "Clone TikTok",
     "legendar": "Legendas",
+    "transcribe": "Transcrição",
     "voice": "Voz V2V",
     "canva": "Limpeza Canva",
     "studio": "Estúdio de Vídeo IA",

@@ -45,6 +45,7 @@ export function StatusPanel({
   const status = error ? "error" : busy ? "running" : (job?.status ?? "idle");
   const lines = job?.log ?? [];
   const auditSummary = job?.audit_summary ?? job?.sterilization?.audit_summary ?? null;
+  const transcriptText = job?.transcript_text?.trim() || null;
   const [dialog, setDialog] = useState<"cancel" | "delete" | null>(null);
   const [acting, setActing] = useState(false);
   const live = job?.status === "running" || job?.status === "queued";
@@ -127,6 +128,20 @@ export function StatusPanel({
           </header>
           <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
             {auditSummary}
+          </pre>
+        </section>
+      ) : null}
+
+      {transcriptText ? (
+        <section className="rounded-xl border border-border bg-background/50 p-3">
+          <header className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-foreground">Transcrição</h3>
+            <span className="rounded-full border border-border bg-background/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              texto gerado
+            </span>
+          </header>
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
+            {transcriptText}
           </pre>
         </section>
       ) : null}

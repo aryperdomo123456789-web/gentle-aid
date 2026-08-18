@@ -19,6 +19,7 @@ from .blueprints.live import bp as live_bp
 from .blueprints.release_keys import bp as release_keys_bp
 from .blueprints.radar import bp as radar_bp
 from .blueprints.recap import bp as recap_bp
+from .blueprints.transcribe_video import bp as transcribe_bp
 from .blueprints.studio import bp as studio_bp
 from .blueprints.tiktok import bp as tiktok_bp
 from .blueprints.voice import bp as voice_bp
@@ -116,6 +117,7 @@ def create_app(config: Config | None = None) -> Flask:
         studio_bp,
         discover_bp,
         recap_bp,
+        transcribe_bp,
         live_bp,
     ):
         app.register_blueprint(bp)

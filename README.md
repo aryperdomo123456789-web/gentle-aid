@@ -15,6 +15,7 @@ Reels e Shorts.
 | `/` | Download e Bypass Universal de YouTube | `POST /api/youtube/bypass` |
 | `/tiktok` | TikTok Dashboard (radar + clonagem 1:1) | `GET /api/tiktok/trends`, `POST /api/tiktok/clone` |
 | `/legendar` | Legendas dinâmicas queimadas | `POST /api/legendar/run` |
+| `/transcrever` | Transcrição de vídeo para texto | `POST /api/transcribe/run` |
 | `/voice-conversion` | Conversão de voz V2V | `POST /api/voice/convert` |
 | `/canva-cleaner` | Recodificação e limpeza pós-Canva | `POST /api/canva-cleaner/run` |
 | `/historico` | Central de histórico | `GET /api/jobs`, `GET /api/jobs/<id>` |
@@ -32,7 +33,7 @@ backend/
   app/
     __init__.py           factory Flask
     config.py             caminhos absolutos, binários, limites
-    blueprints/           youtube, tiktok, legendar, voice, canva_cleaner, jobs
+    blueprints/           youtube, tiktok, legendar, transcribe_video, voice, canva_cleaner, jobs
     services/             jobs (fila + persistência), media (FFmpeg), validation
 deploy/
   install.sh                   instalação completa em um comando
