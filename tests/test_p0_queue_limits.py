@@ -76,6 +76,49 @@ class PersistentQueueAndLimitsTests(unittest.TestCase):
             self.assertEqual(ctx.exception.code, "RATE_LIMIT_EXCEEDED")
             self.assertGreaterEqual(ctx.exception.retry_after_seconds, 1)
 
+    def test_concurrent_job_limit_is_enforced_and_released(self) -> None:
+        consumer = "rk_concurrency_consumer"
+        previous_jobs_limit = os.environ.get("API_JOBS_PER_DAY", "1")
+        os.environ["API_JOBS_PER_DAY"] = "10"
+        os.environ["API_MAX_CONCURRENT_JOBS"] = "2"
+        try:
+            with self.app.app_context():
+                rate_limits.reserve_job(
+                    consumer,
+                    job_id="concurrent-job-1",
+                    idempotency_key="concurrent-key-00000001",
+                    audio_seconds=0.1,
+                    cost_units=0.1,
+                )
+                rate_limits.reserve_job(
+                    consumer,
+                    job_id="concurrent-job-2",
+                    idempotency_key="concurrent-key-00000002",
+                    audio_seconds=0.1,
+                    cost_units=0.1,
+                )
+                with self.assertRaises(rate_limits.LimitExceeded) as ctx:
+                    rate_limits.reserve_job(
+                        consumer,
+                        job_id="concurrent-job-3",
+                        idempotency_key="concurrent-key-00000003",
+                        audio_seconds=0.1,
+                        cost_units=0.1,
+                    )
+                self.assertEqual(ctx.exception.code, "CONCURRENT_JOB_LIMIT_EXCEEDED")
+                rate_limits.release_job(consumer, job_id="concurrent-job-1", idempotency_key="concurrent-key-00000001")
+                rate_limits.reserve_job(
+                    consumer,
+                    job_id="concurrent-job-3",
+                    idempotency_key="concurrent-key-00000003",
+                    audio_seconds=0.1,
+                    cost_units=0.1,
+                )
+                rate_limits.release_job(consumer, job_id="concurrent-job-2", idempotency_key="concurrent-key-00000002")
+                rate_limits.release_job(consumer, job_id="concurrent-job-3", idempotency_key="concurrent-key-00000003")
+        finally:
+            os.environ["API_JOBS_PER_DAY"] = previous_jobs_limit
+
     def test_daily_job_quota_rejects_second_reservation(self) -> None:
         with self.app.app_context():
             rate_limits.reserve_job(
