@@ -93,6 +93,7 @@ else
 fi
 ok "API bind: 127.0.0.1:$API_PORT"
 chmod 600 "$APP_DIR/.env" || true
+chown "$RUN_USER":"$RUN_USER" "$APP_DIR/.env" 2>/dev/null || true
 
 
 # --- 3. Python ---------------------------------------------------------------
