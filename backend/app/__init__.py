@@ -7,7 +7,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 from .config import Config
 from .blueprints.auth import bp as auth_bp
@@ -125,12 +125,24 @@ def create_app(config: Config | None = None) -> Flask:
     ):
         app.register_blueprint(bp)
 
+    @app.after_request
+    def attach_api_request_id(response):
+        """Garante correlação uniforme nas respostas do data plane e control plane."""
+        if request.path.startswith("/api/"):
+            from .services.api_auth import request_id
+
+            response.headers.setdefault("X-Request-Id", request_id())
+        return response
+
     @app.get("/api/health")
     def health():
+        from .services.api_auth import request_id
+
         return jsonify(
             status="ok",
             ffmpeg=cfg.ffmpeg_bin,
             storage=str(cfg.storage_dir),
+            request_id=request_id(),
         )
 
     @app.get("/api/version")

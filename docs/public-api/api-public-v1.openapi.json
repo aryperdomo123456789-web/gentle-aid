@@ -2,9 +2,9 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mago API",
-    "version": "0.1.0-draft",
+    "version": "0.1.0-alpha",
     "summary": "API pública assíncrona para geração e processamento de mídia",
-    "description": "Contrato proposto para o API Hub do gentle-aid. Esta especificação é um\nartefato de design e não deve ser interpretada como disponibilidade atual:\nos endpoints só podem ser anunciados como estáveis depois de implementados,\nprotegidos, testados e publicados no ambiente de produção.\n\nO contrato privilegia operações assíncronas, API keys com escopo,\nidempotência, resultados protegidos, erros machine-readable e compatibilidade\nde longo prazo.\n",
+    "description": "Contrato alpha publicado para o API Hub do gentle-aid. A transcrição v1 e\nsuas rotas de job/result estão disponíveis em produção sob rollout controlado;\nquotas comerciais, fila persistente e estabilidade de SLA ainda não são\ngarantias. Não anuncie este contrato como estável antes dos gates operacionais.\n\nO contrato privilegia operações assíncronas, API keys com escopo,\nidempotência, resultados protegidos, erros machine-readable e compatibilidade\nde longo prazo.\n",
     "contact": {
       "name": "Mago API Support",
       "url": "https://viral.vr766.com"
@@ -16,7 +16,7 @@
   "servers": [
     {
       "url": "https://viral.vr766.com/api/v1",
-      "description": "Produção — publicar somente após o gate de lançamento"
+      "description": "Produção — alpha controlada; consulte a documentação antes de integrar"
     },
     {
       "url": "https://staging.viral.vr766.com/api/v1",

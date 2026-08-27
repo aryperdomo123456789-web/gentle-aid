@@ -1,10 +1,10 @@
 # Memória especializada — Mago API / API Hub do gentle-aid
 
-**Classificação:** documento interno de arquitetura, produto e operação  
-**Versão:** 0.1.0-draft  
-**Data:** 26 de agosto de 2026  
-**Projeto:** `aryperdomo123456789-web/gentle-aid`  
-**Ambiente auditado:** `38.190.176.171:/www/wwwroot/gentle-aid`  
+**Classificação:** documento interno de arquitetura, produto e operação
+**Versão:** 0.1.0-draft
+**Data:** 26 de agosto de 2026
+**Projeto:** `aryperdomo123456789-web/gentle-aid`
+**Ambiente auditado:** `38.190.176.171:/www/wwwroot/gentle-aid`
 **Autor:** Manus AI
 
 ## 1. Propósito desta memória

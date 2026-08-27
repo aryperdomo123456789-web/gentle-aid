@@ -2,12 +2,12 @@
 
 ## Documentação pública de integração
 
-**Versão do documento:** 0.1.0-draft  
-**Status:** proposta pública — ainda não liberar como contrato de produção  
-**Última revisão:** 26 de agosto de 2026  
+**Versão do documento:** 0.1.0-alpha
+**Status:** alpha controlada — transcrição v1 publicada; expansão da API ainda condicionada aos gates operacionais
+**Última revisão:** 27 de agosto de 2026
 **Base prevista:** `https://viral.vr766.com/api/v1`
 
-> **Aviso de disponibilidade.** Este documento define o contrato público recomendado para a próxima versão da Mago API. Ele não afirma que todos os endpoints já estejam publicados. No ambiente atual, as rotas públicas previstas ainda respondem `404`; somente o painel de gerenciamento de chaves está disponível. Consulte a seção [Estado de lançamento](#estado-de-lançamento) antes de iniciar qualquer integração.
+> **Aviso de disponibilidade.** Este documento descreve a Mago API v1 em alpha controlada. `GET /api/v1/health`, `GET /api/v1/capabilities`, `POST /api/v1/transcriptions`, consulta/cancelamento de jobs, entrega protegida e OpenAPI estão publicados no ambiente principal. Rate limit comercial, quotas, paginação por cursor e fila persistente ainda não devem ser tratados como garantias de disponibilidade. Consulte a seção [Estado de lançamento](#estado-de-lançamento) antes de iniciar uma integração.
 
 ## Visão geral
 
@@ -23,14 +23,14 @@ Até que o checklist abaixo esteja verde, a documentação deve permanecer marca
 
 | Gate | Obrigatório para anunciar v1 | Situação observada |
 |---|---|---|
-| Middleware de API key aplicado às rotas | Cada rota protegida valida token, expiração, revogação e escopo | Pendente |
-| Endpoint público de transcrição | `POST /api/v1/transcriptions` responde 202 e cria job isolado | Pendente |
-| Consulta segura | Consumidor só vê jobs criados pela sua chave | Pendente |
-| Resultado protegido | Nenhum caminho físico ou arquivo interno é público | Pendente |
-| OpenAPI publicado | `/api/docs` e `/api/openapi.json` refletem o runtime | Pendente |
-| Limites | Rate limit, quota de upload, concorrência e custo definidos | Pendente |
-| Idempotência | Retry do mesmo POST não duplica job | Pendente |
-| Testes | Autorização, isolamento, erro, retry, expiração e carga cobertos | Pendente |
+| Middleware de API key aplicado às rotas | Cada rota protegida valida token, expiração, revogação e escopo | Implementado |
+| Endpoint público de transcrição | `POST /api/v1/transcriptions` responde 202 e cria job isolado | Publicado em alpha |
+| Consulta segura | Consumidor só vê jobs criados pela sua chave | Implementado |
+| Resultado protegido | Nenhum caminho físico ou arquivo interno é público | Implementado; outputs legados em migração |
+| OpenAPI publicado | `/api/docs` e `/api/openapi.json` refletem o runtime | Publicado |
+| Limites | Rate limit, quota de upload, concorrência e custo definidos | Parcial; limite de upload e concorrência ativos |
+| Idempotência | Retry do mesmo POST não duplica job | Implementado e testado |
+| Testes | Autorização, isolamento, erro, retry, expiração e carga cobertos | Contrato e segurança cobertos; carga pendente |
 
 ## URL base e versões
 

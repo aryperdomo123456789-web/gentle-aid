@@ -15,13 +15,19 @@ Reels e Shorts.
 | `/` | Download e Bypass Universal de YouTube | `POST /api/youtube/bypass` |
 | `/tiktok` | TikTok Dashboard (radar + clonagem 1:1) | `GET /api/tiktok/trends`, `POST /api/tiktok/clone` |
 | `/legendar` | Legendas dinâmicas queimadas | `POST /api/legendar/run` |
-| `/transcrever` | Transcrição de vídeo para texto | `POST /api/transcribe/run` |
 | `/voice-conversion` | Conversão de voz V2V | `POST /api/voice/convert` |
 | `/canva-cleaner` | Recodificação e limpeza pós-Canva | `POST /api/canva-cleaner/run` |
 | `/historico` | Central de histórico | `GET /api/jobs`, `GET /api/jobs/<id>` |
 
 Todo job devolve `202` com o objeto do job; o frontend faz polling em
 `GET /api/jobs/<id>` até `done`/`error` e mostra log, hashes MD5 e download.
+
+## Documentação
+
+- [Mapeamento do produto autenticado e potencial de API](docs/internal/MAPEAMENTO_PRODUTO_API.md)
+- [Memória interna da Mago API v1](docs/internal/MAGO_API.md)
+- [Documentação pública da API v1](docs/public-api/README.md)
+- [Contrato OpenAPI 3.1 em YAML](docs/public-api/api-public-v1.openapi.yaml)
 
 ## Estrutura
 
@@ -33,7 +39,7 @@ backend/
   app/
     __init__.py           factory Flask
     config.py             caminhos absolutos, binários, limites
-    blueprints/           youtube, tiktok, legendar, transcribe_video, voice, canva_cleaner, jobs
+    blueprints/           youtube, tiktok, legendar, voice, canva_cleaner, jobs
     services/             jobs (fila + persistência), media (FFmpeg), validation
 deploy/
   install.sh                   instalação completa em um comando

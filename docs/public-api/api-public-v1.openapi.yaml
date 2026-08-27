@@ -1,13 +1,13 @@
 openapi: 3.1.0
 info:
   title: Mago API
-  version: 0.1.0-draft
+  version: 0.1.0-alpha
   summary: API pública assíncrona para geração e processamento de mídia
   description: |
-    Contrato proposto para o API Hub do gentle-aid. Esta especificação é um
-    artefato de design e não deve ser interpretada como disponibilidade atual:
-    os endpoints só podem ser anunciados como estáveis depois de implementados,
-    protegidos, testados e publicados no ambiente de produção.
+    Contrato alpha publicado para o API Hub do gentle-aid. A transcrição v1 e
+    suas rotas de job/result estão disponíveis em produção sob rollout controlado;
+    quotas comerciais, fila persistente e estabilidade de SLA ainda não são
+    garantias. Não anuncie este contrato como estável antes dos gates operacionais.
 
     O contrato privilegia operações assíncronas, API keys com escopo,
     idempotência, resultados protegidos, erros machine-readable e compatibilidade
@@ -19,7 +19,7 @@ info:
     name: Proprietary
 servers:
   - url: https://viral.vr766.com/api/v1
-    description: Produção — publicar somente após o gate de lançamento
+    description: Produção — alpha controlada; consulte a documentação antes de integrar
   - url: https://staging.viral.vr766.com/api/v1
     description: Staging — substituir pelo host real de homologação
 externalDocs:
