@@ -3,11 +3,11 @@
 ## Documentação pública de integração
 
 **Versão do documento:** 0.1.0-alpha
-**Status:** alpha controlada — transcrição v1 publicada; expansão da API ainda condicionada aos gates operacionais
+**Status:** alpha controlada — transcrição v1 e envelope de operação longa publicados; expansão da API ainda condicionada aos gates operacionais
 **Última revisão:** 27 de agosto de 2026
 **Base prevista:** `https://viral.vr766.com/api/v1`
 
-> **Aviso de disponibilidade.** Este documento descreve a Mago API v1 em alpha controlada. `GET /api/v1/health`, `GET /api/v1/capabilities`, `POST /api/v1/transcriptions`, consulta/cancelamento de jobs, entrega protegida e OpenAPI estão publicados no ambiente principal. Rate limit comercial, quotas, paginação por cursor e fila persistente ainda não devem ser tratados como garantias de disponibilidade. Consulte a seção [Estado de lançamento](#estado-de-lançamento) antes de iniciar uma integração.
+> **Aviso de disponibilidade.** Este documento descreve a Mago API v1 em alpha controlada. `GET /api/v1/health`, `GET /api/v1/capabilities`, `POST /api/v1/transcriptions`, consulta/cancelamento de operações, entrega protegida e OpenAPI estão publicados no ambiente principal. Rate limit comercial, quotas, paginação por cursor e fila persistente ainda não devem ser tratados como garantias de disponibilidade. Consulte a seção [Estado de lançamento](#estado-de-lançamento) antes de iniciar uma integração.
 
 ## Visão geral
 
@@ -17,15 +17,15 @@ O contrato segue princípios usados por APIs maduras: operações longas retorna
 
 ## Estado de lançamento
 
-A API Hub documentada no legado prevê uma camada com `X-API-Key`, `Authorization: Bearer`, catálogo e endpoints públicos. A implementação atual já tem uma tela owner para gerar e revogar chaves em `/api-hub/chaves` e um endpoint administrativo interno em `/api/access-keys`. As rotas externas `/api/public/*`, `/api/docs` e `/api/openapi.json`, no entanto, não estavam publicadas durante a verificação de 26 de agosto de 2026.[7] [8]
+A API Hub documentada no legado prevê uma camada com `X-API-Key`, `Authorization: Bearer`, catálogo e endpoints públicos. A implementação atual tem uma tela owner para gerar e revogar chaves em `/api-hub/chaves`, um endpoint administrativo interno em `/api/access-keys` e a superfície pública alpha em `/api/v1`. O envelope de operação longa foi adicionado sem remover os aliases `/jobs/*`; quotas comerciais, fila persistente e SLA continuam fora da garantia alpha.
 
-Até que o checklist abaixo esteja verde, a documentação deve permanecer marcada como **Draft**:
+Até que o checklist abaixo esteja verde, a documentação deve permanecer marcada como **Alpha**:
 
 | Gate | Obrigatório para anunciar v1 | Situação observada |
 |---|---|---|
 | Middleware de API key aplicado às rotas | Cada rota protegida valida token, expiração, revogação e escopo | Implementado |
 | Endpoint público de transcrição | `POST /api/v1/transcriptions` responde 202 e cria job isolado | Publicado em alpha |
-| Consulta segura | Consumidor só vê jobs criados pela sua chave | Implementado |
+| Consulta segura | Consumidor só vê operações criadas pela sua chave | Implementado |
 | Resultado protegido | Nenhum caminho físico ou arquivo interno é público | Implementado; outputs legados em migração |
 | OpenAPI publicado | `/api/docs` e `/api/openapi.json` refletem o runtime | Publicado |
 | Limites | Rate limit, quota de upload, concorrência e custo definidos | Parcial; limite de upload e concorrência ativos |
@@ -80,7 +80,7 @@ Escopo armazenado não é escopo aplicado. Uma rota só está protegida quando o
 
 ## Criar uma transcrição
 
-`POST /api/v1/transcriptions` recebe um arquivo de áudio ou vídeo e cria uma operação assíncrona. O cliente deve enviar uma `Idempotency-Key` nova para cada intenção de criação. Se houver timeout de rede, repita o mesmo request com a mesma chave; não gere outra chave antes de saber se a primeira operação foi criada.
+`POST /api/v1/transcriptions` recebe um arquivo de áudio ou vídeo e cria uma operação assíncrona. O cliente deve enviar uma `Idempotency-Key` nova para cada intenção de criação. Se houver timeout de rede, repita o mesmo request com a mesma chave; não gere outra chave antes de saber se a primeira operação foi criada. A resposta usa o envelope canônico `Operation`, inspirado na semântica de operações longas do AIP-151 [13].
 
 ```bash
 curl -X POST "https://viral.vr766.com/api/v1/transcriptions" \
@@ -96,26 +96,34 @@ Resposta esperada quando o contrato estiver publicado:
 
 ```http
 HTTP/1.1 202 Accepted
-Location: https://viral.vr766.com/api/v1/jobs/job_01J7MAGOTRANSCRIBE
+Location: https://viral.vr766.com/api/v1/operations/api-transcription-01J7MAGOTRANSCRIBE
 X-Request-Id: req_01J7MAGOACCEPTED
 Content-Type: application/json
 ```
 
 ```json
 {
-  "id": "job_01J7MAGOTRANSCRIBE",
-  "object": "job",
+  "name": "operations/api-transcription-01J7MAGOTRANSCRIBE",
+  "id": "api-transcription-01J7MAGOTRANSCRIBE",
+  "object": "operation",
   "type": "transcription",
-  "status": "queued",
+  "done": false,
+  "status": "PENDING",
+  "metadata": {
+    "progress": 0,
+    "stage": "queued",
+    "created_at": "2026-08-26T23:45:00Z",
+    "expires_at": "2026-08-29T23:45:00Z"
+  },
+  "response": null,
+  "error": null,
+  "poll_url": "https://viral.vr766.com/api/v1/operations/api-transcription-01J7MAGOTRANSCRIBE",
   "progress": 0,
   "stage": "queued",
   "created_at": "2026-08-26T23:45:00Z",
-  "started_at": null,
   "finished_at": null,
   "expires_at": "2026-08-29T23:45:00Z",
-  "poll_url": "https://viral.vr766.com/api/v1/jobs/job_01J7MAGOTRANSCRIBE",
   "result_url": null,
-  "error": null,
   "api_version": "v1"
 }
 ```
@@ -139,28 +147,30 @@ Todo POST que cria job deve aceitar `Idempotency-Key`. A chave deve ser uma UUID
 
 A retenção mínima recomendada para a tabela de idempotência é 24 horas. A API deve persistir o hash do payload, status, corpo seguro da resposta e `job_id`; nunca deve guardar arquivo duplicado apenas para repetir uma resposta. O padrão acompanha a prática da Stripe de comparar parâmetros e tornar retries seguros [2].
 
-## Consultar um job
+## Consultar uma operação
+
+Novas integrações devem consultar o recurso canônico:
 
 ```bash
-curl "https://viral.vr766.com/api/v1/jobs/job_01J7MAGOTRANSCRIBE" \
+curl "https://viral.vr766.com/api/v1/operations/api-transcription-01J7MAGOTRANSCRIBE" \
   -H "X-API-Key: ${MAGO_API_KEY}" \
   -H "X-Client-Request-Id: poll-82731"
 ```
 
-O consumidor só recebe jobs pertencentes à sua chave ou ao tenant associado. Para não revelar existência de IDs de terceiros, a API pode responder `404` tanto para um job inexistente quanto para um job de outro consumidor.
+`GET /api/v1/jobs/{job_id}` permanece como alias compatível e devolve o mesmo envelope. O consumidor só recebe operações pertencentes à sua chave ou ao tenant associado. Para não revelar a existência de IDs de terceiros, a API pode responder `404` tanto para uma operação inexistente quanto para uma operação de outro consumidor.
 
-Estados possíveis:
+Estados públicos possíveis:
 
 | Estado | Significado | Terminal |
 |---|---|---:|
-| `queued` | Aceito e aguardando worker | Não |
-| `running` | Em processamento | Não |
-| `succeeded` | Resultado disponível | Sim |
-| `failed` | Falha permanente ou tentativas esgotadas | Sim |
-| `cancelled` | Cancelado pelo consumidor ou operador | Sim |
-| `expired` | Resultado removido pela retenção | Sim |
+| `PENDING` | Aceita e aguardando worker | Não |
+| `RUNNING` | Em processamento | Não |
+| `SUCCEEDED` | Resultado disponível | Sim |
+| `FAILED` | Falha permanente ou tentativas esgotadas | Sim |
+| `CANCELLED` | Cancelada pelo consumidor ou operador | Sim |
+| `EXPIRED` | Resultado removido pela retenção | Sim |
 
-O cliente deve fazer polling com backoff, respeitando `Retry-After` quando fornecido. Não faça polling agressivo a cada segundo por horas; use o webhook quando precisar de notificação imediata.
+O campo `done` é falso em `PENDING` e `RUNNING`, e verdadeiro em estados terminais. O cliente deve fazer polling com backoff, respeitando `Retry-After` quando fornecido. Não faça polling agressivo a cada segundo por horas; use o webhook quando precisar de notificação imediata. Clientes devem ignorar campos desconhecidos e tolerar novos estados em versões compatíveis.
 
 ## Listar jobs
 
@@ -192,15 +202,17 @@ curl "https://viral.vr766.com/api/v1/jobs?page_size=50&status=succeeded" \
 
 `page_size` tem default 50 e máximo 100. `next_page_token` é opaco e pode expirar. Filtros usados na primeira página devem permanecer iguais nas páginas seguintes. Esse desenho segue as orientações de paginação da Stripe e do Google [3] [9].
 
-## Cancelar um job
+## Cancelar uma operação
+
+Novas integrações devem usar o método canônico:
 
 ```bash
-curl -X POST "https://viral.vr766.com/api/v1/jobs/job_01J7MAGOTRANSCRIBE/cancel" \
+curl -X POST "https://viral.vr766.com/api/v1/operations/api-transcription-01J7MAGOTRANSCRIBE:cancel" \
   -H "X-API-Key: ${MAGO_API_KEY}" \
   -H "Idempotency-Key: cancel-7b8d5b25-4a9e-4de3-9b34-3dca6b7f9f4d"
 ```
 
-A resposta `202` confirma que a solicitação de cancelamento foi aceita, não necessariamente que o processo já terminou. Consulte o job até que o estado seja `cancelled` ou outro estado terminal. Cancelar um job já concluído é uma operação sem efeito ou retorna `409`, conforme o estado definido pelo contrato.
+`POST /api/v1/jobs/{job_id}/cancel` permanece como alias compatível. A resposta `202` confirma que a solicitação de cancelamento foi aceita, não necessariamente que o processo já terminou. Consulte a operação até que o estado seja `CANCELLED` ou outro estado terminal. Cancelar uma operação já concluída é uma operação sem efeito ou retorna `409`, conforme o estado definido pelo contrato.
 
 ## Obter o resultado
 
@@ -332,7 +344,7 @@ with open("video.mp4", "rb") as media:
 response.raise_for_status()
 job = response.json()
 
-while job["status"] in {"queued", "running"}:
+while not job["done"]:
     time.sleep(5)
     poll = requests.get(
         job["poll_url"],
@@ -342,7 +354,7 @@ while job["status"] in {"queued", "running"}:
     poll.raise_for_status()
     job = poll.json()
 
-if job["status"] == "succeeded":
+if job["status"] == "SUCCEEDED":
     result = requests.get(
         job["result_url"],
         headers={"X-API-Key": os.environ["MAGO_API_KEY"]},
@@ -351,7 +363,7 @@ if job["status"] == "succeeded":
     result.raise_for_status()
     open("legenda.srt", "wb").write(result.content)
 else:
-    raise RuntimeError(job["error"])
+    raise RuntimeError(job["error"] or "A operação terminou sem resultado")
 ```
 
 O exemplo é ilustrativo. Ele só deve ser executado quando os endpoints da v1 e seus limites estiverem publicados em homologação.
@@ -408,3 +420,4 @@ A documentação poderá ser promovida de `draft` para `stable` apenas quando:
 [10]: https://www.twilio.com/docs/usage/webhooks
 [11]: https://developers.openai.com/api/docs/guides/rate-limits
 [12]: https://owasp.org/API-Security/editions/2023/en/0x11-t10/
+[13]: https://google.aip.dev/151

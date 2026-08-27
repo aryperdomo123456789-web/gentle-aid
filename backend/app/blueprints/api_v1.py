@@ -18,7 +18,7 @@ from flask import Blueprint, Response, jsonify, request, send_file, url_for
 from werkzeug.utils import secure_filename
 
 from ..config import config
-from ..services import idempotency, jobs, transcribe, validation
+from ..services import idempotency, jobs, operations, transcribe, validation
 from ..services.api_auth import current_api_key, problem_response, request_id, require_api_key
 
 bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
@@ -49,19 +49,14 @@ def _owns(job: dict[str, Any]) -> bool:
 
 
 def _api_status(job: dict[str, Any]) -> str:
-    status = str(job.get("status") or "")
-    expires_at = job.get("expires_at")
-    if status == "done" and isinstance(expires_at, str) and expires_at:
-        try:
-            expires = datetime.fromisoformat(expires_at)
-            if expires <= datetime.now(timezone.utc):
-                return "expired"
-        except ValueError:
-            pass
     return {
-        "done": "succeeded",
-        "error": "failed",
-    }.get(status, status or "failed")
+        "PENDING": "queued",
+        "RUNNING": "running",
+        "SUCCEEDED": "succeeded",
+        "FAILED": "failed",
+        "CANCELLED": "cancelled",
+        "EXPIRED": "expired",
+    }.get(operations.public_state(job), "failed")
 
 
 def _artifact_path(job: dict[str, Any]) -> Path | None:
@@ -89,33 +84,12 @@ def _public_job(job: dict[str, Any]) -> dict[str, Any]:
     status = _api_status(job)
     result_path = _artifact_path(job) if status == "succeeded" else None
     job_id = str(job.get("job_id") or "")
-    payload: dict[str, Any] = {
-        "id": job_id,
-        "object": "job",
-        "type": "transcription",
-        "status": status,
-        "progress": int(job.get("progress") or (100 if status == "succeeded" else 0)),
-        "stage": job.get("stage"),
-        "created_at": job.get("created_at"),
-        "started_at": job.get("started_at"),
-        "finished_at": job.get("finished_at"),
-        "expires_at": job.get("expires_at"),
-        "poll_url": url_for("api_v1.get_job", job_id=job_id, _external=True),
-        "result_url": (
-            url_for("api_v1.get_job_result", job_id=job_id, _external=True)
-            if result_path
-            else None
-        ),
-        "error": None,
-        "api_version": "v1",
-    }
-    if status == "failed":
-        payload["error"] = {
-            "code": "JOB_FAILED",
-            "detail": str(job.get("message") or "O processamento falhou."),
-            "retryable": False,
-        }
-    return payload
+    result_url = (
+        url_for("api_v1.get_job_result", job_id=job_id, _external=True)
+        if result_path
+        else None
+    )
+    return operations.operation_view(job, result_url=result_url)
 
 
 def _parse_common_fields() -> tuple[str, str] | Response:
@@ -408,6 +382,17 @@ def list_jobs():
     )
 
 
+@bp.get("/operations/<job_id>")
+@require_api_key("jobs:read")
+def get_operation(job_id: str):
+    if not _safe_job_id(job_id):
+        return problem_response(404, "NOT_FOUND", "Operação não encontrada.")
+    job = jobs.get(job_id)
+    if not job or not _owns(job):
+        return problem_response(404, "NOT_FOUND", "Operação não encontrada.")
+    return jsonify(_public_job(job))
+
+
 @bp.get("/jobs/<job_id>")
 @require_api_key("jobs:read")
 def get_job(job_id: str):
@@ -417,6 +402,12 @@ def get_job(job_id: str):
     if not job or not _owns(job):
         return problem_response(404, "NOT_FOUND", "Job não encontrado.")
     return jsonify(_public_job(job))
+
+
+@bp.post("/operations/<job_id>:cancel")
+@require_api_key("jobs:write")
+def cancel_operation(job_id: str):
+    return cancel_job(job_id)
 
 
 @bp.post("/jobs/<job_id>/cancel")

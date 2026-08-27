@@ -181,10 +181,10 @@
         },
         "responses": {
           "202": {
-            "description": "Job aceito e colocado na fila.",
+            "description": "Operação aceita e colocada na fila.",
             "headers": {
               "Location": {
-                "description": "URL canônica para consultar o job.",
+                "description": "URL canônica para consultar a operação.",
                 "schema": {
                   "type": "string",
                   "format": "uri"
@@ -197,7 +197,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Job"
+                  "$ref": "#/components/schemas/Operation"
                 }
               }
             }
@@ -359,6 +359,144 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/operations/{job_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/JobId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "operationId": "getOperation",
+        "summary": "Consulta uma operação longa",
+        "description": "Retorna a operação até um estado terminal. O consumidor só pode consultar operações criadas pela própria API key.",
+        "security": [
+          {
+            "ApiKeyAuth": [
+              "jobs:read"
+            ]
+          },
+          {
+            "BearerAuth": [
+              "jobs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientRequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação longa atual.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "410": {
+            "$ref": "#/components/responses/Gone"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/operations/{job_id}:cancel": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/JobId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "operationId": "cancelOperation",
+        "summary": "Cancela uma operação longa",
+        "description": "Solicita cancelamento de uma operação ainda não terminal. A resposta usa o mesmo envelope da operação.",
+        "security": [
+          {
+            "ApiKeyAuth": [
+              "jobs:write"
+            ]
+          },
+          {
+            "BearerAuth": [
+              "jobs:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/ClientRequestId"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cancelamento aceito.",
+            "headers": {
+              "Location": {
+                "description": "URL canônica da operação.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -670,7 +808,7 @@
         "description": "Identificador público do job.",
         "schema": {
           "type": "string",
-          "pattern": "^job_[A-Za-z0-9_-]{12,80}$"
+          "pattern": "^[A-Za-z0-9_-]{3,160}$"
         }
       }
     },
@@ -831,7 +969,218 @@
           }
         }
       },
+      "Operation": {
+        "type": "object",
+        "description": "Operação longa de processamento. Os campos canônicos são `name`, `done`, `metadata`, `response` e `error`; campos legados permanecem apenas para compatibilidade.",
+        "required": [
+          "name",
+          "id",
+          "object",
+          "type",
+          "done",
+          "status",
+          "metadata",
+          "api_version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nome estável no formato operations/{job_id}.",
+            "pattern": "^operations/[A-Za-z0-9_-]{3,160}$",
+            "example": "operations/api-transcription-01J7MAGO"
+          },
+          "id": {
+            "type": "string",
+            "description": "ID do job e último segmento do nome da operação.",
+            "example": "api-transcription-01J7MAGO"
+          },
+          "object": {
+            "type": "string",
+            "const": "operation"
+          },
+          "type": {
+            "type": "string",
+            "const": "transcription"
+          },
+          "done": {
+            "type": "boolean",
+            "description": "Verdadeiro somente em estado terminal."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELLED",
+              "EXPIRED"
+            ]
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/OperationMetadata"
+          },
+          "response": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TranscriptionOperationResponse"
+              }
+            ],
+            "nullable": true
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OperationError"
+              }
+            ],
+            "nullable": true
+          },
+          "poll_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "api_version": {
+            "type": "string",
+            "example": "v1"
+          },
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Campo legado; use metadata.progress em novas integrações."
+          },
+          "stage": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "result_url": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          }
+        }
+      },
+      "OperationMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "stage": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "TranscriptionOperationResponse": {
+        "type": "object",
+        "required": [
+          "job_id",
+          "format",
+          "result_url"
+        ],
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "srt",
+              "vtt",
+              "json",
+              "text"
+            ]
+          },
+          "language": {
+            "type": "string",
+            "nullable": true
+          },
+          "result_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "OperationError": {
+        "type": "object",
+        "required": [
+          "type",
+          "code",
+          "title",
+          "detail",
+          "retryable"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "Job": {
+        "deprecated": true,
         "type": "object",
         "required": [
           "id",
@@ -926,7 +1275,7 @@
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Job"
+              "$ref": "#/components/schemas/Operation"
             }
           },
           "has_more": {
@@ -1004,7 +1353,7 @@
             ],
             "properties": {
               "job": {
-                "$ref": "#/components/schemas/Job"
+                "$ref": "#/components/schemas/Operation"
               }
             }
           }
