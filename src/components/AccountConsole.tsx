@@ -153,7 +153,7 @@ export function AccountConsole() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@viral.site"
+                  placeholder="e-mail do usuário"
                   disabled={Boolean(selectedUser?.protected)}
                 />
               )}

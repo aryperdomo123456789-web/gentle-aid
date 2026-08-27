@@ -1,0 +1,752 @@
+openapi: 3.1.0
+info:
+  title: Mago API
+  version: 0.1.0-draft
+  summary: API pública assíncrona para geração e processamento de mídia
+  description: |
+    Contrato proposto para o API Hub do gentle-aid. Esta especificação é um
+    artefato de design e não deve ser interpretada como disponibilidade atual:
+    os endpoints só podem ser anunciados como estáveis depois de implementados,
+    protegidos, testados e publicados no ambiente de produção.
+
+    O contrato privilegia operações assíncronas, API keys com escopo,
+    idempotência, resultados protegidos, erros machine-readable e compatibilidade
+    de longo prazo.
+  contact:
+    name: Mago API Support
+    url: https://viral.vr766.com
+  license:
+    name: Proprietary
+servers:
+  - url: https://viral.vr766.com/api/v1
+    description: Produção — publicar somente após o gate de lançamento
+  - url: https://staging.viral.vr766.com/api/v1
+    description: Staging — substituir pelo host real de homologação
+externalDocs:
+  description: Documentação pública de integração
+  url: https://viral.vr766.com/api/docs
+
+tags:
+  - name: Platform
+    description: Saúde e capacidades não sensíveis da plataforma.
+  - name: Transcriptions
+    description: Criação e consulta de transcrições assíncronas.
+  - name: Jobs
+    description: Operações sobre jobs pertencentes à API key consumidora.
+  - name: Usage
+    description: Uso e limites do consumidor autenticado.
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Platform]
+      operationId: getHealth
+      summary: Verifica a disponibilidade da API
+      security: []
+      responses:
+        '200':
+          description: Serviço disponível.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: ok
+                api_version: v1
+                request_id: req_01J7MAGOHEALTH
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /capabilities:
+    get:
+      tags: [Platform]
+      operationId: listCapabilities
+      summary: Lista recursos e limites disponíveis
+      security:
+        - ApiKeyAuth: [catalog:read]
+        - BearerAuth: [catalog:read]
+      responses:
+        '200':
+          description: Capacidades visíveis para a API key.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilitiesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /transcriptions:
+    post:
+      tags: [Transcriptions]
+      operationId: createTranscription
+      summary: Enfileira uma transcrição de áudio ou vídeo
+      description: |
+        A operação é assíncrona. O servidor valida o arquivo, cria um job e
+        responde imediatamente com `202 Accepted`. Repetir a mesma requisição
+        com o mesmo `Idempotency-Key` deve devolver o mesmo job enquanto a chave
+        de idempotência estiver retida.
+      security:
+        - ApiKeyAuth: [transcribe:write]
+        - BearerAuth: [transcribe:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ClientRequestId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TranscriptionRequest'
+            encoding:
+              file:
+                contentType: audio/*,video/*,application/octet-stream
+      responses:
+        '202':
+          description: Job aceito e colocado na fila.
+          headers:
+            Location:
+              description: URL canônica para consultar o job.
+              schema:
+                type: string
+                format: uri
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /jobs:
+    get:
+      tags: [Jobs]
+      operationId: listJobs
+      summary: Lista jobs do consumidor autenticado
+      security:
+        - ApiKeyAuth: [jobs:read]
+        - BearerAuth: [jobs:read]
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+        - name: status
+          in: query
+          description: Filtra por estado do job.
+          schema:
+            type: string
+            enum: [queued, running, succeeded, failed, cancelled, expired]
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Página de jobs do consumidor atual.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /jobs/{job_id}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Jobs]
+      operationId: getJob
+      summary: Consulta o estado de um job do consumidor
+      security:
+        - ApiKeyAuth: [jobs:read]
+        - BearerAuth: [jobs:read]
+      parameters:
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Estado atual do job.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /jobs/{job_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    post:
+      tags: [Jobs]
+      operationId: cancelJob
+      summary: Solicita o cancelamento de um job
+      security:
+        - ApiKeyAuth: [jobs:write]
+        - BearerAuth: [jobs:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '202':
+          description: Cancelamento aceito; consultar o job para confirmar o estado terminal.
+          headers:
+            Location:
+              description: URL canônica do job.
+              schema:
+                type: string
+                format: uri
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /jobs/{job_id}/result:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Jobs]
+      operationId: getJobResult
+      summary: Obtém o resultado concluído do job
+      description: |
+        A resposta não deve expor caminhos físicos. O servidor pode redirecionar
+        para uma URL assinada e curta ou devolver o conteúdo solicitado com
+        `Content-Disposition` seguro.
+      security:
+        - ApiKeyAuth: [results:read]
+        - BearerAuth: [results:read]
+      parameters:
+        - name: format
+          in: query
+          description: Formato do resultado.
+          schema:
+            type: string
+            enum: [srt, vtt, json, text]
+            default: srt
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Resultado do job.
+          headers:
+            Content-Disposition:
+              description: Nome de download controlado pelo servidor.
+              schema:
+                type: string
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptionResult'
+        '202':
+          description: Job ainda não terminou.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+
+  /usage:
+    get:
+      tags: [Usage]
+      operationId: getUsage
+      summary: Consulta consumo e limites do consumidor
+      security:
+        - ApiKeyAuth: [usage:read]
+        - BearerAuth: [usage:read]
+      responses:
+        '200':
+          description: Uso agregado, sem dados de outros consumidores.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+webhooks:
+  jobCompleted:
+    post:
+      summary: Evento enviado quando um job alcança estado terminal
+      operationId: receiveJobCompleted
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobEvent'
+      responses:
+        '2XX':
+          description: Evento aceito.
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Chave `mago_...` emitida no painel administrativo.
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: mago_...
+      description: 'Envie a mesma chave no formato Authorization: Bearer mago_....'
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID v4 ou identificador aleatório único por operação de escrita.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 255
+        pattern: '^[A-Za-z0-9._~-]+$'
+      example: 7b8d5b25-4a9e-4de3-9b34-3dca6b7f9f4d
+    ClientRequestId:
+      name: X-Client-Request-Id
+      in: header
+      required: false
+      description: Identificador definido pelo consumidor para correlação própria.
+      schema:
+        type: string
+        maxLength: 128
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      description: Quantidade máxima de itens; default 50, máximo 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    PageToken:
+      name: page_token
+      in: query
+      required: false
+      description: Cursor opaco devolvido pela página anterior.
+      schema:
+        type: string
+        maxLength: 4096
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      description: Identificador público do job.
+      schema:
+        type: string
+        pattern: '^job_[A-Za-z0-9_-]{12,80}$'
+
+  headers:
+    RequestId:
+      description: Identificador gerado pela API para suporte e observabilidade.
+      schema:
+        type: string
+        pattern: '^req_[A-Za-z0-9_-]+$'
+
+  schemas:
+    Health:
+      type: object
+      required: [status, api_version, request_id]
+      properties:
+        status:
+          type: string
+          const: ok
+        api_version:
+          type: string
+          example: v1
+        request_id:
+          type: string
+          example: req_01J7MAGOHEALTH
+
+    Capability:
+      type: object
+      required: [id, status, input_formats, output_formats]
+      properties:
+        id:
+          type: string
+          example: transcription
+        status:
+          type: string
+          enum: [available, degraded, unavailable]
+        input_formats:
+          type: array
+          items: {type: string}
+        output_formats:
+          type: array
+          items: {type: string}
+        limits:
+          type: object
+          additionalProperties: true
+
+    CapabilitiesResponse:
+      type: object
+      required: [data, api_version]
+      properties:
+        api_version:
+          type: string
+          example: v1
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+
+    TranscriptionRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Arquivo de áudio ou vídeo dentro dos limites da conta.
+        language:
+          type: string
+          minLength: 2
+          maxLength: 20
+          example: pt
+        output_format:
+          type: string
+          enum: [srt, vtt, json, text]
+          default: srt
+        webhook:
+          $ref: '#/components/schemas/WebhookConfig'
+
+    WebhookConfig:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: HTTPS público do consumidor; deve ser validado e assinado.
+        secret:
+          type: string
+          writeOnly: true
+          minLength: 32
+          description: Segredo do consumidor para validação HMAC; nunca é devolvido.
+        events:
+          type: array
+          items:
+            type: string
+            enum: [job.completed, job.failed, job.cancelled]
+          default: [job.completed, job.failed, job.cancelled]
+
+    Job:
+      type: object
+      required: [id, object, status, created_at, api_version]
+      properties:
+        id:
+          type: string
+          example: job_01J7MAGOTRANSCRIBE
+        object:
+          type: string
+          const: job
+        type:
+          type: string
+          const: transcription
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed, cancelled, expired]
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+        stage:
+          type: string
+          example: transcribing
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        poll_url:
+          type: string
+          format: uri
+        result_url:
+          type: string
+          format: uri
+          nullable: true
+        error:
+          allOf:
+            - $ref: '#/components/schemas/Problem'
+          nullable: true
+        api_version:
+          type: string
+          example: v1
+
+    JobList:
+      type: object
+      required: [data, has_more]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+        has_more:
+          type: boolean
+        next_page_token:
+          type: string
+          nullable: true
+
+    TranscriptionResult:
+      type: object
+      required: [job_id, format, text]
+      properties:
+        job_id:
+          type: string
+        format:
+          type: string
+          enum: [srt, vtt, json, text]
+        text:
+          type: string
+        language:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: number
+          minimum: 0
+          nullable: true
+
+    JobEvent:
+      type: object
+      required: [id, type, created_at, data]
+      properties:
+        id:
+          type: string
+          example: evt_01J7MAGOEVENT
+        type:
+          type: string
+          enum: [job.completed, job.failed, job.cancelled]
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          required: [job]
+          properties:
+            job:
+              $ref: '#/components/schemas/Job'
+
+    Usage:
+      type: object
+      required: [period, requests, jobs, limits]
+      properties:
+        period:
+          type: string
+          example: 2026-08
+        requests:
+          type: integer
+          minimum: 0
+        jobs:
+          type: integer
+          minimum: 0
+        limits:
+          type: object
+          properties:
+            requests_per_minute: {type: integer, minimum: 1}
+            jobs_concurrent: {type: integer, minimum: 1}
+            max_upload_bytes: {type: integer, minimum: 1}
+
+    FieldError:
+      type: object
+      required: [field, reason]
+      properties:
+        field: {type: string}
+        reason: {type: string}
+        value:
+          description: Valor seguro para diagnóstico; nunca incluir segredos.
+          type: [string, number, boolean, 'null']
+
+    Problem:
+      type: object
+      required: [type, title, status, code, detail, request_id, retryable]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: https://viral.vr766.com/problems/invalid-request
+        title:
+          type: string
+          example: Invalid request
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          pattern: '^[A-Z0-9_]+$'
+          example: INVALID_ARGUMENT
+        detail:
+          type: string
+          description: Mensagem acionável sem stack trace ou caminho físico.
+        instance:
+          type: string
+          format: uri-reference
+          nullable: true
+        request_id:
+          type: string
+          example: req_01J7MAGOERROR
+        retryable:
+          type: boolean
+        retry_after_seconds:
+          type: integer
+          minimum: 1
+          nullable: true
+        field_errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+  responses:
+    BadRequest:
+      description: Requisição inválida.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Unauthorized:
+      description: Credencial ausente, inválida, expirada ou revogada.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Forbidden:
+      description: Credencial válida sem o escopo necessário ou sem acesso ao recurso.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotFound:
+      description: Recurso não encontrado ou não pertence ao consumidor.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Conflict:
+      description: Conflito de estado.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    IdempotencyConflict:
+      description: A Idempotency-Key foi usada com parâmetros diferentes.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    UnprocessableEntity:
+      description: Arquivo ou operação semanticamente inválida.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    UnsupportedMediaType:
+      description: Tipo de mídia não suportado.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    PayloadTooLarge:
+      description: Arquivo excede limite da conta ou endpoint.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    RateLimited:
+      description: Limite temporário atingido.
+      headers:
+        Retry-After:
+          description: Tempo mínimo em segundos até nova tentativa.
+          schema: {type: integer, minimum: 1}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Gone:
+      description: Resultado expirado e removido pela política de retenção.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    ServiceUnavailable:
+      description: Serviço temporariamente indisponível.
+      headers:
+        Retry-After:
+          description: Tempo mínimo em segundos até nova tentativa.
+          schema: {type: integer, minimum: 1}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    InternalError:
+      description: Falha interna sem detalhes de implementação.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}

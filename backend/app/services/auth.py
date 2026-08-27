@@ -6,6 +6,7 @@ para manter login, histórico e permissões.
 
 from __future__ import annotations
 
+import os
 import secrets
 import sqlite3
 from contextlib import contextmanager
@@ -19,10 +20,50 @@ from werkzeug.security import check_password_hash, generate_password_hash
 COOKIE_NAME = "viral_sid"
 SESSION_TTL_DAYS = 30
 
-OWNER_EMAIL = "mago@dono.site"
-OWNER_PASSWORD = "123698745"
-DEMO_EMAIL = "usuario@viral.site"
-DEMO_PASSWORD = "123698745"
+
+
+def _bootstrap_users() -> list[dict[str, Any]]:
+    """Retorna contas iniciais somente quando o operador as fornece por ambiente."""
+    owner_email = os.environ.get("OWNER_EMAIL", "").strip().lower()
+    owner_password = os.environ.get("OWNER_PASSWORD", "")
+    if not owner_email or not owner_password:
+        raise RuntimeError(
+            "Banco de autenticação vazio: defina OWNER_EMAIL e OWNER_PASSWORD "
+            "antes do primeiro boot; credenciais padrão não são permitidas."
+        )
+    if len(owner_password) < 12:
+        raise RuntimeError("OWNER_PASSWORD precisa ter pelo menos 12 caracteres.")
+
+    users = [
+        {
+            "id": "u_owner_mago",
+            "email": owner_email,
+            "name": os.environ.get("OWNER_NAME", "Mago").strip() or "Mago",
+            "role": "owner",
+            "password_hash": generate_password_hash(owner_password),
+            "protected": 1,
+        }
+    ]
+
+    demo_email = os.environ.get("DEMO_EMAIL", "").strip().lower()
+    demo_password = os.environ.get("DEMO_PASSWORD", "")
+    if demo_email or demo_password:
+        if not demo_email or len(demo_password) < 12:
+            raise RuntimeError(
+                "DEMO_EMAIL e DEMO_PASSWORD devem ser definidos juntos; "
+                "DEMO_PASSWORD precisa ter pelo menos 12 caracteres."
+            )
+        users.append(
+            {
+                "id": "u_common_demo",
+                "email": demo_email,
+                "name": os.environ.get("DEMO_NAME", "Operador").strip() or "Operador",
+                "role": "common",
+                "password_hash": generate_password_hash(demo_password),
+                "protected": 0,
+            }
+        )
+    return users
 
 
 def _db_path() -> Path:
@@ -95,24 +136,7 @@ def _seed(conn: sqlite3.Connection) -> None:
         return
 
     now = _now()
-    users = [
-        {
-            "id": "u_owner_mago",
-            "email": OWNER_EMAIL,
-            "name": "Mago",
-            "role": "owner",
-            "password_hash": generate_password_hash(OWNER_PASSWORD),
-            "protected": 1,
-        },
-        {
-            "id": "u_common_demo",
-            "email": DEMO_EMAIL,
-            "name": "Operador",
-            "role": "common",
-            "password_hash": generate_password_hash(DEMO_PASSWORD),
-            "protected": 0,
-        },
-    ]
+    users = _bootstrap_users()
     conn.executemany(
         """
         INSERT INTO auth_users (
