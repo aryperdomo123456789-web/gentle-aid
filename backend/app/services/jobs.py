@@ -214,8 +214,20 @@ def _heal(job: dict[str, Any]) -> dict[str, Any]:
     return job
 
 
+def _has_persistent_queue_entry(job_id: str) -> bool:
+    """Retorna se um job público ainda tem intenção persistente de execução."""
+    try:
+        from . import persistent_queue
+
+        entry = persistent_queue.get(job_id)
+        return bool(entry and entry.get("status") in {"queued", "running"})
+    except Exception:
+        # O schema pode ainda não existir em instalações legadas.
+        return False
+
+
 def reconcile_orphans() -> int:
-    """Roda no boot: fecha jobs que ficaram presos em `running` após restart."""
+    """Roda no boot: fecha jobs órfãos, preservando jobs na fila persistente."""
     healed = 0
     try:
         files = list(config.jobs_dir.glob("*.json"))
@@ -230,6 +242,8 @@ def reconcile_orphans() -> int:
             continue
         data = _normalize(data)
         if data.get("status") in TERMINAL_STATUSES:
+            continue
+        if _has_persistent_queue_entry(str(data.get("job_id") or "")):
             continue
         # No boot, qualquer job não-terminal sem dono vivo é órfão — mesmo recente.
         owner_pid = data.get("owner_pid")
@@ -384,8 +398,40 @@ def stage(
     _event(job_id, "stage", message or f"Etapa: {name}", stage=name)
 
 
+def _load_from_disk(job_id: str) -> dict[str, Any] | None:
+    file = _job_file(job_id)
+    try:
+        data = json.loads(file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict) or not data.get("job_id"):
+        return None
+    return _normalize(data)
+
+
+def load(job_id: str) -> dict[str, Any] | None:
+    """Carrega um job persistido no cache do processo atual."""
+    with _lock:
+        existing = _jobs.get(job_id)
+        if existing:
+            return _normalize(dict(existing))
+    data = _load_from_disk(job_id)
+    if not data:
+        return None
+    with _lock:
+        _jobs[job_id] = data
+        _cancel_events.setdefault(job_id, threading.Event())
+        _done_events.setdefault(job_id, threading.Event())
+    return _normalize(dict(data))
+
+
 def update(job_id: str, **fields: Any) -> None:
     previous_status = None
+    with _lock:
+        job = _jobs.get(job_id)
+    if not job:
+        if not load(job_id):
+            return
     with _lock:
         job = _jobs.get(job_id)
         if not job:
