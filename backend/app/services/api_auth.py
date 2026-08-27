@@ -15,6 +15,7 @@ from uuid import uuid4
 from flask import Response, g, jsonify, request
 
 from . import release_keys
+from .api_errors import catalog_entry, problem_code
 
 _VIEW = TypeVar("_VIEW", bound=Callable[..., Any])
 
@@ -43,20 +44,21 @@ def problem_response(
     code: str,
     detail: str,
     *,
-    retryable: bool = False,
+    retryable: bool | None = None,
     retry_after_seconds: int | None = None,
     field_errors: list[dict[str, Any]] | None = None,
 ) -> Response:
     """Cria uma resposta RFC 9457-like sem detalhes internos ou segredos."""
+    entry = catalog_entry(code)
     payload: dict[str, Any] = {
-        "type": _problem_type(code),
-        "title": code.replace("_", " ").title(),
+        "type": problem_code(code),
+        "title": entry["title"],
         "status": status,
         "code": code,
         "detail": detail,
         "instance": request.path,
         "request_id": request_id(),
-        "retryable": retryable,
+        "retryable": entry["retryable"] if retryable is None else bool(retryable),
         "retry_after_seconds": retry_after_seconds,
         "field_errors": field_errors or [],
     }

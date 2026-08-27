@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -18,7 +19,7 @@ sys.path.insert(0, str(REPO / "backend"))
 
 from app import create_app
 from app.config import Config
-from app.services import idempotency, release_keys
+from app.services import idempotency, jobs, release_keys
 
 
 class ApiV1ContractTests(unittest.TestCase):
@@ -105,6 +106,21 @@ class ApiV1ContractTests(unittest.TestCase):
         first = self.post_transcription(headers)
         self.assertEqual(first.status_code, 202)
         job_id = first.json["id"]
+        self.assertEqual(first.json["object"], "operation")
+        self.assertTrue(first.json["name"].startswith("operations/"))
+        self.assertFalse(first.json["done"])
+        self.assertEqual(first.json["status"], "PENDING")
+        self.assertIn("metadata", first.json)
+        self.assertIsNone(first.json["response"])
+        self.assertIsNone(first.json["error"])
+
+        polling = self.client.get(
+            f"/api/v1/operations/{job_id}",
+            headers=self.api_headers(),
+        )
+        self.assertEqual(polling.status_code, 200)
+        self.assertEqual(polling.json["name"], first.json["name"])
+        self.assertIn("done", polling.json)
 
         replay = self.post_transcription(headers)
         self.assertEqual(replay.status_code, 202)
@@ -136,6 +152,76 @@ class ApiV1ContractTests(unittest.TestCase):
             headers={"X-API-Key": other},
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_failed_operation_uses_stable_error_catalog(self) -> None:
+        headers = self.api_headers(**{"Idempotency-Key": "local-failure-12345"})
+        original_submit = jobs.submit
+        jobs.submit = lambda _job_id, worker: jobs._run_job(_job_id, worker)
+        original_transcribe = __import__("app.services.transcribe", fromlist=["transcribe"]).transcribe
+        module = __import__("app.services.transcribe", fromlist=["transcribe"])
+        module.transcribe = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("provider detail must not leak"))
+        try:
+            created = self.post_transcription(headers)
+            self.assertEqual(created.status_code, 202)
+            operation = self.client.get(
+                f"/api/v1/operations/{created.json['id']}",
+                headers=self.api_headers(),
+            )
+            self.assertEqual(operation.status_code, 200)
+            self.assertTrue(operation.json["done"])
+            self.assertEqual(operation.json["status"], "FAILED")
+            self.assertEqual(operation.json["error"]["code"], "JOB_FAILED")
+            self.assertEqual(operation.json["error"]["retryable"], False)
+            self.assertIn("type", operation.json["error"])
+            self.assertNotIn("provider detail", operation.get_data(as_text=True))
+        finally:
+            module.transcribe = original_transcribe
+            jobs.submit = original_submit
+
+    def test_cancel_operation_is_terminal_and_idempotent(self) -> None:
+        headers = self.api_headers(**{"Idempotency-Key": "local-cancel-12345"})
+        original_submit = jobs.submit
+        jobs.submit = lambda _job_id, _worker: None
+        try:
+            created = self.post_transcription(headers)
+            self.assertEqual(created.status_code, 202)
+            job_id = created.json["id"]
+            cancelled = self.client.post(
+                f"/api/v1/operations/{job_id}:cancel",
+                headers=self.api_headers(**{"Idempotency-Key": "local-cancel-request-12345"}),
+            )
+            self.assertEqual(cancelled.status_code, 202)
+            self.assertTrue(cancelled.json["done"])
+            self.assertEqual(cancelled.json["status"], "CANCELLED")
+            self.assertEqual(cancelled.json["error"]["code"], "CANCELLED")
+            self.assertEqual(cancelled.json["name"], f"operations/{job_id}")
+        finally:
+            jobs.submit = original_submit
+
+    def test_expired_operation_is_terminal_without_result(self) -> None:
+        key_info = release_keys.validate_key(self.full_key)
+        self.assertIsNotNone(key_info)
+        owner_id = key_info["id"]
+        job = jobs.create_job(
+            "api-transcription",
+            meta={"api_key_id": owner_id, "consumer_id": owner_id},
+        )
+        jobs.update(
+            job["job_id"],
+            status="done",
+            finished_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            expires_at=(datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(timespec="seconds"),
+            progress=100,
+        )
+        operation = self.client.get(
+            f"/api/v1/operations/{job['job_id']}",
+            headers=self.api_headers(),
+        )
+        self.assertEqual(operation.status_code, 200)
+        self.assertTrue(operation.json["done"])
+        self.assertEqual(operation.json["status"], "EXPIRED")
+        self.assertEqual(operation.json["error"]["code"], "RESULT_EXPIRED")
+        self.assertIsNone(operation.json["response"])
 
     def test_invalid_output_format_is_rejected(self) -> None:
         response = self.client.post(
