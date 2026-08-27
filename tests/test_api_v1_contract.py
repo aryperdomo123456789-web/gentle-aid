@@ -15,6 +15,7 @@ os.environ["VIRAL_STORAGE"] = str(STORAGE)
 os.environ["SECRET_KEY"] = "local-test-secret-" + ("x" * 40)
 os.environ["OWNER_EMAIL"] = "owner@example.test"
 os.environ["OWNER_PASSWORD"] = "local-owner-password-123"
+os.environ["API_MAX_CONCURRENT_JOBS"] = "100"
 sys.path.insert(0, str(REPO / "backend"))
 
 from app import create_app

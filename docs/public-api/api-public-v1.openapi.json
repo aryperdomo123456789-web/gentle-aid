@@ -1450,6 +1450,10 @@
             "type": "number",
             "minimum": 0
           },
+          "active_jobs": {
+            "type": "integer",
+            "minimum": 0
+          },
           "limits": {
             "type": "object",
             "required": [

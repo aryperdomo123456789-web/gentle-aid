@@ -135,6 +135,11 @@ ERROR_CATALOG: dict[str, dict[str, Any]] = {
         "title": "Daily cost limit exceeded",
         "retryable": True,
     },
+    "CONCURRENT_JOB_LIMIT_EXCEEDED": {
+        "http_status": 429,
+        "title": "Concurrent job limit exceeded",
+        "retryable": True,
+    },
     "USAGE_STORE_UNAVAILABLE": {
         "http_status": 503,
         "title": "Usage store unavailable",

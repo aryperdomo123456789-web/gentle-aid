@@ -481,6 +481,7 @@ def get_job(job_id: str):
 
 @bp.post("/operations/<job_id>:cancel")
 @require_api_key("jobs:write")
+@rate_limits.enforce()
 def cancel_operation(job_id: str):
     return cancel_job(job_id)
 
@@ -502,6 +503,10 @@ def cancel_job(job_id: str):
     if replay is not None:
         return replay
     cancelled = jobs.request_cancel(job_id) or jobs.get(job_id)
+    try:
+        rate_limits.release_active_job(_key_owner(), job_id=job_id)
+    except rate_limits.UsageUnavailable:
+        return problem_response(503, "USAGE_STORE_UNAVAILABLE", "O ledger de uso está temporariamente indisponível.", retryable=True, retry_after_seconds=5)
     public = _public_job(cancelled or job)
     try:
         idempotency.record(

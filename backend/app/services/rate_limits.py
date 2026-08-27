@@ -174,6 +174,14 @@ def _sum(conn: sqlite3.Connection, consumer_id: str, kind: str, start: str) -> f
     return float(row["total"] if row else 0)
 
 
+def _active_count(conn: sqlite3.Connection, consumer_id: str) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS total FROM api_usage_events WHERE consumer_id = ? AND kind = 'active_job'",
+        (str(consumer_id),),
+    ).fetchone()
+    return int(row["total"] if row else 0)
+
+
 def snapshot(consumer_id: str) -> dict[str, Any]:
     check_ready()
     now = _now()
@@ -182,6 +190,7 @@ def snapshot(consumer_id: str) -> dict[str, Any]:
         jobs_count = _sum(conn, consumer_id, "job", _day_start(now))
         audio_seconds = _sum(conn, consumer_id, "audio_seconds", _day_start(now))
         cost_units = _sum(conn, consumer_id, "cost_units", _day_start(now))
+        active_jobs = _active_count(conn, consumer_id)
     configured = limits()
     return {
         "period": "utc",
@@ -191,6 +200,7 @@ def snapshot(consumer_id: str) -> dict[str, Any]:
         "jobs": int(jobs_count),
         "audio_seconds": int(audio_seconds),
         "cost_units": round(cost_units, 3),
+        "active_jobs": active_jobs,
         "limits": configured,
     }
 
@@ -246,6 +256,18 @@ def reserve_job(
         if existing:
             return snapshot(consumer_id)
 
+        active_row = conn.execute(
+            "SELECT COUNT(*) AS total FROM api_usage_events WHERE consumer_id = ? AND kind = 'active_job'",
+            (str(consumer_id),),
+        ).fetchone()
+        active_jobs = int(active_row["total"] if active_row else 0)
+        if active_jobs >= configured["max_concurrent_jobs"]:
+            raise LimitExceeded(
+                "CONCURRENT_JOB_LIMIT_EXCEEDED",
+                30,
+                "Limite de jobs concorrentes atingido para esta API key.",
+            )
+
         jobs_count = _sum(conn, consumer_id, "job", _day_start(now))
         audio_used = _sum(conn, consumer_id, "audio_seconds", _day_start(now))
         cost_used = _sum(conn, consumer_id, "cost_units", _day_start(now))
@@ -267,6 +289,13 @@ def reserve_job(
         conn.execute(
             """
             INSERT INTO api_usage_events (consumer_id, kind, units, job_id, idempotency_key, created_at)
+            VALUES (?, 'active_job', 1, ?, NULL, ?)
+            """,
+            (str(consumer_id), str(job_id), created),
+        )
+        conn.execute(
+            """
+            INSERT INTO api_usage_events (consumer_id, kind, units, job_id, idempotency_key, created_at)
             VALUES (?, 'audio_seconds', ?, ?, NULL, ?)
             """,
             (str(consumer_id), audio, str(job_id), created),
@@ -279,6 +308,16 @@ def reserve_job(
             (str(consumer_id), cost, str(job_id), created),
         )
     return snapshot(consumer_id)
+
+
+def release_active_job(consumer_id: str, *, job_id: str) -> None:
+    """Libera a vaga de concorrência quando o job deixa de estar ativo."""
+    check_ready()
+    with _conn() as conn:
+        conn.execute(
+            "DELETE FROM api_usage_events WHERE consumer_id = ? AND job_id = ? AND kind = 'active_job'",
+            (str(consumer_id), str(job_id)),
+        )
 
 
 def release_job(consumer_id: str, *, job_id: str, idempotency_key: str) -> None:

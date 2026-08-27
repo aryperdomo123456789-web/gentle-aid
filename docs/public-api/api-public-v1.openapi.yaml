@@ -871,6 +871,9 @@ components:
         cost_units:
           type: number
           minimum: 0
+        active_jobs:
+          type: integer
+          minimum: 0
         limits:
           type: object
           required: [requests_per_minute, jobs_per_day, audio_seconds_per_day, cost_units_per_day, max_concurrent_jobs]

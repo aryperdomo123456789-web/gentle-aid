@@ -16,11 +16,25 @@ from typing import Any
 
 from app import create_app
 from app.config import config
-from app.services import jobs, persistent_queue, transcribe
+from app.services import jobs, persistent_queue, rate_limits, transcribe
 from app.services.api_errors import operation_error
 
 _STOP = threading.Event()
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
+
+
+def _release_active_slot(job_id: str) -> None:
+    job = jobs.get(job_id) or {}
+    meta = job.get("meta") or {}
+    consumer_id = meta.get("api_key_id") or meta.get("consumer_id")
+    if not consumer_id:
+        return
+    try:
+        rate_limits.release_active_job(str(consumer_id), job_id=job_id)
+    except rate_limits.UsageUnavailable:
+        return
+
+
 LEASE_SECONDS = max(60, int(os.environ.get("API_QUEUE_LEASE_SECONDS", "900")))
 POLL_SECONDS = max(1, float(os.environ.get("API_QUEUE_POLL_SECONDS", "2")))
 
@@ -109,6 +123,7 @@ def _process(item: dict[str, Any]) -> None:
         if jobs.is_cancelled(job_id):
             jobs.update(job_id, status="cancelled", stage="cancelado", message="Job cancelado antes de iniciar.", finished_at=jobs._now())
             persistent_queue.complete(job_id, WORKER_ID)
+            _release_active_slot(job_id)
             source.unlink(missing_ok=True)
             return
         jobs.update(
@@ -126,10 +141,12 @@ def _process(item: dict[str, Any]) -> None:
         if job.get("status") not in jobs.TERMINAL_STATUSES:
             jobs.update(job_id, status="done", stage="concluido", message="Concluído.", progress=100, finished_at=jobs._now())
         persistent_queue.complete(job_id, WORKER_ID)
+        _release_active_slot(job_id)
         source.unlink(missing_ok=True)
     except jobs.JobCancelled:
         jobs.update(job_id, status="cancelled", stage="cancelado", message="Job cancelado pelo operador.", finished_at=jobs._now())
         persistent_queue.complete(job_id, WORKER_ID)
+        _release_active_slot(job_id)
         source.unlink(missing_ok=True)
     except Exception as exc:
         code, retryable = _retryable(exc)
@@ -144,6 +161,7 @@ def _process(item: dict[str, Any]) -> None:
                 retryable=False,
                 finished_at=jobs._now(),
             )
+            _release_active_slot(job_id)
             source.unlink(missing_ok=True)
         else:
             jobs.update(job_id, status="queued", stage="aguardando_retry", message="Falha temporária; retry agendado.", error_code=code, retryable=True)
