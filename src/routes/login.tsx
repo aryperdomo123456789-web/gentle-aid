@@ -21,8 +21,8 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const auth = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("mago@dono.site");
-  const [password, setPassword] = useState("123698745");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -88,7 +88,7 @@ function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="username"
-                placeholder="mago@dono.site"
+                placeholder="seu e-mail administrativo"
                 required
                 className="h-[58px] rounded-[20px] border-2 border-cyan-400/80 bg-[#e8efff] px-4 text-[15px] text-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/20"
               />

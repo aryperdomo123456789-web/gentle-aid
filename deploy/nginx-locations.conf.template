@@ -19,7 +19,24 @@ location /api/ {
     proxy_buffering off;
 }
 
-# ---- Arquivos finais servidos direto do disco ----
+# ---- Isolamento de storage sensível ----
+# Bloqueia banco, logs de jobs e uploads de origem antes do alias legado.
+# O alias de outputs permanece temporariamente para não quebrar o painel atual;
+# a retirada total ocorrerá quando todos os consumidores usarem rotas autenticadas.
+location ^~ /downloads/_config/ {
+    add_header Cache-Control "no-store" always;
+    return 404;
+}
+location ^~ /downloads/_jobs/ {
+    add_header Cache-Control "no-store" always;
+    return 404;
+}
+location ^~ /downloads/_uploads/ {
+    add_header Cache-Control "no-store" always;
+    return 404;
+}
+
+# ---- Outputs legados — migração pendente para resultado autenticado ----
 location /downloads/ {
     alias __STORAGE__/;
     add_header Content-Disposition "attachment";

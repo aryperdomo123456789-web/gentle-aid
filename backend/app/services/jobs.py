@@ -71,6 +71,7 @@ TOOL_LABELS = {
     "canva": "Limpeza Canva",
     "studio": "Estúdio de Vídeo IA",
     "recap": "Recap Narrado",
+    "transcribe": "Transcrição",
 }
 
 MAX_EVENTS = 600

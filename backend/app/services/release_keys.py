@@ -21,6 +21,16 @@ from flask import current_app, has_app_context
 from ..config import config
 
 KEY_PREFIX = "mago_"
+KNOWN_SCOPES = {
+    "catalog:read",
+    "transcribe:write",
+    "jobs:read",
+    "jobs:write",
+    "results:read",
+    "usage:read",
+    "public",
+    "admin",
+}
 
 
 def _db_path() -> Path:
@@ -151,6 +161,9 @@ def create_key(
         raise ValueError("A validade precisa ficar entre 1 e 3650 dias.")
 
     clean_scopes = _normalize_scopes(scopes)
+    unknown_scopes = sorted(set(clean_scopes) - KNOWN_SCOPES)
+    if unknown_scopes:
+        raise ValueError(f"Escopo(s) desconhecido(s): {', '.join(unknown_scopes)}.")
     token = f"{KEY_PREFIX}{secrets.token_urlsafe(32).replace('-', '').replace('_', '')}"
     now = _now()
     expires_at = (datetime.now(timezone.utc) + timedelta(days=expires_in_days)).isoformat(

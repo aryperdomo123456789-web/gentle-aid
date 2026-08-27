@@ -22,6 +22,13 @@ Reels e Shorts.
 Todo job devolve `202` com o objeto do job; o frontend faz polling em
 `GET /api/jobs/<id>` até `done`/`error` e mostra log, hashes MD5 e download.
 
+## Documentação
+
+- [Mapeamento do produto autenticado e potencial de API](docs/internal/MAPEAMENTO_PRODUTO_API.md)
+- [Memória interna da Mago API v1](docs/internal/MAGO_API.md)
+- [Documentação pública da API v1](docs/public-api/README.md)
+- [Contrato OpenAPI 3.1 em YAML](docs/public-api/api-public-v1.openapi.yaml)
+
 ## Estrutura
 
 ```
