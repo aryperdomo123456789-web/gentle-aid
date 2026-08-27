@@ -127,6 +127,34 @@ class ApiV1ContractTests(unittest.TestCase):
         self.assertEqual(replay.json["id"], job_id)
         self.assertEqual(replay.headers.get("X-Idempotent-Replay"), "true")
 
+    def test_correlation_headers_do_not_change_idempotency(self) -> None:
+        key = "local-correlation-12345"
+        first = self.post_transcription(
+            self.api_headers(
+                **{
+                    "Idempotency-Key": key,
+                    "X-Client-Request-Id": "checkout-attempt-a",
+                    "X-Request-Id": "client-supplied-a",
+                }
+            )
+        )
+        self.assertEqual(first.status_code, 202)
+        second = self.post_transcription(
+            self.api_headers(
+                **{
+                    "Idempotency-Key": key,
+                    "X-Client-Request-Id": "checkout-attempt-b",
+                    "X-Request-Id": "client-supplied-b",
+                }
+            )
+        )
+        self.assertEqual(second.status_code, 202)
+        self.assertEqual(second.json["id"], first.json["id"])
+        self.assertEqual(second.headers.get("X-Idempotent-Replay"), "true")
+        self.assertTrue(first.headers.get("X-Request-Id"))
+        self.assertTrue(second.headers.get("X-Request-Id"))
+        self.assertNotEqual(first.headers.get("X-Request-Id"), second.headers.get("X-Request-Id"))
+
     def test_same_idempotency_key_with_different_payload_conflicts(self) -> None:
         headers = self.api_headers(**{"Idempotency-Key": "local-conflict-12345"})
         first = self.post_transcription(headers, filename="first.mp3")

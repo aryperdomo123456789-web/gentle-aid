@@ -61,6 +61,14 @@ Authorization: Bearer mago_<sua-chave>
 
 Envie a chave somente por HTTPS. Não use `/api/access-keys` ou a interface owner no código do consumidor; essas superfícies são administrativas. A aplicação consumidora deve armazenar o token em secret manager ou variável de ambiente protegida.
 
+### Idempotência e correlação são coisas diferentes
+
+`Idempotency-Key` é um identificador da **intenção de escrita**. Ele é obrigatório para criar ou cancelar operações, é armazenado junto do consumidor e do fingerprint do payload e serve para que um retry não crie um segundo job. A mesma chave com o mesmo payload devolve a mesma decisão; a mesma chave com payload diferente devolve `409 IDEMPOTENCY_CONFLICT`.
+
+`X-Request-Id` é um identificador de **uma requisição HTTP específica**. Ele é gerado pelo servidor, devolvido na resposta e usado para suporte, logs e rastreabilidade. Cada tentativa pode receber um novo `X-Request-Id`, inclusive quando o servidor devolve um replay idempotente. O cliente não deve usar esse valor para deduplicação e não deve depender de seu conteúdo.
+
+`X-Client-Request-Id` é opcional e serve apenas para o consumidor correlacionar a chamada com seu próprio sistema. Ele não altera o fingerprint de idempotência. Um valor enviado pelo cliente no header `X-Request-Id` também não controla o identificador retornado pela API.
+
 ### Escopos
 
 A chave receberá apenas os escopos necessários. A tabela abaixo é o vocabulário inicial proposto:
