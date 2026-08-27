@@ -1,0 +1,11 @@
+[Unit]
+Description=Ecossistema Viral — monitoramento periódico da rota Groq
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=viral-groq-route-monitor.service
+
+[Install]
+WantedBy=timers.target

@@ -166,16 +166,21 @@ if command -v systemctl >/dev/null 2>&1; then
   render "$SCRIPT_DIR/viral-auto-update.timer.template" > /etc/systemd/system/viral-auto-update.timer
   render "$SCRIPT_DIR/viral-backup-mirror.service.template" > /etc/systemd/system/viral-backup-mirror.service
   render "$SCRIPT_DIR/viral-backup-mirror.timer.template" > /etc/systemd/system/viral-backup-mirror.timer
+  render "$SCRIPT_DIR/viral-groq-route-monitor.service.template" > /etc/systemd/system/viral-groq-route-monitor.service
+  render "$SCRIPT_DIR/viral-groq-route-monitor.timer.template" > /etc/systemd/system/viral-groq-route-monitor.timer
   systemctl daemon-reload
   systemctl enable viral-api viral-web viral-worker >/dev/null 2>&1 || true
   systemctl enable viral-auto-update.timer >/dev/null 2>&1 || true
   systemctl enable viral-backup-mirror.timer >/dev/null 2>&1 || true
+  systemctl enable viral-groq-route-monitor.timer >/dev/null 2>&1 || true
   systemctl restart viral-api viral-web
   systemctl start viral-auto-update.timer >/dev/null 2>&1 || true
   systemctl start viral-backup-mirror.timer >/dev/null 2>&1 || true
+  systemctl start viral-groq-route-monitor.timer >/dev/null 2>&1 || true
   ok "viral-api e viral-web ativos; viral-worker preparado para iniciar após a migração da fila"
   ok "timer de auto-update ativo"
   ok "timer de backup mirror ativo"
+  ok "timer de monitoramento da rota Groq ativo"
 else
   warn "systemctl indisponível — inicie manualmente os serviços."
 fi
