@@ -3,11 +3,11 @@
 ## Documentação pública de integração
 
 **Versão do documento:** 0.1.0-alpha
-**Status:** alpha controlada — transcrição v1 e envelope de operação longa publicados; expansão da API ainda condicionada aos gates operacionais
+**Status:** alpha controlada — transcrição v1, envelope de operação longa, fila persistente e limites por consumidor publicados; expansão comercial ainda condicionada aos gates operacionais
 **Última revisão:** 27 de agosto de 2026
 **Base prevista:** `https://viral.vr766.com/api/v1`
 
-> **Aviso de disponibilidade.** Este documento descreve a Mago API v1 em alpha controlada. `GET /api/v1/health`, `GET /api/v1/capabilities`, `POST /api/v1/transcriptions`, consulta/cancelamento de operações, entrega protegida e OpenAPI estão publicados no ambiente principal. Rate limit comercial, quotas, paginação por cursor e fila persistente ainda não devem ser tratados como garantias de disponibilidade. Consulte a seção [Estado de lançamento](#estado-de-lançamento) antes de iniciar uma integração.
+> **Aviso de disponibilidade.** Este documento descreve a Mago API v1 em alpha controlada. `GET /api/v1/health`, `GET /api/v1/capabilities`, `POST /api/v1/transcriptions`, consulta/cancelamento de operações, entrega protegida e OpenAPI estão publicados no ambiente principal. Rate limit, quota diária e fila persistente estão ativos com valores conservadores; não há SLA comercial. Consulte a seção [Estado de lançamento](#estado-de-lançamento) antes de iniciar uma integração.
 
 ## Visão geral
 
@@ -17,7 +17,7 @@ O contrato segue princípios usados por APIs maduras: operações longas retorna
 
 ## Estado de lançamento
 
-A API Hub documentada no legado prevê uma camada com `X-API-Key`, `Authorization: Bearer`, catálogo e endpoints públicos. A implementação atual tem uma tela owner para gerar e revogar chaves em `/api-hub/chaves`, um endpoint administrativo interno em `/api/access-keys` e a superfície pública alpha em `/api/v1`. O envelope de operação longa foi adicionado sem remover os aliases `/jobs/*`; quotas comerciais, fila persistente e SLA continuam fora da garantia alpha.
+A API Hub documentada no legado prevê uma camada com `X-API-Key`, `Authorization: Bearer`, catálogo e endpoints públicos. A implementação atual tem uma tela owner para gerar e revogar chaves em `/api-hub/chaves`, um endpoint administrativo interno em `/api/access-keys` e a superfície pública alpha em `/api/v1`. O envelope de operação longa foi adicionado sem remover os aliases `/jobs/*`; limites técnicos por chave estão ativos, enquanto billing, planos, webhooks e SLA comercial continuam fora da garantia alpha.
 
 Até que o checklist abaixo esteja verde, a documentação deve permanecer marcada como **Alpha**:
 
@@ -28,9 +28,9 @@ Até que o checklist abaixo esteja verde, a documentação deve permanecer marca
 | Consulta segura | Consumidor só vê operações criadas pela sua chave | Implementado |
 | Resultado protegido | Nenhum caminho físico ou arquivo interno é público | Implementado; outputs legados em migração |
 | OpenAPI publicado | `/api/docs` e `/api/openapi.json` refletem o runtime | Publicado |
-| Limites | Rate limit, quota de upload, concorrência e custo definidos | Parcial; limite de upload e concorrência ativos |
+| Limites | Rate limit, quota de upload, concorrência e custo definidos | Implementado com defaults conservadores e configuração por ambiente |
 | Idempotência | Retry do mesmo POST não duplica job | Implementado e testado |
-| Testes | Autorização, isolamento, erro, retry, expiração e carga cobertos | Contrato e segurança cobertos; carga pendente |
+| Testes | Autorização, isolamento, erro, retry, expiração, fila e limites cobertos | Contrato, fila e limites cobertos; provider real e carga pendentes |
 
 ## URL base e versões
 
@@ -231,6 +231,23 @@ curl "https://viral.vr766.com/api/v1/jobs/job_01J7MAGOTRANSCRIBE/result?format=s
 ```
 
 A API nunca deve devolver caminho físico do servidor, nome interno de pasta, JSON privado de job ou link permanente sem autorização. O resultado pode ser transmitido pela API ou entregue por URL assinada com expiração curta. Depois do TTL, o resultado retorna `410 Gone` e o consumidor precisa reenviar o job.
+
+## Rate limit, quotas e custo
+
+As rotas autenticadas aplicam um limite fixo por API key e devolvem headers de transparência quando a chave é válida:
+
+```http
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 59
+X-Quota-Jobs-Limit: 100
+X-Quota-Jobs-Used: 1
+X-Quota-Audio-Seconds-Limit: 3600
+X-Quota-Audio-Seconds-Used: 42
+X-Quota-Cost-Units-Limit: 3600
+X-Quota-Cost-Units-Used: 1
+```
+
+Os defaults são política técnica de alpha, não preço comercial. `cost_units` é uma estimativa interna baseada em minutos de áudio; não representa a fatura final do provider. Quando o limite é excedido, a API responde `429` com `Retry-After` e um código estável: `RATE_LIMIT_EXCEEDED`, `DAILY_JOB_QUOTA_EXCEEDED`, `DAILY_AUDIO_QUOTA_EXCEEDED` ou `DAILY_COST_LIMIT_EXCEEDED`. `/usage` expõe o uso da própria chave.
 
 ## Webhooks
 

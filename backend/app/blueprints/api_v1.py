@@ -18,7 +18,7 @@ from flask import Blueprint, Response, jsonify, request, send_file, url_for
 from werkzeug.utils import secure_filename
 
 from ..config import config
-from ..services import idempotency, jobs, operations, transcribe, validation
+from ..services import idempotency, jobs, media, operations, persistent_queue, rate_limits, transcribe, validation
 from ..services.api_auth import current_api_key, problem_response, request_id, require_api_key
 
 bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
@@ -154,7 +154,14 @@ def _render_segments(segments: list[transcribe.Segment], output_format: str, lan
     return "\n".join(lines)
 
 
-def _run_transcription(job_id: str, source: Path, output_format: str, language: str) -> None:
+def _run_transcription(
+    job_id: str,
+    source: Path,
+    output_format: str,
+    language: str,
+    *,
+    cleanup_source: bool = True,
+) -> None:
     try:
         jobs.stage(job_id, "transcribing", "Transcrevendo o arquivo.", progress=10)
         segments, detected = transcribe.transcribe(
@@ -179,7 +186,8 @@ def _run_transcription(job_id: str, source: Path, output_format: str, language: 
             api_output_format=output_format,
         )
     finally:
-        source.unlink(missing_ok=True)
+        if cleanup_source:
+            source.unlink(missing_ok=True)
 
 
 def _idempotency_key() -> str | Response:
@@ -238,6 +246,7 @@ def health():
 
 @bp.get("/capabilities")
 @require_api_key("catalog:read")
+@rate_limits.enforce()
 def capabilities():
     return jsonify(
         api_version="v1",
@@ -249,7 +258,11 @@ def capabilities():
                 "output_formats": sorted(_ALLOWED_OUTPUTS),
                 "limits": {
                     "max_upload_bytes": config.max_upload_bytes,
-                    "jobs_concurrent": config.max_workers,
+                    "jobs_concurrent": rate_limits.limits()["max_concurrent_jobs"],
+                    "requests_per_minute": rate_limits.limits()["requests_per_minute"],
+                    "jobs_per_day": rate_limits.limits()["jobs_per_day"],
+                    "audio_seconds_per_day": rate_limits.limits()["audio_seconds_per_day"],
+                    "cost_units_per_day": rate_limits.limits()["cost_units_per_day"],
                 },
             }
         ],
@@ -258,6 +271,7 @@ def capabilities():
 
 @bp.post("/transcriptions")
 @require_api_key("transcribe:write")
+@rate_limits.enforce()
 def create_transcription():
     key = _idempotency_key()
     if isinstance(key, Response):
@@ -287,6 +301,7 @@ def create_transcription():
     job_id = job["job_id"]
     expires_at = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(timespec="seconds")
     jobs.update(job_id, expires_at=expires_at)
+    quota_reserved = False
     try:
         source = validation.save_upload(
             uploaded,
@@ -299,17 +314,56 @@ def create_transcription():
             output_format=output_format,
             filename=uploaded.filename,
         )
+        try:
+            duration_seconds = max(0.1, float(media.probe_duration(source)))
+        except (OSError, ValueError, TypeError):
+            duration_seconds = 0.0
+        cost_units = max(1.0, round(duration_seconds / 60.0, 3))
+        jobs.update(
+            job_id,
+            estimated_audio_seconds=round(duration_seconds, 3),
+            estimated_cost_units=cost_units,
+        )
         request.mago_job_id = job_id
         replay = _replay_or_reserve(key, fingerprint)
         if replay is not None:
             jobs.delete(job_id)
             return replay
 
-        public = _public_job(job)
-        jobs.submit(
+        try:
+            rate_limits.reserve_job(
+                _key_owner(),
+                job_id=job_id,
+                idempotency_key=key,
+                audio_seconds=duration_seconds,
+                cost_units=cost_units,
+            )
+            quota_reserved = True
+        except rate_limits.LimitExceeded as exc:
+            jobs.delete(job_id)
+            try:
+                idempotency.release(_key_owner(), key)
+            except idempotency.IdempotencyRecordUnavailable:
+                pass
+            return problem_response(
+                429,
+                exc.code,
+                exc.detail,
+                retryable=True,
+                retry_after_seconds=exc.retry_after_seconds,
+            )
+
+        public = _public_job(jobs.get(job_id) or job)
+        persistent_queue.enqueue(
             job_id,
-            lambda jid: _run_transcription(jid, source, output_format, language),
+            "api-transcription",
+            {
+                "source_path": str(source),
+                "output_format": output_format,
+                "language": language,
+            },
         )
+        jobs.update(job_id, queue="persistent", queue_status="queued")
         idempotency.record(
             _key_owner(),
             key,
@@ -320,7 +374,16 @@ def create_transcription():
     except validation.ValidationError as exc:
         jobs.delete(job_id)
         return problem_response(400, "INVALID_ARGUMENT", str(exc))
-    except (OSError, ValueError, idempotency.IdempotencyRecordUnavailable) as exc:
+    except (OSError, ValueError, persistent_queue.QueueUnavailable, rate_limits.UsageUnavailable, idempotency.IdempotencyRecordUnavailable) as exc:
+        if quota_reserved:
+            try:
+                rate_limits.release_job(_key_owner(), job_id=job_id, idempotency_key=key)
+            except rate_limits.UsageUnavailable:
+                pass
+        try:
+            persistent_queue.discard(job_id)
+        except persistent_queue.QueueUnavailable:
+            pass
         jobs.delete(job_id)
         try:
             idempotency.release(_key_owner(), key)
@@ -334,6 +397,15 @@ def create_transcription():
             retry_after_seconds=5,
         )
     except Exception:
+        if quota_reserved:
+            try:
+                rate_limits.release_job(_key_owner(), job_id=job_id, idempotency_key=key)
+            except rate_limits.UsageUnavailable:
+                pass
+        try:
+            persistent_queue.discard(job_id)
+        except persistent_queue.QueueUnavailable:
+            pass
         jobs.delete(job_id)
         try:
             idempotency.release(_key_owner(), key)
@@ -354,6 +426,7 @@ def create_transcription():
 
 @bp.get("/jobs")
 @require_api_key("jobs:read")
+@rate_limits.enforce()
 def list_jobs():
     try:
         page_size = int(request.args.get("page_size", "50"))
@@ -384,6 +457,7 @@ def list_jobs():
 
 @bp.get("/operations/<job_id>")
 @require_api_key("jobs:read")
+@rate_limits.enforce()
 def get_operation(job_id: str):
     if not _safe_job_id(job_id):
         return problem_response(404, "NOT_FOUND", "Operação não encontrada.")
@@ -395,6 +469,7 @@ def get_operation(job_id: str):
 
 @bp.get("/jobs/<job_id>")
 @require_api_key("jobs:read")
+@rate_limits.enforce()
 def get_job(job_id: str):
     if not _safe_job_id(job_id):
         return problem_response(404, "NOT_FOUND", "Job não encontrado.")
@@ -412,6 +487,7 @@ def cancel_operation(job_id: str):
 
 @bp.post("/jobs/<job_id>/cancel")
 @require_api_key("jobs:write")
+@rate_limits.enforce()
 def cancel_job(job_id: str):
     if not _safe_job_id(job_id):
         return problem_response(404, "NOT_FOUND", "Job não encontrado.")
@@ -445,6 +521,7 @@ def cancel_job(job_id: str):
 
 @bp.get("/jobs/<job_id>/result")
 @require_api_key("results:read")
+@rate_limits.enforce()
 def get_job_result(job_id: str):
     if not _safe_job_id(job_id):
         return problem_response(404, "NOT_FOUND", "Resultado não encontrado.")
@@ -482,15 +559,6 @@ def get_job_result(job_id: str):
 
 @bp.get("/usage")
 @require_api_key("usage:read")
+@rate_limits.enforce()
 def usage():
-    own = [job for job in jobs.list_jobs(limit=500) if _owns(job)]
-    return jsonify(
-        period="current",
-        requests=None,
-        jobs=len(own),
-        limits={
-            "requests_per_minute": 60,
-            "jobs_concurrent": config.max_workers,
-            "max_upload_bytes": config.max_upload_bytes,
-        },
-    )
+    return jsonify(rate_limits.usage(_key_owner()))

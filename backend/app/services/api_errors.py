@@ -115,6 +115,71 @@ ERROR_CATALOG: dict[str, dict[str, Any]] = {
         "title": "Internal error",
         "retryable": False,
     },
+    "RATE_LIMIT_EXCEEDED": {
+        "http_status": 429,
+        "title": "Rate limit exceeded",
+        "retryable": True,
+    },
+    "DAILY_JOB_QUOTA_EXCEEDED": {
+        "http_status": 429,
+        "title": "Daily job quota exceeded",
+        "retryable": True,
+    },
+    "DAILY_AUDIO_QUOTA_EXCEEDED": {
+        "http_status": 429,
+        "title": "Daily audio quota exceeded",
+        "retryable": True,
+    },
+    "DAILY_COST_LIMIT_EXCEEDED": {
+        "http_status": 429,
+        "title": "Daily cost limit exceeded",
+        "retryable": True,
+    },
+    "USAGE_STORE_UNAVAILABLE": {
+        "http_status": 503,
+        "title": "Usage store unavailable",
+        "retryable": True,
+    },
+    "QUEUE_UNAVAILABLE": {
+        "http_status": 503,
+        "title": "Queue unavailable",
+        "retryable": True,
+    },
+    "PROVIDER_AUTH_FAILED": {
+        "http_status": 502,
+        "title": "Provider authentication failed",
+        "retryable": False,
+    },
+    "PROVIDER_RATE_LIMITED": {
+        "http_status": 503,
+        "title": "Provider rate limited",
+        "retryable": True,
+    },
+    "PROVIDER_QUOTA_EXCEEDED": {
+        "http_status": 402,
+        "title": "Provider quota exceeded",
+        "retryable": False,
+    },
+    "PROVIDER_UNAVAILABLE": {
+        "http_status": 503,
+        "title": "Provider unavailable",
+        "retryable": True,
+    },
+    "PROVIDER_ERROR": {
+        "http_status": 502,
+        "title": "Provider error",
+        "retryable": False,
+    },
+    "WORKER_IO_ERROR": {
+        "http_status": 500,
+        "title": "Worker I/O error",
+        "retryable": False,
+    },
+    "WORKER_ERROR": {
+        "http_status": 500,
+        "title": "Worker error",
+        "retryable": False,
+    },
 }
 
 

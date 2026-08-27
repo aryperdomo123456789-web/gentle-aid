@@ -38,6 +38,11 @@ fi
 
 printf '\n\033[1;35m==>\033[0m Reiniciando serviços\n'
 systemctl restart viral-api viral-web
+if systemctl is-active --quiet viral-worker; then
+  systemctl restart viral-worker
+else
+  printf '\033[1;33m  !\033[0m viral-worker não está ativo — execute a migração da fila e inicie-o quando autorizado.\n'
+fi
 sleep 3
 curl -s http://127.0.0.1:"${VIRAL_API_PORT:-8010}"/api/health || true
 

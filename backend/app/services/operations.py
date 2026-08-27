@@ -69,6 +69,10 @@ def _metadata(job: dict[str, Any], state: str) -> dict[str, Any]:
         "started_at": job.get("started_at"),
         "finished_at": job.get("finished_at"),
         "expires_at": job.get("expires_at"),
+        "queue": job.get("queue") or "persistent",
+        "queue_status": job.get("queue_status"),
+        "estimated_audio_seconds": job.get("estimated_audio_seconds"),
+        "estimated_cost_units": job.get("estimated_cost_units"),
     }
     attempt = job.get("attempt")
     if isinstance(attempt, int) and attempt > 0:

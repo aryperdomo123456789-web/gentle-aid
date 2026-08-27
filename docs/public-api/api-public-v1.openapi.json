@@ -4,7 +4,7 @@
     "title": "Mago API",
     "version": "0.1.0-alpha",
     "summary": "API pública assíncrona para geração e processamento de mídia",
-    "description": "Contrato alpha publicado para o API Hub do gentle-aid. A transcrição v1 e\nsuas rotas de job/result estão disponíveis em produção sob rollout controlado;\nquotas comerciais, fila persistente e estabilidade de SLA ainda não são\ngarantias. Não anuncie este contrato como estável antes dos gates operacionais.\n\nO contrato privilegia operações assíncronas, API keys com escopo,\nidempotência, resultados protegidos, erros machine-readable e compatibilidade\nde longo prazo.\n",
+    "description": "Contrato alpha publicado para o API Hub do gentle-aid. A transcrição v1, suas\nrotas de operação/result, fila persistente e limites técnicos por consumidor\nestão disponíveis em alpha controlada. Billing, SLA comercial, webhooks e\nestabilidade de escala ainda não são garantias. Não anuncie este contrato\ncomo estável antes dos gates operacionais.\n\nO contrato privilegia operações assíncronas, API keys com escopo,\nidempotência, resultados protegidos, erros machine-readable e compatibilidade\nde longo prazo.\n",
     "contact": {
       "name": "Mago API Support",
       "url": "https://viral.vr766.com"
@@ -696,6 +696,17 @@
         "responses": {
           "200": {
             "description": "Uso agregado, sem dados de outros consumidores.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -818,6 +829,22 @@
         "schema": {
           "type": "string",
           "pattern": "^req_[A-Za-z0-9_-]+$"
+        }
+      },
+      "RateLimitLimit": {
+        "description": "Número máximo de requests autenticadas por minuto para a chave.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "example": 60
+        }
+      },
+      "RateLimitRemaining": {
+        "description": "Requests autenticadas restantes na janela atual.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "example": 59
         }
       }
     },
@@ -1111,6 +1138,29 @@
           "attempt": {
             "type": "integer",
             "minimum": 1
+          },
+          "queue": {
+            "type": "string",
+            "enum": [
+              "persistent"
+            ]
+          },
+          "queue_status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ]
+          },
+          "estimated_audio_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "estimated_cost_units": {
+            "type": "number",
+            "minimum": 0
           }
         }
       },
@@ -1363,14 +1413,26 @@
         "type": "object",
         "required": [
           "period",
+          "minute_started_at",
+          "day_started_at",
           "requests",
           "jobs",
+          "audio_seconds",
+          "cost_units",
           "limits"
         ],
         "properties": {
           "period": {
             "type": "string",
-            "example": "2026-08"
+            "const": "utc"
+          },
+          "minute_started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "day_started_at": {
+            "type": "string",
+            "format": "date-time"
           },
           "requests": {
             "type": "integer",
@@ -1380,14 +1442,41 @@
             "type": "integer",
             "minimum": 0
           },
+          "audio_seconds": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cost_units": {
+            "type": "number",
+            "minimum": 0
+          },
           "limits": {
             "type": "object",
+            "required": [
+              "requests_per_minute",
+              "jobs_per_day",
+              "audio_seconds_per_day",
+              "cost_units_per_day",
+              "max_concurrent_jobs"
+            ],
             "properties": {
               "requests_per_minute": {
                 "type": "integer",
                 "minimum": 1
               },
-              "jobs_concurrent": {
+              "jobs_per_day": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "audio_seconds_per_day": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "cost_units_per_day": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_concurrent_jobs": {
                 "type": "integer",
                 "minimum": 1
               },

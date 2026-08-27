@@ -1,0 +1,24 @@
+[Unit]
+Description=Ecossistema Viral — Mago API persistent worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__APP_DIR__/backend
+EnvironmentFile=-__APP_DIR__/.env
+Environment=PYTHONPATH=__APP_DIR__/backend
+Environment=VIRAL_ROOT=__APP_DIR__
+Environment=VIRAL_STORAGE=__STORAGE__
+ExecStart=__APP_DIR__/.venv/bin/python __APP_DIR__/backend/worker.py
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

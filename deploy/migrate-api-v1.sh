@@ -28,8 +28,10 @@ PYTHON="${PYTHON_BIN:-$APP_DIR/.venv/bin/python}"
 
 cd "$APP_DIR/backend"
 VIRAL_ROOT="$APP_DIR" "$PYTHON" - <<'PY'
-from app.services import idempotency
+from app.services import idempotency, persistent_queue, rate_limits
 
 idempotency.migrate()
-print("api_idempotency migration applied")
+persistent_queue.migrate()
+rate_limits.migrate()
+print("api_idempotency, api_queue and api_usage_events migrations applied")
 PY

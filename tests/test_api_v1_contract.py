@@ -19,7 +19,8 @@ sys.path.insert(0, str(REPO / "backend"))
 
 from app import create_app
 from app.config import Config
-from app.services import idempotency, jobs, release_keys
+from app.services import idempotency, jobs, persistent_queue, rate_limits, release_keys
+import worker as api_worker
 
 
 class ApiV1ContractTests(unittest.TestCase):
@@ -28,6 +29,8 @@ class ApiV1ContractTests(unittest.TestCase):
         cls.app = create_app(Config.from_env())
         cls.app.config.update(TESTING=True)
         idempotency.migrate()
+        persistent_queue.migrate()
+        rate_limits.migrate()
         cls.client = cls.app.test_client()
         owner = {"id": "u_owner_test", "email": "owner@example.test", "role": "owner"}
         cls.full_key = release_keys.create_key(
@@ -183,14 +186,15 @@ class ApiV1ContractTests(unittest.TestCase):
 
     def test_failed_operation_uses_stable_error_catalog(self) -> None:
         headers = self.api_headers(**{"Idempotency-Key": "local-failure-12345"})
-        original_submit = jobs.submit
-        jobs.submit = lambda _job_id, worker: jobs._run_job(_job_id, worker)
         original_transcribe = __import__("app.services.transcribe", fromlist=["transcribe"]).transcribe
         module = __import__("app.services.transcribe", fromlist=["transcribe"])
         module.transcribe = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("provider detail must not leak"))
         try:
             created = self.post_transcription(headers)
             self.assertEqual(created.status_code, 202)
+            item = persistent_queue.claim("test-worker-failure", lease_seconds=60, job_id=created.json["id"])
+            self.assertIsNotNone(item)
+            api_worker._process(item)
             operation = self.client.get(
                 f"/api/v1/operations/{created.json['id']}",
                 headers=self.api_headers(),
@@ -198,18 +202,17 @@ class ApiV1ContractTests(unittest.TestCase):
             self.assertEqual(operation.status_code, 200)
             self.assertTrue(operation.json["done"])
             self.assertEqual(operation.json["status"], "FAILED")
-            self.assertEqual(operation.json["error"]["code"], "JOB_FAILED")
+            self.assertEqual(operation.json["error"]["code"], "WORKER_ERROR")
             self.assertEqual(operation.json["error"]["retryable"], False)
             self.assertIn("type", operation.json["error"])
             self.assertNotIn("provider detail", operation.get_data(as_text=True))
         finally:
             module.transcribe = original_transcribe
-            jobs.submit = original_submit
 
     def test_cancel_operation_is_terminal_and_idempotent(self) -> None:
         headers = self.api_headers(**{"Idempotency-Key": "local-cancel-12345"})
-        original_submit = jobs.submit
-        jobs.submit = lambda _job_id, _worker: None
+        original_enqueue = persistent_queue.enqueue
+        persistent_queue.enqueue = lambda _job_id, _kind, _payload: True
         try:
             created = self.post_transcription(headers)
             self.assertEqual(created.status_code, 202)
@@ -224,7 +227,7 @@ class ApiV1ContractTests(unittest.TestCase):
             self.assertEqual(cancelled.json["error"]["code"], "CANCELLED")
             self.assertEqual(cancelled.json["name"], f"operations/{job_id}")
         finally:
-            jobs.submit = original_submit
+            persistent_queue.enqueue = original_enqueue
 
     def test_expired_operation_is_terminal_without_result(self) -> None:
         key_info = release_keys.validate_key(self.full_key)
