@@ -356,4 +356,10 @@ def check_ready() -> None:
 
 
 def usage(consumer_id: str) -> dict[str, Any]:
-    return snapshot(consumer_id)
+    value = snapshot(consumer_id)
+    try:
+        from . import persistence
+        value["persistence"] = persistence.backend_status()
+    except Exception:
+        value["persistence"] = {"backend": "sqlite", "active": "sqlite", "migration_ready": False}
+    return value
