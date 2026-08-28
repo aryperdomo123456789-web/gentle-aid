@@ -4,7 +4,7 @@
     "title": "Mago API",
     "version": "0.1.0-alpha",
     "summary": "API pública assíncrona para geração e processamento de mídia",
-    "description": "Contrato alpha publicado para o API Hub do gentle-aid. A transcrição v1, suas\nrotas de operação/result, fila persistente e limites técnicos por consumidor\nestão disponíveis em alpha controlada. Billing, SLA comercial, webhooks e\nestabilidade de escala ainda não são garantias. Não anuncie este contrato\ncomo estável antes dos gates operacionais.\n\nO contrato privilegia operações assíncronas, API keys com escopo,\nidempotência, resultados protegidos, erros machine-readable e compatibilidade\nde longo prazo. Entradas com mais de 10 minutos ou chunks intermediários\nacima de 25 MB usam particionamento sequencial com cortes próximos de silêncio\nquando o VAD baseado em FFmpeg encontra pontos adequados.\n",
+    "description": "Contrato alpha publicado para o API Hub do gentle-aid. A transcrição v1, suas\nrotas de operação/result, fila persistente e limites técnicos por consumidor\nestão disponíveis em beta comercial controlada. Billing por tenant, quotas\nmensais, webhooks assinados e retenção estão publicados; checkout externo,\nSLA financeiro e escala distribuída exigem configuração e contrato próprios.\n\nO contrato privilegia operações assíncronas, API keys com escopo,\nidempotência, resultados protegidos, erros machine-readable e compatibilidade\nde longo prazo. Entradas com mais de 10 minutos ou chunks intermediários\nacima de 25 MB usam particionamento sequencial com cortes próximos de silêncio\nquando o VAD baseado em FFmpeg encontra pontos adequados. Billing por tenant,\nquotas mensais, webhooks assinados e TTL de mídia estão disponíveis em beta;\ncheckout externo exige credenciais de provider configuradas no ambiente.\n",
     "contact": {
       "name": "Mago API Support",
       "url": "https://viral.vr766.com"
@@ -43,6 +43,10 @@
     {
       "name": "Usage",
       "description": "Uso e limites do consumidor autenticado."
+    },
+    {
+      "name": "Billing",
+      "description": "Planos, consumo comercial e webhooks de providers de cobrança."
     }
   ],
   "security": [
@@ -374,6 +378,150 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/billing/usage": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "operationId": "getBillingUsage",
+        "summary": "Consulta plano e consumo comercial do tenant",
+        "security": [
+          {
+            "ApiKeyAuth": [
+              "usage:read"
+            ]
+          },
+          {
+            "BearerAuth": [
+              "usage:read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plano, período, uso e saldo mensal, além da visão técnica da chave.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingUsageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/billing/webhooks/stripe": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "operationId": "receiveStripeBillingWebhook",
+        "summary": "Recebe evento assinado da Stripe",
+        "description": "Valida `Stripe-Signature`, deduplica event id e atualiza entitlements quando houver metadata.account_id e metadata.plan_code.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evento recebido ou replay idempotente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/billing/webhooks/mercado-pago": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "operationId": "receiveMercadoPagoBillingWebhook",
+        "summary": "Recebe notificação assinada do Mercado Pago",
+        "description": "Valida x-signature, x-request-id e data.id; eventos sem account_id são registrados mas não concedem acesso.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "data.id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notificação recebida ou replay idempotente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
@@ -1121,9 +1269,150 @@
           "minimum": 0,
           "example": 59
         }
+      },
+      "RateLimitReset": {
+        "description": "Unix timestamp do início da próxima janela UTC.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "example": 1788133680
+        }
       }
     },
     "schemas": {
+      "Plan": {
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "monthly_audio_minutes",
+          "monthly_clips",
+          "storage_bytes"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "starter",
+              "pro",
+              "agency"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "monthly_audio_minutes": {
+            "type": "number",
+            "minimum": 0
+          },
+          "monthly_clips": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "storage_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "requests_per_minute": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "jobs_per_day": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_concurrent_jobs": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "BillingUsage": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "plan",
+          "subscription_status",
+          "period_start",
+          "period_end",
+          "used",
+          "limits",
+          "remaining"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "subscription_status": {
+            "type": "string",
+            "example": "active"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "used": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "limits": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "remaining": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "BillingUsageResponse": {
+        "type": "object",
+        "required": [
+          "billing",
+          "technical"
+        ],
+        "properties": {
+          "billing": {
+            "$ref": "#/components/schemas/BillingUsage"
+          },
+          "technical": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "WebhookAck": {
+        "type": "object",
+        "required": [
+          "accepted",
+          "duplicate",
+          "event_id"
+        ],
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "duplicate": {
+            "type": "boolean"
+          },
+          "event_id": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "account_mapped": {
+            "type": "boolean"
+          }
+        }
+      },
       "Health": {
         "type": "object",
         "required": [

@@ -1,0 +1,12 @@
+[Unit]
+Description=Ecossistema Viral — garbage collection de mídia expirada
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=__USER__
+Group=__USER__
+WorkingDirectory=__APP_DIR__
+ExecStart=/usr/bin/flock -n __APP_DIR__/fabrica_clips/_config/retention-gc.lock __APP_DIR__/deploy/viral-retention-gc.sh __APP_DIR__
+NoNewPrivileges=true
+PrivateTmp=true

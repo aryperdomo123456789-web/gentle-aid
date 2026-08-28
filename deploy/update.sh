@@ -23,6 +23,24 @@ rm -f \
 printf '\n\033[1;35m==>\033[0m Dependências Python\n'
 "$APP_DIR/.venv/bin/pip" install -q -r backend/requirements.txt
 
+printf '\n\033[1;35m==>\033[0m Migração explícita de billing/delivery\n'
+bash "$APP_DIR/deploy/migrate-billing.sh" "$APP_DIR"
+
+printf '\n\033[1;35m==>\033[0m Renderizando timers operacionais\n'
+chmod 750 "$APP_DIR/deploy/viral-retention-gc.sh" 2>/dev/null || true
+if command -v systemctl >/dev/null 2>&1; then
+  RUN_USER="${VIRAL_USER:-www}"
+  id -u "$RUN_USER" >/dev/null 2>&1 || RUN_USER="root"
+  sed -e "s|__APP_DIR__|$APP_DIR|g" -e "s|__USER__|$RUN_USER|g" "$APP_DIR/deploy/viral-retention-gc.service.template" > /etc/systemd/system/viral-retention-gc.service
+  sed -e "s|__APP_DIR__|$APP_DIR|g" -e "s|__USER__|$RUN_USER|g" "$APP_DIR/deploy/viral-retention-gc.timer.template" > /etc/systemd/system/viral-retention-gc.timer
+  if [ -f "$APP_DIR/deploy/viral-groq-route-monitor.service.template" ]; then
+    sed -e "s|__APP_DIR__|$APP_DIR|g" -e "s|__USER__|$RUN_USER|g" "$APP_DIR/deploy/viral-groq-route-monitor.service.template" > /etc/systemd/system/viral-groq-route-monitor.service
+    sed -e "s|__APP_DIR__|$APP_DIR|g" -e "s|__USER__|$RUN_USER|g" "$APP_DIR/deploy/viral-groq-route-monitor.timer.template" > /etc/systemd/system/viral-groq-route-monitor.timer
+  fi
+  systemctl daemon-reload
+  systemctl enable --now viral-retention-gc.timer viral-groq-route-monitor.timer >/dev/null 2>&1 || true
+fi
+
 printf '\n\033[1;35m==>\033[0m Build do frontend\n'
 if command -v bun >/dev/null 2>&1 && { [ -f "$APP_DIR/bun.lock" ] || [ -f "$APP_DIR/bun.lockb" ]; }; then
   printf '\033[1;32m  ✔\033[0m Usando bun (bun.lock detectado)\n'
@@ -38,6 +56,11 @@ fi
 
 printf '\n\033[1;35m==>\033[0m Reiniciando serviços\n'
 systemctl restart viral-api viral-web
+if systemctl is-active --quiet viral-worker; then
+  systemctl restart viral-worker
+else
+  printf '\033[1;33m  !\033[0m viral-worker não está ativo — execute a migração da fila e inicie-o quando autorizado.\n'
+fi
 sleep 3
 curl -s http://127.0.0.1:"${VIRAL_API_PORT:-8010}"/api/health || true
 

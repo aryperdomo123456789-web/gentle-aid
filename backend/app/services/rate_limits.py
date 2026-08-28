@@ -9,6 +9,7 @@ provider; valores reais devem ser reconciliados por um ledger posterior.
 from __future__ import annotations
 
 import sqlite3
+import time
 from contextlib import contextmanager
 from functools import wraps
 from datetime import datetime, timedelta, timezone
@@ -55,8 +56,9 @@ def enforce():
                     retryable=True,
                     retry_after_seconds=exc.retry_after_seconds,
                 )
-                response.headers["X-RateLimit-Limit"] = str(limits()["requests_per_minute"])
+                response.headers["X-RateLimit-Limit"] = str(limits(consumer_id)["requests_per_minute"])
                 response.headers["X-RateLimit-Remaining"] = "0"
+                response.headers["X-RateLimit-Reset"] = str(int(time.time()) + _retry_after_minute())
                 return response
             except UsageUnavailable:
                 return problem_response(503, "USAGE_STORE_UNAVAILABLE", "O ledger de uso está temporariamente indisponível.", retryable=True, retry_after_seconds=5)
@@ -66,6 +68,7 @@ def enforce():
                 current = snapshot(consumer_id)
                 response.headers["X-RateLimit-Limit"] = str(current["limits"]["requests_per_minute"])
                 response.headers["X-RateLimit-Remaining"] = str(max(0, current["limits"]["requests_per_minute"] - current["requests"]))
+                response.headers["X-RateLimit-Reset"] = str(int(time.time()) + _retry_after_minute())
                 response.headers["X-Quota-Jobs-Limit"] = str(current["limits"]["jobs_per_day"])
                 response.headers["X-Quota-Jobs-Used"] = str(current["jobs"])
                 response.headers["X-Quota-Audio-Seconds-Limit"] = str(current["limits"]["audio_seconds_per_day"])
@@ -130,14 +133,23 @@ def _limit_int(name: str, default: int) -> int:
         return default
 
 
-def limits() -> dict[str, int]:
-    return {
+def limits(consumer_id: str | None = None) -> dict[str, int]:
+    defaults = {
         "requests_per_minute": _limit_int("API_REQUESTS_PER_MINUTE", DEFAULT_REQUESTS_PER_MINUTE),
         "jobs_per_day": _limit_int("API_JOBS_PER_DAY", DEFAULT_JOBS_PER_DAY),
         "audio_seconds_per_day": _limit_int("API_AUDIO_SECONDS_PER_DAY", DEFAULT_AUDIO_SECONDS_PER_DAY),
         "cost_units_per_day": _limit_int("API_COST_UNITS_PER_DAY", DEFAULT_COST_UNITS_PER_DAY),
         "max_concurrent_jobs": _limit_int("API_MAX_CONCURRENT_JOBS", 2),
     }
+    if not consumer_id:
+        return defaults
+    try:
+        from . import billing
+        account_id = billing.account_id_for_consumer(str(consumer_id))
+        return billing.limits_for(account_id)
+    except Exception:
+        # Compatibilidade durante rollout: a migração de billing é explícita.
+        return defaults
 
 
 def migrate() -> None:
@@ -191,7 +203,7 @@ def snapshot(consumer_id: str) -> dict[str, Any]:
         audio_seconds = _sum(conn, consumer_id, "audio_seconds", _day_start(now))
         cost_units = _sum(conn, consumer_id, "cost_units", _day_start(now))
         active_jobs = _active_count(conn, consumer_id)
-    configured = limits()
+    configured = limits(consumer_id)
     return {
         "period": "utc",
         "minute_started_at": _minute_start(now),
@@ -215,7 +227,7 @@ def record_request(consumer_id: str) -> dict[str, Any]:
     check_ready()
     now = _now()
     start = _minute_start(now)
-    configured = limits()
+    configured = limits(consumer_id)
     with _conn() as conn:
         count = _sum(conn, consumer_id, "request", start)
         if count >= configured["requests_per_minute"]:
@@ -242,7 +254,7 @@ def reserve_job(
     """Reserva job/custo atomicamente; a chave de idempotência evita cobrança dupla."""
     check_ready()
     now = _now()
-    configured = limits()
+    configured = limits(consumer_id)
     audio = max(0.0, float(audio_seconds))
     cost = max(0.0, float(cost_units))
     with _conn() as conn:
