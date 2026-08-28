@@ -25,6 +25,8 @@ from app.services import billing, billing_webhooks, idempotency, persistent_queu
 
 class _FakeHTTPResponse:
     status = 204
+    def read(self, limit=-1):
+        return b""
     def __enter__(self):
         return self
     def __exit__(self, *args):
@@ -85,7 +87,9 @@ class SaasCommercialTests(unittest.TestCase):
         def fake_urlopen(request, timeout):
             self.assertEqual(timeout, 5.0)
             return _FakeHTTPResponse()
-        with mock.patch.object(webhook_delivery.urllib.request, "Request", RequestCapture), mock.patch.object(webhook_delivery.urllib.request, "urlopen", side_effect=fake_urlopen):
+        fake_opener = mock.Mock()
+        fake_opener.open.side_effect = fake_urlopen
+        with mock.patch.object(webhook_delivery, "_safe_delivery_url", return_value=True), mock.patch.object(webhook_delivery.urllib.request, "Request", RequestCapture), mock.patch.object(webhook_delivery.urllib.request, "build_opener", return_value=fake_opener):
             result = webhook_delivery.notify_job(job)
         self.assertEqual(result["status"], "delivered")
         self.assertEqual(result["attempts"], 1)
@@ -99,7 +103,8 @@ class SaasCommercialTests(unittest.TestCase):
                 raise OSError("synthetic failure")
             return _FakeHTTPResponse()
         job["job_id"] = "job-webhook-2"
-        with mock.patch.object(webhook_delivery.time, "sleep"), mock.patch.object(webhook_delivery.urllib.request, "urlopen", side_effect=flaky_urlopen):
+        fake_opener.open.side_effect = flaky_urlopen
+        with mock.patch.object(webhook_delivery, "_safe_delivery_url", return_value=True), mock.patch.object(webhook_delivery.time, "sleep"), mock.patch.object(webhook_delivery.urllib.request, "build_opener", return_value=fake_opener):
             retried = webhook_delivery.notify_job(job)
         self.assertEqual(retried["status"], "delivered")
         self.assertEqual(retried["attempts"], 3)
