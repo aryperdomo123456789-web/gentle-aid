@@ -416,6 +416,9 @@
               },
               "X-RateLimit-Remaining": {
                 "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
               }
             },
             "content": {
