@@ -16,7 +16,7 @@ from typing import Any
 
 from app import create_app
 from app.config import config
-from app.services import jobs, persistent_queue, rate_limits, transcribe
+from app.services import jobs, persistent_queue, rate_limits, transcribe, viral_clips
 from app.services.api_errors import operation_error
 
 _STOP = threading.Event()
@@ -107,24 +107,86 @@ def _run_api_transcription(item: dict[str, Any]) -> None:
         beat.join(timeout=1)
 
 
+def _run_api_clip(item: dict[str, Any]) -> None:
+    job_id = str(item["job_id"])
+    payload = item.get("payload") or {}
+    parent_job_id = str(payload.get("parent_job_id") or "")
+    parent = jobs.load(parent_job_id) if parent_job_id else None
+    if not parent:
+        raise viral_clips.ClipValidationError("A transcrição de origem não foi encontrada.")
+    transcription = parent.get("transcription")
+    if not isinstance(transcription, dict) or not isinstance(transcription.get("segments"), list):
+        raise viral_clips.ClipValidationError("A transcrição de origem não possui segmentos canônicos.")
+    source = Path(str(parent.get("source_path") or ""))
+    if not source.is_file():
+        raise FileNotFoundError("source media is missing")
+    start, end, duration = viral_clips.validate_window(
+        payload.get("start_seconds"), payload.get("end_seconds"),
+        transcription.get("duration_seconds") or parent.get("estimated_audio_seconds") or 0,
+    )
+    insights = payload.get("insight") if isinstance(payload.get("insight"), dict) else None
+    clip = viral_clips.clip_payload(transcription, start, end, insight=insights)
+    destination = viral_clips.media_output_path(parent_job_id, job_id, source)
+    srt_path = viral_clips.caption_output_path(parent_job_id, job_id, "srt")
+    vtt_path = viral_clips.caption_output_path(parent_job_id, job_id, "vtt")
+    jobs.stage(job_id, "slicing", "Extraindo o trecho viral da mídia.", progress=20)
+    viral_clips.slice_media(source, destination, start=start, end=end, job_id=job_id)
+    srt_path.write_text(viral_clips.render_captions(clip, "srt"), encoding="utf-8")
+    vtt_path.write_text(viral_clips.render_captions(clip, "vtt"), encoding="utf-8")
+    jobs.register_artifact(job_id, destination, "api-output")
+    jobs.register_artifact(job_id, srt_path, "clip-srt")
+    jobs.register_artifact(job_id, vtt_path, "clip-vtt")
+    jobs.update(
+        job_id,
+        parent_job_id=parent_job_id,
+        source_start_seconds=start,
+        source_end_seconds=end,
+        clip_duration_seconds=round(end - start, 3),
+        transcription=clip,
+        clip_insight=insights,
+        filename=destination.name,
+        size_bytes=destination.stat().st_size,
+        api_output_format=destination.suffix.lstrip("."),
+        api_language=clip.get("language"),
+        progress=100,
+        stage="concluido",
+        message="Clipe viral gerado.",
+        status="done",
+        finished_at=jobs._now(),
+    )
+
+
 def _dispatch(item: dict[str, Any]) -> None:
     if item.get("kind") == "api-transcription":
         _run_api_transcription(item)
         return
+    if item.get("kind") == "api-clip":
+        _run_api_clip(item)
+        return
     raise ValueError("unsupported queue kind")
+
+
+def _cleanup_input_source(item: dict[str, Any], *, terminal_success: bool = False) -> None:
+    if item.get("kind") == "api-clip":
+        return
+    job_id = str(item.get("job_id") or "")
+    job = jobs.get(job_id) or {}
+    if terminal_success and job.get("clips_enabled"):
+        return
+    source = Path(str((item.get("payload") or {}).get("source_path") or ""))
+    source.unlink(missing_ok=True)
 
 
 def _process(item: dict[str, Any]) -> None:
     job_id = str(item["job_id"])
     attempts = int(item.get("attempts") or 1)
-    source = Path(str((item.get("payload") or {}).get("source_path") or ""))
     try:
         jobs.load(job_id)
         if jobs.is_cancelled(job_id):
             jobs.update(job_id, status="cancelled", stage="cancelado", message="Job cancelado antes de iniciar.", finished_at=jobs._now())
             persistent_queue.complete(job_id, WORKER_ID)
             _release_active_slot(job_id)
-            source.unlink(missing_ok=True)
+            _cleanup_input_source(item)
             return
         jobs.update(
             job_id,
@@ -142,12 +204,12 @@ def _process(item: dict[str, Any]) -> None:
             jobs.update(job_id, status="done", stage="concluido", message="Concluído.", progress=100, finished_at=jobs._now())
         persistent_queue.complete(job_id, WORKER_ID)
         _release_active_slot(job_id)
-        source.unlink(missing_ok=True)
+        _cleanup_input_source(item, terminal_success=True)
     except jobs.JobCancelled:
         jobs.update(job_id, status="cancelled", stage="cancelado", message="Job cancelado pelo operador.", finished_at=jobs._now())
         persistent_queue.complete(job_id, WORKER_ID)
         _release_active_slot(job_id)
-        source.unlink(missing_ok=True)
+        _cleanup_input_source(item)
     except Exception as exc:
         code, retryable = _retryable(exc)
         terminal = persistent_queue.fail(job_id, code, retryable=retryable, worker_id=WORKER_ID)
@@ -162,7 +224,7 @@ def _process(item: dict[str, Any]) -> None:
                 finished_at=jobs._now(),
             )
             _release_active_slot(job_id)
-            source.unlink(missing_ok=True)
+            _cleanup_input_source(item)
         else:
             jobs.update(job_id, status="queued", stage="aguardando_retry", message="Falha temporária; retry agendado.", error_code=code, retryable=True)
 

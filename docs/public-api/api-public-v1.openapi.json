@@ -232,6 +232,155 @@
         }
       }
     },
+    "/transcriptions/{job_id}/insights": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/JobId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Transcriptions"
+        ],
+        "operationId": "getTranscriptionInsights",
+        "summary": "Identifica oportunidades de cortes virais",
+        "description": "Analisa o json_verbose persistido com o motor heurístico `heuristic-v1`.\nO score entre 0 e 100 é uma priorização editorial explicável e não uma\ngarantia de alcance ou retenção real.\n",
+        "security": [
+          {
+            "ApiKeyAuth": [
+              "results:read"
+            ]
+          },
+          {
+            "BearerAuth": [
+              "results:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientRequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Oportunidades de clips ordenadas por score.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViralInsightsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/transcriptions/{job_id}/clips": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/JobId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Transcriptions"
+        ],
+        "operationId": "createClip",
+        "summary": "Enfileira a geração de um clip viral",
+        "description": "Recorta de 1 a 90 segundos da mídia-fonte protegida de uma transcrição\nconcluída. A resposta é uma operação longa; ao terminar, o result_url\naponta para o arquivo de mídia e `/transcriptions/{job_id}/export` pode\nrenderizar as legendas relativas do clip.\n",
+        "security": [
+          {
+            "ApiKeyAuth": [
+              "transcribe:write"
+            ]
+          },
+          {
+            "BearerAuth": [
+              "transcribe:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/ClientRequestId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClipRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Clip aceito e colocado na fila persistente.",
+            "headers": {
+              "Location": {
+                "description": "URL canônica para consultar a operação do clip.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
     "/jobs": {
       "get": {
         "tags": [
@@ -1055,6 +1204,94 @@
           }
         }
       },
+      "ClipRequest": {
+        "type": "object",
+        "required": [
+          "start_seconds",
+          "end_seconds"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "start_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Início absoluto na mídia-fonte, em segundos."
+          },
+          "end_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Fim absoluto na mídia-fonte, em segundos; janela máxima de 90 segundos."
+          },
+          "insight": {
+            "$ref": "#/components/schemas/ViralClipInsight"
+          }
+        }
+      },
+      "ViralClipInsight": {
+        "type": "object",
+        "properties": {
+          "retention_score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "suggested_title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "initial_hook": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ViralInsightsResponse": {
+        "type": "object",
+        "required": [
+          "object",
+          "engine",
+          "disclaimer",
+          "count",
+          "clips"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "viral_insights"
+          },
+          "engine": {
+            "type": "string",
+            "example": "heuristic-v1"
+          },
+          "disclaimer": {
+            "type": "string"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViralClipInsight"
+            }
+          }
+        }
+      },
       "TranscriptionRequest": {
         "type": "object",
         "required": [
@@ -1154,7 +1391,10 @@
           },
           "type": {
             "type": "string",
-            "const": "transcription"
+            "enum": [
+              "transcription",
+              "clip"
+            ]
           },
           "done": {
             "type": "boolean",
@@ -1309,7 +1549,9 @@
               "vtt",
               "json",
               "json_verbose",
-              "text"
+              "text",
+              "mp4",
+              "m4a"
             ]
           },
           "language": {

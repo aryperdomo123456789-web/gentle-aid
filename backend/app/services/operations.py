@@ -127,11 +127,12 @@ def operation_view(
     state = public_state(job)
     name = operation_name(job_id)
     poll_url = url_for("api_v1.get_operation", job_id=job_id, _external=True)
+    operation_type = str((job.get("meta") or {}).get("operation_type") or "transcription")
     payload: dict[str, Any] = {
         "name": name,
         "id": job_id,
         "object": "operation",
-        "type": "transcription",
+        "type": operation_type,
         "done": state in TERMINAL_PUBLIC,
         "status": state,
         "metadata": _metadata(job, state),

@@ -29,6 +29,8 @@ from ..services import (
     transcribe,
     transcription_exports,
     validation,
+    viral_clips,
+    viral_insights,
 )
 from ..services.api_auth import current_api_key, problem_response, request_id, require_api_key
 
@@ -314,7 +316,7 @@ def create_transcription():
     )
     job_id = job["job_id"]
     expires_at = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(timespec="seconds")
-    jobs.update(job_id, expires_at=expires_at)
+    jobs.update(job_id, expires_at=expires_at, clips_enabled=True)
     quota_reserved = False
     try:
         source = validation.save_upload(
@@ -626,6 +628,155 @@ def export_transcription(job_id: str):
         mimetype=transcription_exports.mime_type(requested),
         max_age=0,
     )
+
+
+@bp.post("/transcriptions/<job_id>/clips")
+@require_api_key("transcribe:write")
+@rate_limits.enforce()
+def create_clip(job_id: str):
+    """Cria um job assíncrono de recorte a partir de uma transcrição concluída."""
+    if not _safe_job_id(job_id):
+        return problem_response(404, "NOT_FOUND", "Transcrição não encontrada.")
+    parent = jobs.get(job_id)
+    if not parent or not _owns(parent):
+        return problem_response(404, "NOT_FOUND", "Transcrição não encontrada.")
+    if _api_status(parent) != "succeeded":
+        return problem_response(409, "RESULT_UNAVAILABLE", "A transcrição precisa estar concluída para gerar um clip.")
+    transcription = parent.get("transcription")
+    if not isinstance(transcription, dict) or not isinstance(transcription.get("segments"), list):
+        return problem_response(409, "CLIP_SOURCE_UNAVAILABLE", "A transcrição não possui segmentos canônicos para gerar o clip.")
+    source = Path(str(parent.get("source_path") or ""))
+    try:
+        source = viral_clips.source_in_storage(source)
+    except viral_clips.ClipValidationError:
+        return problem_response(409, "CLIP_SOURCE_UNAVAILABLE", "A mídia-fonte não está disponível para recorte.")
+
+    key = _idempotency_key()
+    if isinstance(key, Response):
+        return key
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return problem_response(400, "INVALID_ARGUMENT", "Envie um objeto JSON com start_seconds e end_seconds.")
+    try:
+        start, end, duration = viral_clips.validate_window(
+            body.get("start_seconds"),
+            body.get("end_seconds"),
+            transcription.get("duration_seconds") or parent.get("estimated_audio_seconds") or 0,
+        )
+    except viral_clips.ClipValidationError as exc:
+        return problem_response(
+            400,
+            "CLIP_INVALID_WINDOW",
+            str(exc),
+            field_errors=[
+                {"field": "start_seconds", "reason": "invalid_window"},
+                {"field": "end_seconds", "reason": "invalid_window"},
+            ],
+        )
+
+    max_clips = body.get("max_clips")
+    insight = body.get("insight") if isinstance(body.get("insight"), dict) else None
+    fingerprint = idempotency.request_hash(
+        request.method,
+        request.path,
+        job_id,
+        str(start),
+        str(end),
+        json.dumps(insight, sort_keys=True, ensure_ascii=False) if insight else "",
+    )
+    clip_job = jobs.create_job(
+        "api-clip",
+        meta={
+            "api_key_id": _key_owner(),
+            "consumer_id": _key_owner(),
+            "api_version": "v1",
+            "operation_type": "clip",
+            "parent_job_id": job_id,
+            "output_format": "mp4" if source.suffix.lower() in validation.VIDEO_EXT else "m4a",
+        },
+    )
+    clip_id = clip_job["job_id"]
+    expires_at = parent.get("expires_at")
+    jobs.update(
+        clip_id,
+        expires_at=expires_at,
+        parent_job_id=job_id,
+        source_start_seconds=start,
+        source_end_seconds=end,
+        clip_duration_seconds=round(end - start, 3),
+        source_path=str(source),
+        clips_enabled=False,
+    )
+    request.mago_job_id = clip_id
+    quota_reserved = False
+    try:
+        replay = _replay_or_reserve(key, fingerprint)
+        if replay is not None:
+            jobs.delete(clip_id)
+            return replay
+        rate_limits.reserve_job(
+            _key_owner(),
+            job_id=clip_id,
+            idempotency_key=key,
+            audio_seconds=0.0,
+            cost_units=0.0,
+        )
+        quota_reserved = True
+        payload = {
+            "parent_job_id": job_id,
+            "start_seconds": start,
+            "end_seconds": end,
+            "insight": insight,
+            "max_clips": max_clips,
+        }
+        persistent_queue.enqueue(clip_id, "api-clip", payload)
+        jobs.update(clip_id, queue="persistent", queue_status="queued")
+        public = _public_job(jobs.get(clip_id) or clip_job)
+        idempotency.record(_key_owner(), key, status_code=202, response=public, resource_id=clip_id)
+    except rate_limits.LimitExceeded as exc:
+        jobs.delete(clip_id)
+        try:
+            idempotency.release(_key_owner(), key)
+        except idempotency.IdempotencyRecordUnavailable:
+            pass
+        return problem_response(429, exc.code, exc.detail, retryable=True, retry_after_seconds=exc.retry_after_seconds)
+    except (persistent_queue.QueueUnavailable, rate_limits.UsageUnavailable, idempotency.IdempotencyRecordUnavailable, OSError, ValueError):
+        if quota_reserved:
+            try:
+                rate_limits.release_job(_key_owner(), job_id=clip_id, idempotency_key=key)
+            except rate_limits.UsageUnavailable:
+                pass
+        try:
+            persistent_queue.discard(clip_id)
+        except persistent_queue.QueueUnavailable:
+            pass
+        jobs.delete(clip_id)
+        try:
+            idempotency.release(_key_owner(), key)
+        except idempotency.IdempotencyRecordUnavailable:
+            pass
+        return problem_response(503, "JOB_ACCEPTANCE_FAILED", "Não foi possível aceitar o job de clip.", retryable=True, retry_after_seconds=5)
+    response = jsonify(public)
+    response.status_code = 202
+    response.headers["Location"] = url_for("api_v1.get_operation", job_id=clip_id, _external=True)
+    return response
+
+
+@bp.get("/transcriptions/<job_id>/insights")
+@require_api_key("results:read")
+@rate_limits.enforce()
+def get_transcription_insights(job_id: str):
+    if not _safe_job_id(job_id):
+        return problem_response(404, "NOT_FOUND", "Transcrição não encontrada.")
+    job = jobs.get(job_id)
+    if not job or not _owns(job):
+        return problem_response(404, "NOT_FOUND", "Transcrição não encontrada.")
+    if _api_status(job) != "succeeded":
+        return problem_response(409, "RESULT_UNAVAILABLE", "A transcrição precisa estar concluída para gerar insights.")
+    transcription = job.get("transcription")
+    if not isinstance(transcription, dict):
+        return problem_response(409, "CLIP_SOURCE_UNAVAILABLE", "O job não possui json_verbose canônico.")
+    return jsonify(viral_insights.analyze_json_verbose(transcription))
 
 
 @bp.get("/usage")

@@ -270,6 +270,62 @@ class ApiV1ContractTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json["code"], "INVALID_ARGUMENT")
 
+    def test_insights_and_clip_creation_are_protected_and_async(self) -> None:
+        owner = release_keys.validate_key(self.full_key)
+        self.assertIsNotNone(owner)
+        parent = jobs.create_job(
+            "api-transcription",
+            meta={"api_key_id": owner["id"], "consumer_id": owner["id"], "output_format": "json_verbose"},
+        )
+        source = STORAGE / f"{parent['job_id']}_src.mp3"
+        source.write_bytes(b"synthetic-source")
+        jobs.update(
+            parent["job_id"],
+            status="done",
+            stage="concluido",
+            progress=100,
+            expires_at=(datetime.now(timezone.utc) + timedelta(days=1)).isoformat(timespec="seconds"),
+            source_path=str(source),
+            clips_enabled=True,
+            transcription={
+                "object": "transcription",
+                "language": "pt",
+                "duration_seconds": 60.0,
+                "text": "A verdade que ninguém te conta? O resultado aumentou 200%.",
+                "segments": [
+                    {"start": 0.0, "end": 30.0, "text": "A verdade que ninguém te conta?", "words": []},
+                    {"start": 30.0, "end": 60.0, "text": "O resultado aumentou 200%.", "words": []},
+                ],
+            },
+        )
+        try:
+            insights = self.client.get(
+                f"/api/v1/transcriptions/{parent['job_id']}/insights",
+                headers=self.api_headers(),
+            )
+            self.assertEqual(insights.status_code, 200)
+            self.assertEqual(insights.json["object"], "viral_insights")
+            self.assertGreaterEqual(insights.json["count"], 1)
+
+            created = self.client.post(
+                f"/api/v1/transcriptions/{parent['job_id']}/clips",
+                headers=self.api_headers(**{"Idempotency-Key": "clip-contract-key-12345"}),
+                json={"start_seconds": 0, "end_seconds": 30},
+            )
+            self.assertEqual(created.status_code, 202)
+            self.assertEqual(created.json["type"], "clip")
+            self.assertFalse(created.json["done"])
+            child_id = created.json["id"]
+            self.assertEqual(created.json["metadata"]["queue"], "persistent")
+            self.assertEqual((persistent_queue.get(child_id) or {}).get("kind"), "api-clip")
+        finally:
+            child_id = locals().get("child_id")
+            if child_id:
+                persistent_queue.discard(child_id)
+                rate_limits.release_job(owner["id"], job_id=child_id, idempotency_key="clip-contract-key-12345")
+                jobs.delete(child_id)
+            jobs.delete(parent["job_id"])
+
     def test_protected_export_renders_formats_from_canonical_segments(self) -> None:
         owner = release_keys.validate_key(self.full_key)
         self.assertIsNotNone(owner)
