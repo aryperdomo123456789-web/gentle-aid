@@ -80,6 +80,8 @@ class ApiV1ContractTests(unittest.TestCase):
         self.assertEqual(spec.status_code, 200)
         self.assertEqual(spec.json["openapi"], "3.1.0")
         self.assertIn("/transcriptions", spec.json["paths"])
+        self.assertIn("/transcriptions/{job_id}/export", spec.json["paths"])
+        self.assertIn("json_verbose", spec.json["components"]["schemas"]["TranscriptionRequest"]["properties"]["output_format"]["enum"])
 
     def test_internal_routes_and_downloads_are_not_public(self) -> None:
         self.assertEqual(self.client.get("/api/jobs").status_code, 401)
@@ -267,6 +269,54 @@ class ApiV1ContractTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json["code"], "INVALID_ARGUMENT")
+
+    def test_protected_export_renders_formats_from_canonical_segments(self) -> None:
+        owner = release_keys.validate_key(self.full_key)
+        self.assertIsNotNone(owner)
+        job = jobs.create_job(
+            "api-transcription",
+            meta={"api_key_id": owner["id"], "consumer_id": owner["id"]},
+        )
+        jobs.update(
+            job["job_id"],
+            status="done",
+            stage="concluido",
+            progress=100,
+            api_language="pt",
+            api_output_format="srt",
+            transcription={
+                "object": "transcription",
+                "language": "pt",
+                "duration_seconds": 3.2,
+                "text": "Olá API",
+                "segments": [
+                    {"start": 0.1, "end": 1.2, "text": "Olá API", "words": []}
+                ],
+            },
+            finished_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        )
+        try:
+            for fmt, expected in (
+                ("srt", "00:00:00,100 --> 00:00:01,200"),
+                ("vtt", "00:00:00.100 --> 00:00:01.200"),
+                ("json_verbose", '"duration_seconds": 3.2'),
+            ):
+                response = self.client.get(
+                    f"/api/v1/transcriptions/{job['job_id']}/export?format={fmt}",
+                    headers=self.api_headers(),
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(expected, response.get_data(as_text=True))
+                self.assertIn("attachment", response.headers.get("Content-Disposition", ""))
+
+            limited = self.client.get(
+                f"/api/v1/transcriptions/{job['job_id']}/export?format=srt",
+                headers={"X-API-Key": self.limited_key},
+            )
+            self.assertEqual(limited.status_code, 403)
+            self.assertEqual(limited.json["code"], "MISSING_SCOPE")
+        finally:
+            jobs.delete(job["job_id"])
 
 
 if __name__ == "__main__":

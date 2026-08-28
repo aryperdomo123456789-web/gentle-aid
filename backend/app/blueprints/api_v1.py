@@ -8,6 +8,7 @@ ownership baseado na API key autenticada.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -18,12 +19,22 @@ from flask import Blueprint, Response, jsonify, request, send_file, url_for
 from werkzeug.utils import secure_filename
 
 from ..config import config
-from ..services import idempotency, jobs, media, operations, persistent_queue, rate_limits, transcribe, validation
+from ..services import (
+    idempotency,
+    jobs,
+    media,
+    operations,
+    persistent_queue,
+    rate_limits,
+    transcribe,
+    transcription_exports,
+    validation,
+)
 from ..services.api_auth import current_api_key, problem_response, request_id, require_api_key
 
 bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
-_ALLOWED_OUTPUTS = {"srt", "vtt", "json", "text"}
+_ALLOWED_OUTPUTS = {"srt", "vtt", "json", "json_verbose", "text"}
 _JOB_ID_RE = re.compile(r"^[A-Za-z0-9_-]{3,160}$")
 _IDEMPOTENCY_RE = re.compile(r"^[A-Za-z0-9._~-]{16,255}$")
 
@@ -99,7 +110,7 @@ def _parse_common_fields() -> tuple[str, str] | Response:
         return problem_response(
             400,
             "INVALID_ARGUMENT",
-            "output_format deve ser srt, vtt, json ou text.",
+            "output_format deve ser srt, vtt, json, json_verbose ou text.",
             field_errors=[{"field": "output_format", "reason": "unsupported_value"}],
         )
     return language, output_format
@@ -130,28 +141,19 @@ def _format_timestamp(seconds: float, *, vtt: bool) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}{separator}{millis:03d}"
 
 
-def _render_segments(segments: list[transcribe.Segment], output_format: str, language: str) -> str:
-    if output_format == "text":
-        return "\n".join(segment.text.strip() for segment in segments if segment.text.strip()) + "\n"
-    if output_format == "json":
-        return json.dumps(
-            {
-                "language": language or None,
-                "segments": [segment.dict() for segment in segments],
-            },
-            ensure_ascii=False,
-            indent=2,
-        ) + "\n"
-
-    vtt = output_format == "vtt"
-    lines = ["WEBVTT", ""] if vtt else []
-    for index, segment in enumerate(segments, start=1):
-        start = _format_timestamp(segment.start, vtt=vtt)
-        end = _format_timestamp(max(segment.end, segment.start + 0.05), vtt=vtt)
-        if not vtt:
-            lines.append(str(index))
-        lines.extend([f"{start} --> {end}", segment.text.strip(), ""])
-    return "\n".join(lines)
+def _render_segments(
+    segments: list[transcribe.Segment],
+    output_format: str,
+    language: str,
+    *,
+    duration_seconds: float | None = None,
+) -> str:
+    return transcription_exports.render_segments(
+        segments,
+        output_format,
+        language=language,
+        duration_seconds=duration_seconds,
+    )
 
 
 def _run_transcription(
@@ -164,17 +166,29 @@ def _run_transcription(
 ) -> None:
     try:
         jobs.stage(job_id, "transcribing", "Transcrevendo o arquivo.", progress=10)
+        duration_seconds = max(0.1, media.probe_duration(source))
         segments, detected = transcribe.transcribe(
             source,
             job_id=job_id,
             language=language or None,
-            word_timestamps=output_format == "json",
+            word_timestamps=output_format in {"json", "json_verbose"},
         )
         jobs.check_cancelled(job_id)
-        content = _render_segments(segments, output_format, detected)
-        output = validation.output_path("api", job_id, f".{output_format}")
+        canonical = transcription_exports.verbose_payload(
+            segments,
+            language=detected,
+            duration_seconds=duration_seconds,
+        )
+        content = _render_segments(
+            segments,
+            output_format,
+            detected,
+            duration_seconds=duration_seconds,
+        )
+        output = validation.output_path("api", job_id, f".{transcription_exports.extension_for(output_format)}")
         output.write_text(content, encoding="utf-8")
         jobs.register_artifact(job_id, output, "api-output")
+        jobs.update(job_id, transcription=canonical)
         jobs.update(
             job_id,
             progress=100,
@@ -557,7 +571,59 @@ def get_job_result(job_id: str):
         output,
         as_attachment=True,
         download_name=output.name,
-        mimetype={"srt": "application/x-subrip", "vtt": "text/vtt", "json": "application/json", "text": "text/plain"}.get(expected, "application/octet-stream"),
+        mimetype=transcription_exports.mime_type(expected) if expected in transcription_exports.OUTPUT_FORMATS else "application/octet-stream",
+        max_age=0,
+    )
+
+
+@bp.get("/transcriptions/<job_id>/export")
+@require_api_key("results:read")
+@rate_limits.enforce()
+def export_transcription(job_id: str):
+    """Renderiza novamente os segmentos canônicos em um formato protegido."""
+    if not _safe_job_id(job_id):
+        return problem_response(404, "NOT_FOUND", "Transcrição não encontrada.")
+    job = jobs.get(job_id)
+    if not job or not _owns(job):
+        return problem_response(404, "NOT_FOUND", "Transcrição não encontrada.")
+    status = _api_status(job)
+    if status == "expired":
+        return problem_response(410, "RESULT_EXPIRED", "O resultado expirou.")
+    if status in {"queued", "running"}:
+        return problem_response(202, "JOB_NOT_READY", "O job ainda está sendo processado.", retryable=True, retry_after_seconds=5)
+    if status != "succeeded":
+        return problem_response(409, "RESULT_UNAVAILABLE", "O job não possui resultado disponível.")
+
+    requested = (request.args.get("format") or "srt").strip().lower()
+    if requested not in {"srt", "vtt", "json_verbose", "json", "text"}:
+        return problem_response(
+            400,
+            "INVALID_ARGUMENT",
+            "format deve ser srt, vtt, json_verbose ou text.",
+            field_errors=[{"field": "format", "reason": "unsupported_value"}],
+        )
+
+    canonical = job.get("transcription")
+    if not isinstance(canonical, dict) or not isinstance(canonical.get("segments"), list):
+        output = _artifact_path(job)
+        expected = output.suffix.lstrip(".") if output else ""
+        if output and expected == requested:
+            return send_file(
+                output,
+                as_attachment=True,
+                download_name=output.name,
+                mimetype=transcription_exports.mime_type(requested),
+                max_age=0,
+            )
+        return problem_response(409, "EXPORT_NOT_AVAILABLE", "Este job antigo não possui segmentos canônicos para exportação.")
+
+    content = transcription_exports.render_payload(canonical, requested)
+    extension = transcription_exports.extension_for(requested)
+    return send_file(
+        io.BytesIO(content.encode("utf-8")),
+        as_attachment=True,
+        download_name=f"{job_id}.{extension}",
+        mimetype=transcription_exports.mime_type(requested),
         max_age=0,
     )
 

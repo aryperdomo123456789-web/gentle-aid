@@ -3,7 +3,7 @@
 ## Documentação pública de integração
 
 **Versão do documento:** 0.1.0-alpha
-**Status:** alpha controlada — transcrição v1, envelope de operação longa, fila persistente e limites por consumidor publicados; expansão comercial ainda condicionada aos gates operacionais
+**Status:** alpha controlada — transcrição v1, chunking/VAD para mídia longa, envelope de operação longa, fila persistente, exportação protegida e limites por consumidor publicados; expansão comercial ainda condicionada aos gates operacionais
 **Última revisão:** 27 de agosto de 2026
 **Base prevista:** `https://viral.vr766.com/api/v1`
 
@@ -11,7 +11,7 @@
 
 ## Visão geral
 
-A Mago API será a camada externa do gentle-aid para que outros produtos criem e acompanhem operações de processamento de mídia sem depender da interface do painel. A primeira versão será deliberadamente pequena: saúde, capacidades, transcrição assíncrona, consulta/cancelamento de jobs, entrega protegida de resultados e consumo do próprio consumidor.
+A Mago API será a camada externa do gentle-aid para que outros produtos criem e acompanhem operações de processamento de mídia sem depender da interface do painel. A primeira versão será deliberadamente pequena: saúde, capacidades, transcrição assíncrona, chunking/VAD para entradas longas, consulta/cancelamento de jobs, exportação protegida de resultados e consumo do próprio consumidor.
 
 O contrato segue princípios usados por APIs maduras: operações longas retornam um recurso consultável em vez de bloquear o request [1], POSTs que criam efeitos aceitam idempotência [2], coleções usam cursores [3], erros são machine-readable [4] [5], e mudanças incompatíveis exigem uma nova versão [6].
 
@@ -142,7 +142,7 @@ Content-Type: application/json
 |---|---:|---|---|
 | `file` | Sim | binário | Áudio ou vídeo dentro do limite da chave |
 | `language` | Não | string | Código curto, por exemplo `pt`, `en` ou `es` |
-| `output_format` | Não | enum | `srt`, `vtt`, `json` ou `text`; default `srt` |
+| `output_format` | Não | enum | `srt`, `vtt`, `json`, `json_verbose` ou `text`; default `srt` |
 | `webhook.url` | Não | URL | HTTPS público do consumidor |
 | `webhook.secret` | Não | string | Segredo HMAC com pelo menos 32 caracteres; nunca devolvido |
 | `webhook.events` | Não | array | `job.completed`, `job.failed`, `job.cancelled` |
@@ -231,6 +231,22 @@ curl "https://viral.vr766.com/api/v1/jobs/job_01J7MAGOTRANSCRIBE/result?format=s
 ```
 
 A API nunca deve devolver caminho físico do servidor, nome interno de pasta, JSON privado de job ou link permanente sem autorização. O resultado pode ser transmitido pela API ou entregue por URL assinada com expiração curta. Depois do TTL, o resultado retorna `410 Gone` e o consumidor precisa reenviar o job.
+
+### Exportar formatos adicionais
+
+Quando o job foi criado com segmentos canônicos, o consumidor pode renderizar uma nova saída sem reenviar a mídia:
+
+```bash
+curl "https://viral.vr766.com/api/v1/transcriptions/job_01J7MAGOTRANSCRIBE/export?format=vtt" \
+  -H "X-API-Key: ${MAGO_API_KEY}" \
+  -o legenda.vtt
+```
+
+O endpoint `GET /api/v1/transcriptions/{job_id}/export` aceita `srt`, `vtt`, `json_verbose`, `json` e `text`. Ele exige o escopo `results:read`, valida ownership e devolve `202` enquanto o job ainda estiver em processamento. `json_verbose` inclui `object`, `language`, `duration_seconds`, `text`, segmentos e palavras quando o provider retorná-las. Jobs antigos que não possuem segmentos canônicos só podem ser baixados no formato originalmente produzido.
+
+### Mídia longa e chunking
+
+Entradas superiores a dez minutos ou cujo arquivo intermediário possa ultrapassar 25 MB são particionadas sequencialmente. O pipeline usa `ffmpeg silencedetect` para mover cortes para pontos próximos de silêncio quando disponíveis; se não encontrar silêncio adequado, usa cortes temporais seguros. Cada segmento retornado pelo provider recebe o offset absoluto do chunk, preservando a linha do tempo global na concatenação. O tamanho final de cada chunk é validado antes do envio ao provider.
 
 ## Rate limit, quotas e custo
 

@@ -12,7 +12,9 @@ info:
 
     O contrato privilegia operações assíncronas, API keys com escopo,
     idempotência, resultados protegidos, erros machine-readable e compatibilidade
-    de longo prazo.
+    de longo prazo. Entradas com mais de 10 minutos ou chunks intermediários
+    acima de 25 MB usam particionamento sequencial com cortes próximos de silêncio
+    quando o VAD baseado em FFmpeg encontra pontos adequados.
   contact:
     name: Mago API Support
     url: https://viral.vr766.com
@@ -348,7 +350,7 @@ paths:
           description: Formato do resultado.
           schema:
             type: string
-            enum: [srt, vtt, json, text]
+            enum: [srt, vtt, json, json_verbose, text]
             default: srt
         - $ref: '#/components/parameters/ClientRequestId'
       responses:
@@ -382,6 +384,71 @@ paths:
           $ref: '#/components/responses/NotFound'
         '410':
           $ref: '#/components/responses/Gone'
+
+  /transcriptions/{job_id}/export:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Transcriptions]
+      operationId: exportTranscription
+      summary: Exporta segmentos canônicos em outro formato
+      description: |
+        Renderiza novamente os segmentos persistidos de uma transcrição concluída,
+        sem reenviar a mídia. A operação exige ownership e o escopo `results:read`.
+        Aceita SRT, WebVTT, JSON verbose, JSON legado e texto simples.
+      security:
+        - ApiKeyAuth: [results:read]
+        - BearerAuth: [results:read]
+      parameters:
+        - name: format
+          in: query
+          required: false
+          description: Formato da exportação.
+          schema:
+            type: string
+            enum: [srt, vtt, json_verbose, json, text]
+            default: srt
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Arquivo de legenda ou transcrição exportado.
+          headers:
+            Content-Disposition:
+              description: Nome de download controlado pelo servidor.
+              schema: {type: string}
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/x-subrip:
+              schema: {type: string}
+            text/vtt:
+              schema: {type: string}
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TranscriptionResult'
+                  - $ref: '#/components/schemas/VerboseTranscription'
+            text/plain:
+              schema: {type: string}
+        '202':
+          description: Job ainda não terminou.
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /usage:
     get:
@@ -568,7 +635,7 @@ components:
           example: pt
         output_format:
           type: string
-          enum: [srt, vtt, json, text]
+          enum: [srt, vtt, json, json_verbose, text]
           default: srt
         webhook:
           $ref: '#/components/schemas/WebhookConfig'
@@ -709,7 +776,7 @@ components:
           type: string
         format:
           type: string
-          enum: [srt, vtt, json, text]
+          enum: [srt, vtt, json, json_verbose, text]
         language:
           type: string
           nullable: true
@@ -815,7 +882,7 @@ components:
           type: string
         format:
           type: string
-          enum: [srt, vtt, json, text]
+          enum: [srt, vtt, json, json_verbose, text]
         text:
           type: string
         language:
@@ -825,6 +892,56 @@ components:
           type: number
           minimum: 0
           nullable: true
+
+    VerboseTranscription:
+      type: object
+      required: [object, text, segments]
+      properties:
+        object:
+          type: string
+          const: transcription
+        language:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: number
+          minimum: 0
+        text:
+          type: string
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptionSegment'
+
+    TranscriptionSegment:
+      type: object
+      required: [start, end, text, words]
+      properties:
+        start:
+          type: number
+          minimum: 0
+        end:
+          type: number
+          minimum: 0
+        text:
+          type: string
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptionWord'
+
+    TranscriptionWord:
+      type: object
+      required: [start, end, text]
+      properties:
+        start:
+          type: number
+          minimum: 0
+        end:
+          type: number
+          minimum: 0
+        text:
+          type: string
 
     JobEvent:
       type: object
