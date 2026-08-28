@@ -137,6 +137,7 @@ def require_api_key(*required_scopes: str) -> Callable[[_VIEW], _VIEW]:
             # Apenas metadados sanitizados; jamais guardar raw_key.
             g.mago_api_key = {
                 "id": info.get("id"),
+                "account_id": info.get("account_id") or info.get("id"),
                 "prefix": info.get("prefix"),
                 "scopes": sorted(_scopes(info)),
                 "expires_at": info.get("expires_at"),

@@ -3,23 +3,23 @@
 ## Documentação pública de integração
 
 **Versão do documento:** 0.1.0-alpha
-**Status:** alpha controlada — transcrição v1, chunking/VAD para mídia longa, Viral Clip Engine heurístico, envelope de operação longa, fila persistente, exportação protegida e limites por consumidor publicados; expansão comercial ainda condicionada aos gates operacionais
+**Status:** beta comercial controlada — transcrição v1, chunking/VAD para mídia longa, Viral Clip Engine heurístico, billing por tenant, quotas mensais, webhooks assinados, retenção TTL e fila persistente publicados; checkout externo ainda depende das credenciais do provider
 **Última revisão:** 27 de agosto de 2026
 **Base prevista:** `https://viral.vr766.com/api/v1`
 
-> **Aviso de disponibilidade.** Este documento descreve a Mago API v1 em alpha controlada. `GET /api/v1/health`, `GET /api/v1/capabilities`, `POST /api/v1/transcriptions`, consulta/cancelamento de operações, entrega protegida e OpenAPI estão publicados no ambiente principal. Rate limit, quota diária e fila persistente estão ativos com valores conservadores; não há SLA comercial. Consulte a seção [Estado de lançamento](#estado-de-lançamento) antes de iniciar uma integração.
+> **Aviso de disponibilidade.** Este documento descreve a Mago API v1 em beta comercial controlada. `GET /api/v1/health`, `GET /api/v1/capabilities`, `POST /api/v1/transcriptions`, billing/usage, webhooks assinados, consulta/cancelamento, entrega protegida e OpenAPI estão publicados no ambiente principal. Quotas de plano, rate limit e TTL estão ativos; não há SLA financeiro ou compromisso de disponibilidade sem contrato comercial. Stripe/Mercado Pago só devem ser ativados depois de configurar e testar os segredos do provider.
 
 ## Visão geral
 
-A Mago API será a camada externa do gentle-aid para que outros produtos criem e acompanhem operações de processamento de mídia sem depender da interface do painel. A primeira versão será deliberadamente pequena: saúde, capacidades, transcrição assíncrona, chunking/VAD para entradas longas, insights editoriais, geração assíncrona de clips, consulta/cancelamento de jobs, exportação protegida de resultados e consumo do próprio consumidor.
+A Mago API será a camada externa do gentle-aid para que outros produtos criem e acompanhem operações de processamento de mídia sem depender da interface do painel. A primeira versão comercial controlada reúne saúde, capacidades, transcrição assíncrona, chunking/VAD para entradas longas, insights editoriais, geração assíncrona de clips, consulta/cancelamento de jobs, exportação protegida, billing/usage, webhooks downstream e governança de retenção.
 
 O contrato segue princípios usados por APIs maduras: operações longas retornam um recurso consultável em vez de bloquear o request [1], POSTs que criam efeitos aceitam idempotência [2], coleções usam cursores [3], erros são machine-readable [4] [5], e mudanças incompatíveis exigem uma nova versão [6].
 
 ## Estado de lançamento
 
-A API Hub documentada no legado prevê uma camada com `X-API-Key`, `Authorization: Bearer`, catálogo e endpoints públicos. A implementação atual tem uma tela owner para gerar e revogar chaves em `/api-hub/chaves`, um endpoint administrativo interno em `/api/access-keys` e a superfície pública alpha em `/api/v1`. O envelope de operação longa foi adicionado sem remover os aliases `/jobs/*`; limites técnicos por chave estão ativos, enquanto billing, planos, webhooks e SLA comercial continuam fora da garantia alpha.
+A API Hub documentada no legado prevê uma camada com `X-API-Key`, `Authorization: Bearer`, catálogo e endpoints públicos. A implementação atual tem uma tela owner para gerar e revogar chaves em `/api-hub/chaves`, um endpoint administrativo interno em `/api/access-keys` e a superfície pública em `/api/v1`. O envelope de operação longa foi adicionado sem remover os aliases `/jobs/*`; billing e quotas são aplicados por tenant associado à API key, enquanto rate limit técnico permanece por chave.
 
-Até que o checklist abaixo esteja verde, a documentação deve permanecer marcada como **Alpha**:
+Enquanto os itens comerciais externos não estiverem configurados no ambiente, a documentação permanece como **Beta comercial controlada**:
 
 | Gate | Obrigatório para anunciar v1 | Situação observada |
 |---|---|---|
@@ -30,11 +30,11 @@ Até que o checklist abaixo esteja verde, a documentação deve permanecer marca
 | OpenAPI publicado | `/api/docs` e `/api/openapi.json` refletem o runtime | Publicado |
 | Limites | Rate limit, quota de upload, concorrência e custo definidos | Implementado com defaults conservadores e configuração por ambiente |
 | Idempotência | Retry do mesmo POST não duplica job | Implementado e testado |
-| Testes | Autorização, isolamento, erro, retry, expiração, fila e limites cobertos | Contrato, fila e limites cobertos; provider real e carga pendentes |
+| Testes | Autorização, isolamento, erro, retry, expiração, fila, billing e webhooks cobertos | Suítes comerciais, TTL, HMAC e carga sintética cobertas; checkout externo aguardando credenciais reais |
 
 ## URL base e versões
 
-Quando liberada, a API estável será servida sob `/api/v1`. A versão major fica no caminho para tornar a compatibilidade explícita. Mudanças aditivas e compatíveis entram em `v1`; alterações incompatíveis exigem `v2`, período de depreciação e comunicação prévia. A API não usará `v1.1.2` no caminho.
+A superfície beta é servida sob `/api/v1`; a promoção para API estável exige os gates de operação, suporte e billing listados ao final. A versão major fica no caminho para tornar a compatibilidade explícita. Mudanças aditivas e compatíveis entram em `v1`; alterações incompatíveis exigem `v2`, período de depreciação e comunicação prévia. A API não usará `v1.1.2` no caminho.
 
 | Ambiente | URL | Uso |
 |---|---|---|
@@ -88,7 +88,7 @@ Escopo armazenado não é escopo aplicado. Uma rota só está protegida quando o
 
 ## Criar uma transcrição
 
-`POST /api/v1/transcriptions` recebe um arquivo de áudio ou vídeo e cria uma operação assíncrona. O cliente deve enviar uma `Idempotency-Key` nova para cada intenção de criação. Se houver timeout de rede, repita o mesmo request com a mesma chave; não gere outra chave antes de saber se a primeira operação foi criada. A resposta usa o envelope canônico `Operation`, inspirado na semântica de operações longas do AIP-151 [13].
+`POST /api/v1/transcriptions` recebe um arquivo de áudio ou vídeo e cria uma operação assíncrona. Opcionalmente, o campo multipart `webhook` recebe um JSON com `url`, `secret` e `events`; os aliases planos `webhook_url`/`webhook_secret` também são aceitos para compatibilidade. O cliente deve enviar uma `Idempotency-Key` nova para cada intenção de criação. Se houver timeout de rede, repita o mesmo request com a mesma chave; não gere outra chave antes de saber se a primeira operação foi criada. A resposta usa o envelope canônico `Operation`, inspirado na semântica de operações longas do AIP-151 [13].
 
 ```bash
 curl -X POST "https://viral.vr766.com/api/v1/transcriptions" \
@@ -143,9 +143,10 @@ Content-Type: application/json
 | `file` | Sim | binário | Áudio ou vídeo dentro do limite da chave |
 | `language` | Não | string | Código curto, por exemplo `pt`, `en` ou `es` |
 | `output_format` | Não | enum | `srt`, `vtt`, `json`, `json_verbose` ou `text`; default `srt` |
-| `webhook.url` | Não | URL | HTTPS público do consumidor |
-| `webhook.secret` | Não | string | Segredo HMAC com pelo menos 32 caracteres; nunca devolvido |
-| `webhook.events` | Não | array | `job.completed`, `job.failed`, `job.cancelled` |
+| `webhook` | Não | JSON | Objeto com `url` HTTPS e `secret` HMAC de 32+ caracteres |
+| `webhook.url` | Condicional | URL | Compatibilidade documental para o objeto `webhook` |
+| `webhook.secret` | Condicional | string | Nunca devolvido; usado para assinar callbacks |
+| `webhook.events` | Não | array | `job.completed`, `job.failed`, `job.cancelled`; o servidor pode adicionar `clip.ready` |
 
 Os limites exatos de tamanho, duração, concorrência e retenção devem ser retornados em `/capabilities` e `/usage`. O consumidor não deve assumir que o limite do painel interno vale para a API externa.
 
@@ -286,45 +287,47 @@ X-Quota-Cost-Units-Limit: 3600
 X-Quota-Cost-Units-Used: 1
 ```
 
-Os defaults são política técnica de alpha, não preço comercial. `cost_units` é uma estimativa interna baseada em minutos de áudio; não representa a fatura final do provider. Quando o limite é excedido, a API responde `429` com `Retry-After` e um código estável: `RATE_LIMIT_EXCEEDED`, `DAILY_JOB_QUOTA_EXCEEDED`, `DAILY_AUDIO_QUOTA_EXCEEDED` ou `DAILY_COST_LIMIT_EXCEEDED`. `/usage` expõe o uso da própria chave.
+Os planos comerciais atuais são Starter, Pro e Agency. O consumo mensal de minutos, clips e storage é agregado pelo tenant, enquanto requests, concorrência e quotas diárias continuam protegidos por API key. Quando um limite é excedido, a API responde `429` com `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` e código estável. `GET /api/v1/billing/usage` expõe plano, período, uso e saldo comercial; `/usage` permanece como visão técnica compatível. `cost_units` continua sendo uma estimativa interna, não uma fatura final do provider.
 
-## Webhooks
+## Webhooks downstream
 
-O consumidor pode informar um webhook no momento da criação. A API envia um POST assinado quando o job atingir estado terminal. O endpoint do consumidor deve:
+O consumidor pode informar um webhook no momento da criação. Ao atingir estado terminal, o Viral envia `job.completed`, `job.failed` ou `job.cancelled`; para um job de clip concluído, envia `clip.ready`. O corpo é assinado com HMAC-SHA256 sobre `timestamp + "." + corpo` e o header `X-Viral-Signature` usa o formato `t=<unix>,v1=<hex>`.
 
-1. validar assinatura e timestamp antes de processar;
-2. deduplicar pelo `event.id`;
-3. responder `2xx` rapidamente;
-4. enfileirar o processamento próprio fora do request;
-5. tolerar reentrega do mesmo evento;
-6. registrar o `X-Request-Id` e o `event.id`.
+O endpoint do consumidor deve validar assinatura e timestamp, deduplicar por `X-Viral-Delivery`, responder `2xx` rapidamente, enfileirar o trabalho próprio e tolerar reentregas. O Viral registra delivery de forma idempotente e faz até três tentativas com backoff de 0, 1 e 4 segundos. Falhas permanecem registradas para reconciliação posterior; o processamento do job não fica bloqueado pelo consumidor.
 
-Payload:
+Exemplo sanitizado:
 
 ```json
 {
-  "id": "evt_01J7MAGOEVENT",
-  "type": "job.completed",
-  "created_at": "2026-08-26T23:47:20Z",
-  "data": {
-    "job": {
-      "id": "job_01J7MAGOTRANSCRIBE",
-      "status": "succeeded",
-      "result_url": "https://viral.vr766.com/api/v1/jobs/job_01J7MAGOTRANSCRIBE/result"
-    }
-  }
+  "id": "api-transcription-01J7MAGOTRANSCRIBE",
+  "type": "transcription",
+  "event": "job.completed",
+  "status": "SUCCEEDED",
+  "created_at": "2026-08-26T23:45:00Z",
+  "finished_at": "2026-08-26T23:47:20Z",
+  "format": "json_verbose",
+  "language": "pt",
+  "duration_seconds": 140.5
 }
 ```
 
-Headers propostos:
-
 ```http
-X-Mago-Event-Id: evt_01J7MAGOEVENT
-X-Mago-Event-Timestamp: 2026-08-26T23:47:20Z
-X-Mago-Signature: sha256=<hex>
+X-Viral-Event: job.completed
+X-Viral-Delivery: wh_01J7MAGO
+X-Viral-Signature: t=1788133640,v1=<hexadecimal-hmac>
 ```
 
-Webhooks são callbacks HTTP e devem ser tratados como eventos potencialmente repetidos; esse modelo segue a prática descrita na documentação da Twilio para integrações orientadas a eventos [10].
+## Billing e webhooks de provider
+
+O endpoint `GET /api/v1/billing/usage` exige `usage:read` e retorna o plano do tenant, período atual, consumo mensal de minutos/clips/storage, saldo restante e visão técnica da API key. A API aceita `Starter`, `Pro` e `Agency`; a mudança de plano é feita pelo control plane e deve ser refletida por webhook assinado do provider.
+
+Os endpoints de provider são `POST /api/v1/billing/webhooks/stripe` e `POST /api/v1/billing/webhooks/mercado-pago`. O primeiro valida `Stripe-Signature`; o segundo valida `x-signature`, `x-request-id` e `data.id`. Eventos são deduplicados por `(provider, event_id)`. Nenhum segredo de provider é criado automaticamente: configure `STRIPE_WEBHOOK_SECRET` ou `MERCADO_PAGO_WEBHOOK_SECRET` somente no secret manager do ambiente e valide em homologação antes de produção.
+
+A implementação usa metadata `account_id` e `plan_code` para provisionamento determinístico. Sem `account_id`, o evento é registrado mas não concede acesso. Billing acompanha entitlements e consumo; cobrança monetária, checkout e conciliação bancária continuam responsabilidades do adapter do provider.
+
+## Retenção e governança de mídia
+
+O TTL padrão é de sete dias, configurável por `API_RETENTION_DAYS`. O timer diário marca o job como retido, marca artefatos como `expired`, remove arquivos físicos do storage protegido e libera a reserva de bytes. O ledger histórico de uso e a trilha de auditoria não são apagados. Depois da expiração, a operação retorna `EXPIRED`/`410 Gone` e precisa ser reenviada para gerar novo resultado.
 
 ## Rate limits, quotas e retry
 
@@ -344,7 +347,7 @@ Limites serão aplicados por API key e endpoint. A resposta `429` deve incluir `
 | `500` | Condicional | Repetir com a mesma idempotência se for POST |
 | `502`/`503`/`504` | Sim, limitado | Retry com backoff; respeitar `Retry-After` |
 
-O endpoint `/usage` deve permitir ao consumidor acompanhar requests, jobs, bytes e concorrência. Quotas de CPU, disco, duração e custo devem existir antes de a API aceitar tráfego de terceiros.
+O endpoint `/api/v1/billing/usage` permite acompanhar plano, minutos, clips e storage do tenant; `/usage` mantém requests, jobs, bytes e concorrência da API key. Quotas de CPU, disco, duração e custo devem existir antes de ampliar tráfego de terceiros.
 
 ## Erros
 
@@ -468,7 +471,7 @@ A documentação poderá ser promovida de `draft` para `stable` apenas quando:
 | Contrato | OpenAPI validado, docs renderizadas, exemplos executados em staging |
 | Operação | Rate limits, quotas, métricas, alertas, backup e rollback ensaiados |
 | Qualidade | CI verde para lint, typecheck, build, testes e scan de dependências |
-| Produto | Política de retenção, suporte, changelog e depreciação publicados |
+| Produto | Política de retenção, suporte, changelog e depreciação publicados | TTL de 7 dias, billing/usage e webhooks documentados; checkout depende de credenciais do provider |
 
 ## Referências
 
@@ -485,3 +488,5 @@ A documentação poderá ser promovida de `draft` para `stable` apenas quando:
 [11]: https://developers.openai.com/api/docs/guides/rate-limits
 [12]: https://owasp.org/API-Security/editions/2023/en/0x11-t10/
 [13]: https://google.aip.dev/151
+[14]: https://docs.stripe.com/billing/subscriptions/webhooks
+[15]: https://www.mercadopago.com.ar/developers/en/docs/your-integrations/notifications/webhooks

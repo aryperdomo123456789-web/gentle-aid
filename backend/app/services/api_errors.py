@@ -150,6 +150,41 @@ ERROR_CATALOG: dict[str, dict[str, Any]] = {
         "title": "Daily cost limit exceeded",
         "retryable": True,
     },
+    "MONTHLY_AUDIO_QUOTA_EXCEEDED": {
+        "http_status": 429,
+        "title": "Monthly audio quota exceeded",
+        "retryable": False,
+    },
+    "MONTHLY_CLIP_QUOTA_EXCEEDED": {
+        "http_status": 429,
+        "title": "Monthly clip quota exceeded",
+        "retryable": False,
+    },
+    "STORAGE_QUOTA_EXCEEDED": {
+        "http_status": 413,
+        "title": "Storage quota exceeded",
+        "retryable": False,
+    },
+    "SUBSCRIPTION_INACTIVE": {
+        "http_status": 402,
+        "title": "Subscription inactive",
+        "retryable": False,
+    },
+    "INVALID_WEBHOOK_SIGNATURE": {
+        "http_status": 400,
+        "title": "Invalid webhook signature",
+        "retryable": False,
+    },
+    "INVALID_WEBHOOK_PAYLOAD": {
+        "http_status": 400,
+        "title": "Invalid webhook payload",
+        "retryable": False,
+    },
+    "BILLING_WEBHOOK_UNAVAILABLE": {
+        "http_status": 503,
+        "title": "Billing webhook unavailable",
+        "retryable": True,
+    },
     "CONCURRENT_JOB_LIMIT_EXCEEDED": {
         "http_status": 429,
         "title": "Concurrent job limit exceeded",

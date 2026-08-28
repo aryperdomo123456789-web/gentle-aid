@@ -801,6 +801,15 @@ def delete(job_id: str) -> None:
     request_cancel(job_id)
     wait(job_id, timeout=10.0)
     job = get(job_id)
+    if job:
+        try:
+            from . import billing
+            meta = job.get("meta") if isinstance(job.get("meta"), dict) else {}
+            consumer_id = meta.get("api_key_id") or meta.get("consumer_id")
+            if consumer_id:
+                billing.release_storage(billing.account_id_for_consumer(str(consumer_id)), resource_id=job_id)
+        except Exception:
+            pass
     audit(
         "deleted",
         job_id,

@@ -20,7 +20,7 @@ sys.path.insert(0, str(REPO / "backend"))
 
 from app import create_app
 from app.config import Config
-from app.services import idempotency, jobs, persistent_queue, rate_limits, release_keys
+from app.services import billing, idempotency, jobs, persistent_queue, rate_limits, release_keys
 import worker as api_worker
 
 
@@ -32,8 +32,11 @@ class ApiV1ContractTests(unittest.TestCase):
         idempotency.migrate()
         persistent_queue.migrate()
         rate_limits.migrate()
+        billing.migrate()
         cls.client = cls.app.test_client()
         owner = {"id": "u_owner_test", "email": "owner@example.test", "role": "owner"}
+        with cls.app.app_context():
+            billing.set_subscription(owner["id"], plan_code="agency", status="active")
         cls.full_key = release_keys.create_key(
             owner,
             label="local integration",

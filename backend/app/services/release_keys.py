@@ -80,6 +80,7 @@ def migrate() -> None:
             """
             CREATE TABLE IF NOT EXISTS release_keys (
                 id TEXT PRIMARY KEY,
+                account_id TEXT,
                 label TEXT NOT NULL,
                 key_prefix TEXT NOT NULL,
                 secret_hash TEXT NOT NULL UNIQUE,
@@ -96,6 +97,10 @@ def migrate() -> None:
             CREATE INDEX IF NOT EXISTS idx_release_keys_secret_hash ON release_keys(secret_hash);
             """
         )
+        columns = {str(row[1]) for row in conn.execute("PRAGMA table_info(release_keys)").fetchall()}
+        if "account_id" not in columns:
+            conn.execute("ALTER TABLE release_keys ADD COLUMN account_id TEXT")
+        conn.execute("UPDATE release_keys SET account_id = id WHERE account_id IS NULL OR account_id = ''")
 
 
 def _public(row: sqlite3.Row) -> dict[str, Any]:
@@ -176,12 +181,13 @@ def create_key(
         conn.execute(
             """
             INSERT INTO release_keys (
-                id, label, key_prefix, secret_hash, scopes_json, created_at, created_by, expires_at,
+                id, account_id, label, key_prefix, secret_hash, scopes_json, created_at, created_by, expires_at,
                 revoked_at, last_used_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
             """,
             (
                 key_id,
+                str(actor.get("id") or actor.get("email") or key_id),
                 clean_label,
                 _prefix(token),
                 secret_hash,
@@ -245,5 +251,6 @@ def validate_key(raw_key: str) -> dict[str, Any] | None:
             (_now(), row["id"]),
         )
         public = _public(row)
+        public["account_id"] = row["account_id"] or row["id"]
         public["valid"] = True
         return public

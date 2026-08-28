@@ -104,8 +104,12 @@ log "Ambiente virtual Python"
 ok "$("$VENV/bin/python" -V)"
 
 log "Verificando importação da API Flask"
-( cd "$APP_DIR/backend" && VIRAL_ROOT="$APP_DIR" "$VENV/bin/python" -c "from app import create_app; create_app(); print('Flask OK')" ) \
+( cd "$APP_DIR/backend" && VIRAL_ROOT="$APP_DIR" VIRAL_STORAGE="$STORAGE" PYTHONPATH="$APP_DIR/backend" "$VENV/bin/python" -c "from app import create_app; create_app(); print('Flask OK')" ) \
   || die "A aplicação Flask não importou. Veja o erro acima."
+
+log "Migração explícita de billing e delivery"
+( VIRAL_ROOT="$APP_DIR" VIRAL_STORAGE="$STORAGE" PYTHONPATH="$APP_DIR/backend" "$VENV/bin/python" -c "from app.services import billing, release_keys, webhook_delivery; release_keys.migrate(); billing.migrate(); webhook_delivery.migrate(); print('Billing OK')" ) \
+  || die "A migração comercial falhou. Nenhum daemon será reiniciado."
 
 # --- 4. Storage --------------------------------------------------------------
 log "Estrutura de armazenamento"
@@ -168,19 +172,25 @@ if command -v systemctl >/dev/null 2>&1; then
   render "$SCRIPT_DIR/viral-backup-mirror.timer.template" > /etc/systemd/system/viral-backup-mirror.timer
   render "$SCRIPT_DIR/viral-groq-route-monitor.service.template" > /etc/systemd/system/viral-groq-route-monitor.service
   render "$SCRIPT_DIR/viral-groq-route-monitor.timer.template" > /etc/systemd/system/viral-groq-route-monitor.timer
+  render "$SCRIPT_DIR/viral-retention-gc.service.template" > /etc/systemd/system/viral-retention-gc.service
+  render "$SCRIPT_DIR/viral-retention-gc.timer.template" > /etc/systemd/system/viral-retention-gc.timer
+  chmod 750 "$SCRIPT_DIR/viral-retention-gc.sh" "$SCRIPT_DIR/migrate-billing.sh" 2>/dev/null || true
   systemctl daemon-reload
   systemctl enable viral-api viral-web viral-worker >/dev/null 2>&1 || true
   systemctl enable viral-auto-update.timer >/dev/null 2>&1 || true
   systemctl enable viral-backup-mirror.timer >/dev/null 2>&1 || true
   systemctl enable viral-groq-route-monitor.timer >/dev/null 2>&1 || true
+  systemctl enable viral-retention-gc.timer >/dev/null 2>&1 || true
   systemctl restart viral-api viral-web
   systemctl start viral-auto-update.timer >/dev/null 2>&1 || true
   systemctl start viral-backup-mirror.timer >/dev/null 2>&1 || true
   systemctl start viral-groq-route-monitor.timer >/dev/null 2>&1 || true
+  systemctl start viral-retention-gc.timer >/dev/null 2>&1 || true
   ok "viral-api e viral-web ativos; viral-worker preparado para iniciar após a migração da fila"
   ok "timer de auto-update ativo"
   ok "timer de backup mirror ativo"
   ok "timer de monitoramento da rota Groq ativo"
+  ok "timer de retenção/garbage collection ativo"
 else
   warn "systemctl indisponível — inicie manualmente os serviços."
 fi

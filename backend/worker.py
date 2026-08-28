@@ -16,11 +16,23 @@ from typing import Any
 
 from app import create_app
 from app.config import config
-from app.services import jobs, persistent_queue, rate_limits, transcribe, viral_clips
+from app.services import jobs, persistent_queue, rate_limits, transcribe, viral_clips, webhook_delivery
 from app.services.api_errors import operation_error
 
 _STOP = threading.Event()
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
+
+
+def _notify_downstream(job_id: str) -> None:
+    job = jobs.get(job_id) or {}
+    if not job or job.get("tool") not in {"api-transcription", "api-clip"}:
+        return
+    def deliver() -> None:
+        try:
+            webhook_delivery.notify_job(job)
+        except Exception:
+            return
+    threading.Thread(target=deliver, name=f"viral-webhook-{job_id[:12]}", daemon=True).start()
 
 
 def _release_active_slot(job_id: str) -> None:
@@ -133,6 +145,20 @@ def _run_api_clip(item: dict[str, Any]) -> None:
     viral_clips.slice_media(source, destination, start=start, end=end, job_id=job_id)
     srt_path.write_text(viral_clips.render_captions(clip, "srt"), encoding="utf-8")
     vtt_path.write_text(viral_clips.render_captions(clip, "vtt"), encoding="utf-8")
+    try:
+        from app.services import billing
+        meta = jobs.get(job_id).get("meta") if jobs.get(job_id) else {}
+        consumer_id = meta.get("api_key_id") or meta.get("consumer_id")
+        if consumer_id:
+            billing.reserve_storage(
+                billing.account_id_for_consumer(str(consumer_id)),
+                resource_id=job_id,
+                storage_bytes=sum(path.stat().st_size for path in (destination, srt_path, vtt_path)),
+            )
+    except Exception:
+        for path in (destination, srt_path, vtt_path):
+            path.unlink(missing_ok=True)
+        raise
     jobs.register_artifact(job_id, destination, "api-output")
     jobs.register_artifact(job_id, srt_path, "clip-srt")
     jobs.register_artifact(job_id, vtt_path, "clip-vtt")
@@ -175,6 +201,14 @@ def _cleanup_input_source(item: dict[str, Any], *, terminal_success: bool = Fals
         return
     source = Path(str((item.get("payload") or {}).get("source_path") or ""))
     source.unlink(missing_ok=True)
+    try:
+        from app.services import billing
+        meta = job.get("meta") if isinstance(job.get("meta"), dict) else {}
+        consumer_id = meta.get("api_key_id") or meta.get("consumer_id")
+        if consumer_id:
+            billing.release_storage(billing.account_id_for_consumer(str(consumer_id)), resource_id=job_id)
+    except Exception:
+        pass
 
 
 def _process(item: dict[str, Any]) -> None:
@@ -187,6 +221,7 @@ def _process(item: dict[str, Any]) -> None:
             persistent_queue.complete(job_id, WORKER_ID)
             jobs.update(job_id, queue_status="done")
             _release_active_slot(job_id)
+            _notify_downstream(job_id)
             _cleanup_input_source(item)
             return
         jobs.update(
@@ -206,12 +241,14 @@ def _process(item: dict[str, Any]) -> None:
         persistent_queue.complete(job_id, WORKER_ID)
         jobs.update(job_id, queue_status="done")
         _release_active_slot(job_id)
+        _notify_downstream(job_id)
         _cleanup_input_source(item, terminal_success=True)
     except jobs.JobCancelled:
         jobs.update(job_id, status="cancelled", stage="cancelado", message="Job cancelado pelo operador.", finished_at=jobs._now())
         persistent_queue.complete(job_id, WORKER_ID)
         jobs.update(job_id, queue_status="done")
         _release_active_slot(job_id)
+        _notify_downstream(job_id)
         _cleanup_input_source(item)
     except Exception as exc:
         code, retryable = _retryable(exc)
@@ -228,6 +265,7 @@ def _process(item: dict[str, Any]) -> None:
                 queue_status="failed",
             )
             _release_active_slot(job_id)
+            _notify_downstream(job_id)
             _cleanup_input_source(item)
         else:
             jobs.update(job_id, status="queued", stage="aguardando_retry", message="Falha temporária; retry agendado.", error_code=code, retryable=True, queue_status="queued")
