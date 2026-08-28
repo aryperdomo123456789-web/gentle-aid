@@ -1,0 +1,12 @@
+[Unit]
+Description=Ecossistema Viral — agenda do garbage collector
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=24h
+Persistent=true
+RandomizedDelaySec=15min
+Unit=viral-retention-gc.service
+
+[Install]
+WantedBy=timers.target

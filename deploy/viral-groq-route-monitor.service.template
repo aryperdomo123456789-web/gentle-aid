@@ -1,0 +1,19 @@
+[Unit]
+Description=Ecossistema Viral — Groq route monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__USER__
+Group=__USER__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=-__APP_DIR__/.env
+Environment=VIRAL_ROOT=__APP_DIR__
+ExecStart=__APP_DIR__/deploy/viral-groq-route-monitor.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateDevices=true
+RestrictAddressFamilies=AF_INET AF_UNIX

@@ -71,6 +71,7 @@ TOOL_LABELS = {
     "canva": "Limpeza Canva",
     "studio": "Estúdio de Vídeo IA",
     "recap": "Recap Narrado",
+    "transcribe": "Transcrição",
 }
 
 MAX_EVENTS = 600
@@ -213,8 +214,20 @@ def _heal(job: dict[str, Any]) -> dict[str, Any]:
     return job
 
 
+def _has_persistent_queue_entry(job_id: str) -> bool:
+    """Retorna se um job público ainda tem intenção persistente de execução."""
+    try:
+        from . import persistent_queue
+
+        entry = persistent_queue.get(job_id)
+        return bool(entry and entry.get("status") in {"queued", "running"})
+    except Exception:
+        # O schema pode ainda não existir em instalações legadas.
+        return False
+
+
 def reconcile_orphans() -> int:
-    """Roda no boot: fecha jobs que ficaram presos em `running` após restart."""
+    """Roda no boot: fecha jobs órfãos, preservando jobs na fila persistente."""
     healed = 0
     try:
         files = list(config.jobs_dir.glob("*.json"))
@@ -229,6 +242,8 @@ def reconcile_orphans() -> int:
             continue
         data = _normalize(data)
         if data.get("status") in TERMINAL_STATUSES:
+            continue
+        if _has_persistent_queue_entry(str(data.get("job_id") or "")):
             continue
         # No boot, qualquer job não-terminal sem dono vivo é órfão — mesmo recente.
         owner_pid = data.get("owner_pid")
@@ -383,8 +398,40 @@ def stage(
     _event(job_id, "stage", message or f"Etapa: {name}", stage=name)
 
 
+def _load_from_disk(job_id: str) -> dict[str, Any] | None:
+    file = _job_file(job_id)
+    try:
+        data = json.loads(file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict) or not data.get("job_id"):
+        return None
+    return _normalize(data)
+
+
+def load(job_id: str) -> dict[str, Any] | None:
+    """Carrega um job persistido no cache do processo atual."""
+    with _lock:
+        existing = _jobs.get(job_id)
+        if existing:
+            return _normalize(dict(existing))
+    data = _load_from_disk(job_id)
+    if not data:
+        return None
+    with _lock:
+        _jobs[job_id] = data
+        _cancel_events.setdefault(job_id, threading.Event())
+        _done_events.setdefault(job_id, threading.Event())
+    return _normalize(dict(data))
+
+
 def update(job_id: str, **fields: Any) -> None:
     previous_status = None
+    with _lock:
+        job = _jobs.get(job_id)
+    if not job:
+        if not load(job_id):
+            return
     with _lock:
         job = _jobs.get(job_id)
         if not job:
@@ -503,16 +550,22 @@ def wait(job_id: str, timeout: float = 8.0) -> None:
 
 
 def get(job_id: str) -> dict[str, Any] | None:
+    """Lê o snapshot persistido para sincronizar Gunicorn e worker separados."""
+    file = _job_file(job_id)
+    if file.exists():
+        try:
+            data = _heal(_normalize(json.loads(file.read_text(encoding="utf-8"))))
+            with _lock:
+                _jobs[job_id] = data
+                _cancel_events.setdefault(job_id, threading.Event())
+                _done_events.setdefault(job_id, threading.Event())
+            return data
+        except (OSError, json.JSONDecodeError):
+            pass
     with _lock:
         job = _jobs.get(job_id)
         if job:
             return _heal(_normalize(dict(job)))
-    file = _job_file(job_id)
-    if file.exists():
-        try:
-            return _heal(_normalize(json.loads(file.read_text(encoding="utf-8"))))
-        except json.JSONDecodeError:
-            return None
     return None
 
 
@@ -748,6 +801,15 @@ def delete(job_id: str) -> None:
     request_cancel(job_id)
     wait(job_id, timeout=10.0)
     job = get(job_id)
+    if job:
+        try:
+            from . import billing
+            meta = job.get("meta") if isinstance(job.get("meta"), dict) else {}
+            consumer_id = meta.get("api_key_id") or meta.get("consumer_id")
+            if consumer_id:
+                billing.release_storage(billing.account_id_for_consumer(str(consumer_id)), resource_id=job_id)
+        except Exception:
+            pass
     audit(
         "deleted",
         job_id,

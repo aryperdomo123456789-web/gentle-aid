@@ -1,0 +1,1545 @@
+openapi: 3.1.0
+info:
+  title: Mago API
+  version: 0.1.0-alpha
+  summary: API pública assíncrona para geração e processamento de mídia
+  description: |
+    Contrato alpha publicado para o API Hub do gentle-aid. A transcrição v1, suas
+    rotas de operação/result, fila persistente e limites técnicos por consumidor
+    estão disponíveis em beta comercial controlada. Billing por tenant, quotas
+    mensais, webhooks assinados e retenção estão publicados; checkout externo,
+    SLA financeiro e escala distribuída exigem configuração e contrato próprios.
+
+    O contrato privilegia operações assíncronas, API keys com escopo,
+    idempotência, resultados protegidos, erros machine-readable e compatibilidade
+    de longo prazo. Entradas com mais de 10 minutos ou chunks intermediários
+    acima de 25 MB usam particionamento sequencial com cortes próximos de silêncio
+    quando o VAD baseado em FFmpeg encontra pontos adequados. Billing por tenant,
+    quotas mensais, webhooks assinados e TTL de mídia estão disponíveis em beta;
+    checkout externo exige credenciais de provider configuradas no ambiente.
+  contact:
+    name: Mago API Support
+    url: https://viral.vr766.com
+  license:
+    name: Proprietary
+servers:
+  - url: https://viral.vr766.com/api/v1
+    description: Produção — alpha controlada; consulte a documentação antes de integrar
+  - url: https://staging.viral.vr766.com/api/v1
+    description: Staging — substituir pelo host real de homologação
+externalDocs:
+  description: Documentação pública de integração
+  url: https://viral.vr766.com/api/docs
+
+tags:
+  - name: Platform
+    description: Saúde e capacidades não sensíveis da plataforma.
+  - name: Transcriptions
+    description: Criação e consulta de transcrições assíncronas.
+  - name: Jobs
+    description: Operações sobre jobs pertencentes à API key consumidora.
+  - name: Usage
+    description: Uso e limites do consumidor autenticado.
+  - name: Billing
+    description: Planos, consumo comercial e webhooks de providers de cobrança.
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Platform]
+      operationId: getHealth
+      summary: Verifica a disponibilidade da API
+      security: []
+      responses:
+        '200':
+          description: Serviço disponível.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: ok
+                api_version: v1
+                request_id: req_01J7MAGOHEALTH
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /capabilities:
+    get:
+      tags: [Platform]
+      operationId: listCapabilities
+      summary: Lista recursos e limites disponíveis
+      security:
+        - ApiKeyAuth: [catalog:read]
+        - BearerAuth: [catalog:read]
+      responses:
+        '200':
+          description: Capacidades visíveis para a API key.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilitiesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /transcriptions:
+    post:
+      tags: [Transcriptions]
+      operationId: createTranscription
+      summary: Enfileira uma transcrição de áudio ou vídeo
+      description: |
+        A operação é assíncrona. O servidor valida o arquivo, cria um job e
+        responde imediatamente com `202 Accepted`. Repetir a mesma requisição
+        com o mesmo `Idempotency-Key` deve devolver o mesmo job enquanto a chave
+        de idempotência estiver retida.
+      security:
+        - ApiKeyAuth: [transcribe:write]
+        - BearerAuth: [transcribe:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ClientRequestId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TranscriptionRequest'
+            encoding:
+              file:
+                contentType: audio/*,video/*,application/octet-stream
+      responses:
+        '202':
+          description: Operação aceita e colocada na fila.
+          headers:
+            Location:
+              description: URL canônica para consultar a operação.
+              schema:
+                type: string
+                format: uri
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /transcriptions/{job_id}/insights:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Transcriptions]
+      operationId: getTranscriptionInsights
+      summary: Identifica oportunidades de cortes virais
+      description: |
+        Analisa o json_verbose persistido com o motor heurístico `heuristic-v1`.
+        O score entre 0 e 100 é uma priorização editorial explicável e não uma
+        garantia de alcance ou retenção real.
+      security:
+        - ApiKeyAuth: [results:read]
+        - BearerAuth: [results:read]
+      parameters:
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Oportunidades de clips ordenadas por score.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ViralInsightsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /transcriptions/{job_id}/clips:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    post:
+      tags: [Transcriptions]
+      operationId: createClip
+      summary: Enfileira a geração de um clip viral
+      description: |
+        Recorta de 1 a 90 segundos da mídia-fonte protegida de uma transcrição
+        concluída. A resposta é uma operação longa; ao terminar, o result_url
+        aponta para o arquivo de mídia e `/transcriptions/{job_id}/export` pode
+        renderizar as legendas relativas do clip.
+      security:
+        - ApiKeyAuth: [transcribe:write]
+        - BearerAuth: [transcribe:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ClientRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClipRequest'
+      responses:
+        '202':
+          description: Clip aceito e colocado na fila persistente.
+          headers:
+            Location:
+              description: URL canônica para consultar a operação do clip.
+              schema: {type: string, format: uri}
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /billing/usage:
+    get:
+      tags: [Billing]
+      operationId: getBillingUsage
+      summary: Consulta plano, quotas mensais e consumo do tenant
+      security:
+        - ApiKeyAuth: [usage:read]
+        - BearerAuth: [usage:read]
+      responses:
+        '200':
+          description: Snapshot comercial e técnico do consumidor autenticado.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingUsageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /billing/webhooks/stripe:
+    post:
+      tags: [Billing]
+      operationId: receiveStripeBillingWebhook
+      summary: Recebe eventos assinados da Stripe
+      description: Valida `Stripe-Signature`, registra o event id de forma idempotente e atualiza entitlements quando o evento contém `metadata.account_id`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Evento recebido ou replay idempotente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /billing/webhooks/mercado-pago:
+    post:
+      tags: [Billing]
+      operationId: receiveMercadoPagoBillingWebhook
+      summary: Recebe notificações assinadas do Mercado Pago
+      description: Valida `x-signature`, `x-request-id` e `data.id`; eventos sem `account_id` ficam registrados como recebidos e não provisionam acesso.
+      security: []
+      parameters:
+        - name: data.id
+          in: query
+          required: false
+          schema: {type: string, maxLength: 200}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Notificação recebida ou replay idempotente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /jobs:
+    get:
+      tags: [Jobs]
+      operationId: listJobs
+      summary: Lista jobs do consumidor autenticado
+      security:
+        - ApiKeyAuth: [jobs:read]
+        - BearerAuth: [jobs:read]
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+        - name: status
+          in: query
+          description: Filtra por estado do job.
+          schema:
+            type: string
+            enum: [queued, running, succeeded, failed, cancelled, expired]
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Página de jobs do consumidor atual.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /jobs/{job_id}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Jobs]
+      operationId: getJob
+      summary: Consulta o estado de um job do consumidor
+      security:
+        - ApiKeyAuth: [jobs:read]
+        - BearerAuth: [jobs:read]
+      parameters:
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Estado atual do job.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /operations/{job_id}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Jobs]
+      operationId: getOperation
+      summary: Consulta uma operação longa
+      description: Retorna a operação até um estado terminal. O consumidor só pode consultar operações criadas pela própria API key.
+      security:
+        - ApiKeyAuth: [jobs:read]
+        - BearerAuth: [jobs:read]
+      parameters:
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Operação longa atual.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /operations/{job_id}:cancel:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    post:
+      tags: [Jobs]
+      operationId: cancelOperation
+      summary: Cancela uma operação longa
+      description: Solicita cancelamento de uma operação ainda não terminal. A resposta usa o mesmo envelope da operação.
+      security:
+        - ApiKeyAuth: [jobs:write]
+        - BearerAuth: [jobs:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '202':
+          description: Cancelamento aceito.
+          headers:
+            Location:
+              description: URL canônica da operação.
+              schema:
+                type: string
+                format: uri
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /jobs/{job_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    post:
+      tags: [Jobs]
+      operationId: cancelJob
+      summary: Solicita o cancelamento de um job
+      security:
+        - ApiKeyAuth: [jobs:write]
+        - BearerAuth: [jobs:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '202':
+          description: Cancelamento aceito; consultar o job para confirmar o estado terminal.
+          headers:
+            Location:
+              description: URL canônica do job.
+              schema:
+                type: string
+                format: uri
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /jobs/{job_id}/result:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Jobs]
+      operationId: getJobResult
+      summary: Obtém o resultado concluído do job
+      description: |
+        A resposta não deve expor caminhos físicos. O servidor pode redirecionar
+        para uma URL assinada e curta ou devolver o conteúdo solicitado com
+        `Content-Disposition` seguro.
+      security:
+        - ApiKeyAuth: [results:read]
+        - BearerAuth: [results:read]
+      parameters:
+        - name: format
+          in: query
+          description: Formato do resultado.
+          schema:
+            type: string
+            enum: [srt, vtt, json, json_verbose, text]
+            default: srt
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Resultado do job.
+          headers:
+            Content-Disposition:
+              description: Nome de download controlado pelo servidor.
+              schema:
+                type: string
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptionResult'
+        '202':
+          description: Job ainda não terminou.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+
+  /transcriptions/{job_id}/export:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Transcriptions]
+      operationId: exportTranscription
+      summary: Exporta segmentos canônicos em outro formato
+      description: |
+        Renderiza novamente os segmentos persistidos de uma transcrição concluída,
+        sem reenviar a mídia. A operação exige ownership e o escopo `results:read`.
+        Aceita SRT, WebVTT, JSON verbose, JSON legado e texto simples.
+      security:
+        - ApiKeyAuth: [results:read]
+        - BearerAuth: [results:read]
+      parameters:
+        - name: format
+          in: query
+          required: false
+          description: Formato da exportação.
+          schema:
+            type: string
+            enum: [srt, vtt, json_verbose, json, text]
+            default: srt
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Arquivo de legenda ou transcrição exportado.
+          headers:
+            Content-Disposition:
+              description: Nome de download controlado pelo servidor.
+              schema: {type: string}
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/x-subrip:
+              schema: {type: string}
+            text/vtt:
+              schema: {type: string}
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TranscriptionResult'
+                  - $ref: '#/components/schemas/VerboseTranscription'
+            text/plain:
+              schema: {type: string}
+        '202':
+          description: Job ainda não terminou.
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /billing/usage:
+    get:
+      tags: [Billing]
+      operationId: getBillingUsage
+      summary: Consulta plano e consumo comercial do tenant
+      security:
+        - ApiKeyAuth: [usage:read]
+        - BearerAuth: [usage:read]
+      responses:
+        '200':
+          description: Plano, período, uso e saldo mensal, além da visão técnica da chave.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingUsageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /billing/webhooks/stripe:
+    post:
+      tags: [Billing]
+      operationId: receiveStripeBillingWebhook
+      summary: Recebe evento assinado da Stripe
+      description: Valida `Stripe-Signature`, deduplica event id e atualiza entitlements quando houver metadata.account_id e metadata.plan_code.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Evento recebido ou replay idempotente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /billing/webhooks/mercado-pago:
+    post:
+      tags: [Billing]
+      operationId: receiveMercadoPagoBillingWebhook
+      summary: Recebe notificação assinada do Mercado Pago
+      description: Valida x-signature, x-request-id e data.id; eventos sem account_id são registrados mas não concedem acesso.
+      security: []
+      parameters:
+        - name: data.id
+          in: query
+          required: false
+          schema: {type: string, maxLength: 200}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Notificação recebida ou replay idempotente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /usage:
+    get:
+      tags: [Usage]
+      operationId: getUsage
+      summary: Consulta consumo e limites do consumidor
+      security:
+        - ApiKeyAuth: [usage:read]
+        - BearerAuth: [usage:read]
+      responses:
+        '200':
+          description: Uso agregado, sem dados de outros consumidores.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+webhooks:
+  jobCompleted:
+    post:
+      summary: Evento enviado quando um job alcança estado terminal
+      operationId: receiveJobCompleted
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobEvent'
+      responses:
+        '2XX':
+          description: Evento aceito.
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Chave `mago_...` emitida no painel administrativo.
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: mago_...
+      description: 'Envie a mesma chave no formato Authorization: Bearer mago_....'
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID v4 ou identificador aleatório único por operação de escrita.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 255
+        pattern: '^[A-Za-z0-9._~-]+$'
+      example: 7b8d5b25-4a9e-4de3-9b34-3dca6b7f9f4d
+    ClientRequestId:
+      name: X-Client-Request-Id
+      in: header
+      required: false
+      description: Identificador definido pelo consumidor para correlação própria.
+      schema:
+        type: string
+        maxLength: 128
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      description: Quantidade máxima de itens; default 50, máximo 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    PageToken:
+      name: page_token
+      in: query
+      required: false
+      description: Cursor opaco devolvido pela página anterior.
+      schema:
+        type: string
+        maxLength: 4096
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      description: Identificador público do job.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_-]{3,160}$'
+
+  headers:
+    RequestId:
+      description: Identificador gerado pela API para suporte e observabilidade.
+      schema:
+        type: string
+        pattern: '^req_[A-Za-z0-9_-]+$'
+    RateLimitLimit:
+      description: Número máximo de requests autenticadas por minuto para a chave.
+      schema:
+        type: integer
+        minimum: 1
+        example: 60
+    RateLimitRemaining:
+      description: Requests autenticadas restantes na janela atual.
+      schema:
+        type: integer
+        minimum: 0
+        example: 59
+    RateLimitReset:
+      description: Unix timestamp do início da próxima janela UTC.
+      schema:
+        type: integer
+        minimum: 0
+        example: 1788133680
+
+  schemas:
+    Plan:
+      type: object
+      required: [code, name, monthly_audio_minutes, monthly_clips, storage_bytes]
+      properties:
+        code: {type: string, enum: [starter, pro, agency]}
+        name: {type: string}
+        monthly_audio_minutes: {type: number, minimum: 0}
+        monthly_clips: {type: integer, minimum: 0}
+        storage_bytes: {type: integer, minimum: 0}
+        requests_per_minute: {type: integer, minimum: 1}
+        jobs_per_day: {type: integer, minimum: 1}
+        max_concurrent_jobs: {type: integer, minimum: 1}
+
+    BillingUsage:
+      type: object
+      required: [account_id, plan, subscription_status, period_start, period_end, used, limits, remaining]
+      properties:
+        account_id: {type: string}
+        plan: {$ref: '#/components/schemas/Plan'}
+        subscription_status: {type: string, example: active}
+        period_start: {type: string, format: date-time}
+        period_end: {type: string, format: date-time}
+        used: {type: object, additionalProperties: true}
+        limits: {type: object, additionalProperties: true}
+        remaining: {type: object, additionalProperties: true}
+
+    BillingUsageResponse:
+      type: object
+      required: [billing, technical]
+      properties:
+        billing: {$ref: '#/components/schemas/BillingUsage'}
+        technical: {type: object, additionalProperties: true}
+
+    WebhookAck:
+      type: object
+      required: [accepted, duplicate, event_id]
+      properties:
+        accepted: {type: boolean}
+        duplicate: {type: boolean}
+        event_id: {type: string}
+        event_type: {type: string}
+        account_mapped: {type: boolean}
+
+    Plan:
+      type: object
+      required: [code, name, monthly_audio_minutes, monthly_clips, storage_bytes]
+      properties:
+        code: {type: string, enum: [starter, pro, agency]}
+        name: {type: string}
+        monthly_audio_minutes: {type: number, minimum: 0}
+        monthly_clips: {type: integer, minimum: 0}
+        storage_bytes: {type: integer, minimum: 0}
+        requests_per_minute: {type: integer, minimum: 1}
+        jobs_per_day: {type: integer, minimum: 1}
+        max_concurrent_jobs: {type: integer, minimum: 1}
+
+    BillingUsage:
+      type: object
+      required: [account_id, plan, subscription_status, period_start, period_end, used, limits, remaining]
+      properties:
+        account_id: {type: string}
+        plan: {$ref: '#/components/schemas/Plan'}
+        subscription_status: {type: string, example: active}
+        period_start: {type: string, format: date-time}
+        period_end: {type: string, format: date-time}
+        used: {type: object, additionalProperties: true}
+        limits: {type: object, additionalProperties: true}
+        remaining: {type: object, additionalProperties: true}
+
+    BillingUsageResponse:
+      type: object
+      required: [billing, technical]
+      properties:
+        billing: {$ref: '#/components/schemas/BillingUsage'}
+        technical: {type: object, additionalProperties: true}
+
+    WebhookAck:
+      type: object
+      required: [accepted, duplicate, event_id]
+      properties:
+        accepted: {type: boolean}
+        duplicate: {type: boolean}
+        event_id: {type: string}
+        event_type: {type: string}
+        account_mapped: {type: boolean}
+
+    Health:
+      type: object
+      required: [status, api_version, request_id]
+      properties:
+        status:
+          type: string
+          const: ok
+        api_version:
+          type: string
+          example: v1
+        request_id:
+          type: string
+          example: req_01J7MAGOHEALTH
+
+    Capability:
+      type: object
+      required: [id, status, input_formats, output_formats]
+      properties:
+        id:
+          type: string
+          example: transcription
+        status:
+          type: string
+          enum: [available, degraded, unavailable]
+        input_formats:
+          type: array
+          items: {type: string}
+        output_formats:
+          type: array
+          items: {type: string}
+        limits:
+          type: object
+          additionalProperties: true
+
+    CapabilitiesResponse:
+      type: object
+      required: [data, api_version]
+      properties:
+        api_version:
+          type: string
+          example: v1
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+
+    ClipRequest:
+      type: object
+      required: [start_seconds, end_seconds]
+      additionalProperties: false
+      properties:
+        start_seconds:
+          type: number
+          minimum: 0
+          description: Início absoluto na mídia-fonte, em segundos.
+        end_seconds:
+          type: number
+          exclusiveMinimum: 0
+          description: Fim absoluto na mídia-fonte, em segundos; janela máxima de 90 segundos.
+        insight:
+          $ref: '#/components/schemas/ViralClipInsight'
+
+    ViralClipInsight:
+      type: object
+      properties:
+        retention_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        suggested_title:
+          type: string
+          maxLength: 200
+        initial_hook:
+          type: string
+          maxLength: 400
+        summary:
+          type: string
+          maxLength: 500
+        reasons:
+          type: array
+          items: {type: string}
+
+    ViralInsightsResponse:
+      type: object
+      required: [object, engine, disclaimer, count, clips]
+      properties:
+        object:
+          type: string
+          const: viral_insights
+        engine:
+          type: string
+          example: heuristic-v1
+        disclaimer:
+          type: string
+        duration_seconds:
+          type: number
+          nullable: true
+        count:
+          type: integer
+          minimum: 0
+        clips:
+          type: array
+          items:
+            $ref: '#/components/schemas/ViralClipInsight'
+
+    TranscriptionRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Arquivo de áudio ou vídeo dentro dos limites da conta.
+        language:
+          type: string
+          minLength: 2
+          maxLength: 20
+          example: pt
+        output_format:
+          type: string
+          enum: [srt, vtt, json, json_verbose, text]
+          default: srt
+        webhook:
+          type: string
+          description: JSON com url HTTPS, secret HMAC e events; nunca devolvido.
+          example: '{"url":"https://cliente.example/webhook","secret":"<segredo-32+>","events":["job.completed","job.failed","job.cancelled"]}'
+        webhook:
+          $ref: '#/components/schemas/WebhookConfig'
+
+    WebhookConfig:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: HTTPS público do consumidor; deve ser validado e assinado.
+        secret:
+          type: string
+          writeOnly: true
+          minLength: 32
+          description: Segredo do consumidor para validação HMAC; nunca é devolvido.
+        events:
+          type: array
+          items:
+            type: string
+            enum: [job.completed, job.failed, job.cancelled]
+          default: [job.completed, job.failed, job.cancelled]
+
+    Operation:
+      type: object
+      description: Operação longa de processamento. Os campos canônicos são `name`, `done`, `metadata`, `response` e `error`; campos legados permanecem apenas para compatibilidade.
+      required: [name, id, object, type, done, status, metadata, api_version]
+      properties:
+        name:
+          type: string
+          description: Nome estável no formato operations/{job_id}.
+          pattern: '^operations/[A-Za-z0-9_-]{3,160}$'
+          example: operations/api-transcription-01J7MAGO
+        id:
+          type: string
+          description: ID do job e último segmento do nome da operação.
+          example: api-transcription-01J7MAGO
+        object:
+          type: string
+          const: operation
+        type:
+          type: string
+          enum: [transcription, clip]
+        done:
+          type: boolean
+          description: Verdadeiro somente em estado terminal.
+        status:
+          type: string
+          enum: [PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED, EXPIRED]
+        metadata:
+          $ref: '#/components/schemas/OperationMetadata'
+        response:
+          allOf:
+            - $ref: '#/components/schemas/TranscriptionOperationResponse'
+          nullable: true
+        error:
+          allOf:
+            - $ref: '#/components/schemas/OperationError'
+          nullable: true
+        poll_url:
+          type: string
+          format: uri
+        api_version:
+          type: string
+          example: v1
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Campo legado; use metadata.progress em novas integrações.
+        stage:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        result_url:
+          type: string
+          format: uri
+          nullable: true
+
+    OperationMetadata:
+      type: object
+      additionalProperties: false
+      properties:
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        stage:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        attempt:
+          type: integer
+          minimum: 1
+        queue:
+          type: string
+          enum: [persistent]
+        queue_status:
+          type: string
+          enum: [queued, running, done, failed]
+        estimated_audio_seconds:
+          type: number
+          minimum: 0
+        estimated_cost_units:
+          type: number
+          minimum: 0
+
+    TranscriptionOperationResponse:
+      type: object
+      required: [job_id, format, result_url]
+      properties:
+        job_id:
+          type: string
+        format:
+          type: string
+          enum: [srt, vtt, json, json_verbose, text, mp4, m4a]
+        language:
+          type: string
+          nullable: true
+        result_url:
+          type: string
+          format: uri
+
+    OperationError:
+      type: object
+      required: [type, code, title, detail, retryable]
+      properties:
+        type:
+          type: string
+          format: uri
+        code:
+          type: string
+          pattern: '^[A-Z0-9_]+$'
+        title:
+          type: string
+        detail:
+          type: string
+        retryable:
+          type: boolean
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+
+    Job:
+      deprecated: true
+      type: object
+      required: [id, object, status, created_at, api_version]
+      properties:
+        id:
+          type: string
+          example: job_01J7MAGOTRANSCRIBE
+        object:
+          type: string
+          const: job
+        type:
+          type: string
+          const: transcription
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed, cancelled, expired]
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+        stage:
+          type: string
+          example: transcribing
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        poll_url:
+          type: string
+          format: uri
+        result_url:
+          type: string
+          format: uri
+          nullable: true
+        error:
+          allOf:
+            - $ref: '#/components/schemas/Problem'
+          nullable: true
+        api_version:
+          type: string
+          example: v1
+
+    JobList:
+      type: object
+      required: [data, has_more]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Operation'
+        has_more:
+          type: boolean
+        next_page_token:
+          type: string
+          nullable: true
+
+    TranscriptionResult:
+      type: object
+      required: [job_id, format, text]
+      properties:
+        job_id:
+          type: string
+        format:
+          type: string
+          enum: [srt, vtt, json, json_verbose, text]
+        text:
+          type: string
+        language:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: number
+          minimum: 0
+          nullable: true
+
+    VerboseTranscription:
+      type: object
+      required: [object, text, segments]
+      properties:
+        object:
+          type: string
+          const: transcription
+        language:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: number
+          minimum: 0
+        text:
+          type: string
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptionSegment'
+
+    TranscriptionSegment:
+      type: object
+      required: [start, end, text, words]
+      properties:
+        start:
+          type: number
+          minimum: 0
+        end:
+          type: number
+          minimum: 0
+        text:
+          type: string
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptionWord'
+
+    TranscriptionWord:
+      type: object
+      required: [start, end, text]
+      properties:
+        start:
+          type: number
+          minimum: 0
+        end:
+          type: number
+          minimum: 0
+        text:
+          type: string
+
+    JobEvent:
+      type: object
+      required: [id, type, created_at, data]
+      properties:
+        id:
+          type: string
+          example: evt_01J7MAGOEVENT
+        type:
+          type: string
+          enum: [job.completed, job.failed, job.cancelled]
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          required: [job]
+          properties:
+            job:
+              $ref: '#/components/schemas/Operation'
+
+    Usage:
+      type: object
+      required: [period, minute_started_at, day_started_at, requests, jobs, audio_seconds, cost_units, limits]
+      properties:
+        period:
+          type: string
+          const: utc
+        minute_started_at:
+          type: string
+          format: date-time
+        day_started_at:
+          type: string
+          format: date-time
+        requests:
+          type: integer
+          minimum: 0
+        jobs:
+          type: integer
+          minimum: 0
+        audio_seconds:
+          type: integer
+          minimum: 0
+        cost_units:
+          type: number
+          minimum: 0
+        active_jobs:
+          type: integer
+          minimum: 0
+        limits:
+          type: object
+          required: [requests_per_minute, jobs_per_day, audio_seconds_per_day, cost_units_per_day, max_concurrent_jobs]
+          properties:
+            requests_per_minute: {type: integer, minimum: 1}
+            jobs_per_day: {type: integer, minimum: 1}
+            audio_seconds_per_day: {type: integer, minimum: 1}
+            cost_units_per_day: {type: integer, minimum: 1}
+            max_concurrent_jobs: {type: integer, minimum: 1}
+            max_upload_bytes: {type: integer, minimum: 1}
+
+    FieldError:
+      type: object
+      required: [field, reason]
+      properties:
+        field: {type: string}
+        reason: {type: string}
+        value:
+          description: Valor seguro para diagnóstico; nunca incluir segredos.
+          type: [string, number, boolean, 'null']
+
+    Problem:
+      type: object
+      required: [type, title, status, code, detail, request_id, retryable]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: https://viral.vr766.com/problems/invalid-request
+        title:
+          type: string
+          example: Invalid request
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          pattern: '^[A-Z0-9_]+$'
+          example: INVALID_ARGUMENT
+        detail:
+          type: string
+          description: Mensagem acionável sem stack trace ou caminho físico.
+        instance:
+          type: string
+          format: uri-reference
+          nullable: true
+        request_id:
+          type: string
+          example: req_01J7MAGOERROR
+        retryable:
+          type: boolean
+        retry_after_seconds:
+          type: integer
+          minimum: 1
+          nullable: true
+        field_errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+  responses:
+    BadRequest:
+      description: Requisição inválida.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Unauthorized:
+      description: Credencial ausente, inválida, expirada ou revogada.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Forbidden:
+      description: Credencial válida sem o escopo necessário ou sem acesso ao recurso.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotFound:
+      description: Recurso não encontrado ou não pertence ao consumidor.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Conflict:
+      description: Conflito de estado.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    IdempotencyConflict:
+      description: A Idempotency-Key foi usada com parâmetros diferentes.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    UnprocessableEntity:
+      description: Arquivo ou operação semanticamente inválida.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    UnsupportedMediaType:
+      description: Tipo de mídia não suportado.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    PayloadTooLarge:
+      description: Arquivo excede limite da conta ou endpoint.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    RateLimited:
+      description: Limite temporário atingido.
+      headers:
+        Retry-After:
+          description: Tempo mínimo em segundos até nova tentativa.
+          schema: {type: integer, minimum: 1}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Gone:
+      description: Resultado expirado e removido pela política de retenção.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    ServiceUnavailable:
+      description: Serviço temporariamente indisponível.
+      headers:
+        Retry-After:
+          description: Tempo mínimo em segundos até nova tentativa.
+          schema: {type: integer, minimum: 1}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    InternalError:
+      description: Falha interna sem detalhes de implementação.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}

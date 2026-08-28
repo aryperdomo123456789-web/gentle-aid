@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 from .config import Config
 from .blueprints.auth import bp as auth_bp
+from .blueprints.api_v1 import bp as api_v1_bp
 from .blueprints.apis import bp as apis_bp
 from .blueprints.canva_cleaner import bp as canva_bp
 from .blueprints.discover import bp as discover_bp
@@ -17,6 +19,7 @@ from .blueprints.jobs import bp as jobs_bp
 from .blueprints.legendar import bp as legendar_bp
 from .blueprints.live import bp as live_bp
 from .blueprints.release_keys import bp as release_keys_bp
+from .blueprints.transcribe_video import bp as transcribe_bp
 from .blueprints.radar import bp as radar_bp
 from .blueprints.recap import bp as recap_bp
 from .blueprints.studio import bp as studio_bp
@@ -104,6 +107,7 @@ def create_app(config: Config | None = None) -> Flask:
 
     for bp in (
         auth_bp,
+        api_v1_bp,
         youtube_bp,
         tiktok_bp,
         legendar_bp,
@@ -116,16 +120,29 @@ def create_app(config: Config | None = None) -> Flask:
         studio_bp,
         discover_bp,
         recap_bp,
+        transcribe_bp,
         live_bp,
     ):
         app.register_blueprint(bp)
 
+    @app.after_request
+    def attach_api_request_id(response):
+        """Garante correlação uniforme nas respostas do data plane e control plane."""
+        if request.path.startswith("/api/"):
+            from .services.api_auth import request_id
+
+            response.headers.setdefault("X-Request-Id", request_id())
+        return response
+
     @app.get("/api/health")
     def health():
+        from .services.api_auth import request_id
+
         return jsonify(
             status="ok",
             ffmpeg=cfg.ffmpeg_bin,
             storage=str(cfg.storage_dir),
+            request_id=request_id(),
         )
 
     @app.get("/api/version")
@@ -136,10 +153,41 @@ def create_app(config: Config | None = None) -> Flask:
             root=str(cfg.app_root),
         )
 
+    @app.get("/api/openapi.json")
+    def openapi_json():
+        """Serve a especificação versionada, sem consultar o storage de produção."""
+        spec_path = cfg.app_root / "docs" / "public-api" / "api-public-v1.openapi.json"
+        try:
+            payload = json.loads(spec_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return jsonify(error="Especificação OpenAPI ainda não publicada."), 503
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.get("/api/docs")
+    def api_docs():
+        """Página pública de referência; o schema é servido pela própria aplicação."""
+        response = app.response_class(
+            """<!doctype html>
+<html lang=\"pt-BR\">
+  <head>
+    <meta charset=\"utf-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+    <title>Mago API — documentação</title>
+    <style>body{margin:0;background:#0b1020;color:#e8eefc;font-family:system-ui,sans-serif}main{max-width:56rem;margin:8rem auto;padding:2rem}a{color:#67e8f9}</style>
+  </head>
+  <body><main><h1>Mago API</h1><p>A referência interativa será publicada quando a API v1 passar pelo gate de lançamento.</p><p><a href=\"/api/openapi.json\">Baixar OpenAPI JSON</a></p></main></body>
+</html>""",
+            mimetype="text/html",
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.get("/downloads/<path:filename>")
     def downloads(filename: str):
-        """Serve arquivos finais. Em produção o Nginx intercepta essa rota."""
-        return send_from_directory(cfg.storage_dir, filename, as_attachment=True)
+        """Downloads diretos ficam desativados; resultados usam rota autenticada."""
+        return jsonify(error="Downloads públicos desativados; use uma rota autenticada."), 404
 
     @app.errorhandler(413)
     def too_large(_err):
