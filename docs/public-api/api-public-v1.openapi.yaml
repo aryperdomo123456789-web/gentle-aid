@@ -4,14 +4,17 @@ info:
   version: 0.1.0-alpha
   summary: API pública assíncrona para geração e processamento de mídia
   description: |
-    Contrato alpha publicado para o API Hub do gentle-aid. A transcrição v1 e
-    suas rotas de job/result estão disponíveis em produção sob rollout controlado;
-    quotas comerciais, fila persistente e estabilidade de SLA ainda não são
-    garantias. Não anuncie este contrato como estável antes dos gates operacionais.
+    Contrato alpha publicado para o API Hub do gentle-aid. A transcrição v1, suas
+    rotas de operação/result, fila persistente e limites técnicos por consumidor
+    estão disponíveis em alpha controlada. Billing, SLA comercial, webhooks e
+    estabilidade de escala ainda não são garantias. Não anuncie este contrato
+    como estável antes dos gates operacionais.
 
     O contrato privilegia operações assíncronas, API keys com escopo,
     idempotência, resultados protegidos, erros machine-readable e compatibilidade
-    de longo prazo.
+    de longo prazo. Entradas com mais de 10 minutos ou chunks intermediários
+    acima de 25 MB usam particionamento sequencial com cortes próximos de silêncio
+    quando o VAD baseado em FFmpeg encontra pontos adequados.
   contact:
     name: Mago API Support
     url: https://viral.vr766.com
@@ -347,7 +350,7 @@ paths:
           description: Formato do resultado.
           schema:
             type: string
-            enum: [srt, vtt, json, text]
+            enum: [srt, vtt, json, json_verbose, text]
             default: srt
         - $ref: '#/components/parameters/ClientRequestId'
       responses:
@@ -382,6 +385,71 @@ paths:
         '410':
           $ref: '#/components/responses/Gone'
 
+  /transcriptions/{job_id}/export:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Transcriptions]
+      operationId: exportTranscription
+      summary: Exporta segmentos canônicos em outro formato
+      description: |
+        Renderiza novamente os segmentos persistidos de uma transcrição concluída,
+        sem reenviar a mídia. A operação exige ownership e o escopo `results:read`.
+        Aceita SRT, WebVTT, JSON verbose, JSON legado e texto simples.
+      security:
+        - ApiKeyAuth: [results:read]
+        - BearerAuth: [results:read]
+      parameters:
+        - name: format
+          in: query
+          required: false
+          description: Formato da exportação.
+          schema:
+            type: string
+            enum: [srt, vtt, json_verbose, json, text]
+            default: srt
+        - $ref: '#/components/parameters/ClientRequestId'
+      responses:
+        '200':
+          description: Arquivo de legenda ou transcrição exportado.
+          headers:
+            Content-Disposition:
+              description: Nome de download controlado pelo servidor.
+              schema: {type: string}
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/x-subrip:
+              schema: {type: string}
+            text/vtt:
+              schema: {type: string}
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TranscriptionResult'
+                  - $ref: '#/components/schemas/VerboseTranscription'
+            text/plain:
+              schema: {type: string}
+        '202':
+          description: Job ainda não terminou.
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/Problem'}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   /usage:
     get:
       tags: [Usage]
@@ -393,6 +461,13 @@ paths:
       responses:
         '200':
           description: Uso agregado, sem dados de outros consumidores.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
@@ -485,6 +560,18 @@ components:
       schema:
         type: string
         pattern: '^req_[A-Za-z0-9_-]+$'
+    RateLimitLimit:
+      description: Número máximo de requests autenticadas por minuto para a chave.
+      schema:
+        type: integer
+        minimum: 1
+        example: 60
+    RateLimitRemaining:
+      description: Requests autenticadas restantes na janela atual.
+      schema:
+        type: integer
+        minimum: 0
+        example: 59
 
   schemas:
     Health:
@@ -548,7 +635,7 @@ components:
           example: pt
         output_format:
           type: string
-          enum: [srt, vtt, json, text]
+          enum: [srt, vtt, json, json_verbose, text]
           default: srt
         webhook:
           $ref: '#/components/schemas/WebhookConfig'
@@ -668,6 +755,18 @@ components:
         attempt:
           type: integer
           minimum: 1
+        queue:
+          type: string
+          enum: [persistent]
+        queue_status:
+          type: string
+          enum: [queued, running, done, failed]
+        estimated_audio_seconds:
+          type: number
+          minimum: 0
+        estimated_cost_units:
+          type: number
+          minimum: 0
 
     TranscriptionOperationResponse:
       type: object
@@ -677,7 +776,7 @@ components:
           type: string
         format:
           type: string
-          enum: [srt, vtt, json, text]
+          enum: [srt, vtt, json, json_verbose, text]
         language:
           type: string
           nullable: true
@@ -783,7 +882,7 @@ components:
           type: string
         format:
           type: string
-          enum: [srt, vtt, json, text]
+          enum: [srt, vtt, json, json_verbose, text]
         text:
           type: string
         language:
@@ -793,6 +892,56 @@ components:
           type: number
           minimum: 0
           nullable: true
+
+    VerboseTranscription:
+      type: object
+      required: [object, text, segments]
+      properties:
+        object:
+          type: string
+          const: transcription
+        language:
+          type: string
+          nullable: true
+        duration_seconds:
+          type: number
+          minimum: 0
+        text:
+          type: string
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptionSegment'
+
+    TranscriptionSegment:
+      type: object
+      required: [start, end, text, words]
+      properties:
+        start:
+          type: number
+          minimum: 0
+        end:
+          type: number
+          minimum: 0
+        text:
+          type: string
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptionWord'
+
+    TranscriptionWord:
+      type: object
+      required: [start, end, text]
+      properties:
+        start:
+          type: number
+          minimum: 0
+        end:
+          type: number
+          minimum: 0
+        text:
+          type: string
 
     JobEvent:
       type: object
@@ -816,22 +965,41 @@ components:
 
     Usage:
       type: object
-      required: [period, requests, jobs, limits]
+      required: [period, minute_started_at, day_started_at, requests, jobs, audio_seconds, cost_units, limits]
       properties:
         period:
           type: string
-          example: 2026-08
+          const: utc
+        minute_started_at:
+          type: string
+          format: date-time
+        day_started_at:
+          type: string
+          format: date-time
         requests:
           type: integer
           minimum: 0
         jobs:
           type: integer
           minimum: 0
+        audio_seconds:
+          type: integer
+          minimum: 0
+        cost_units:
+          type: number
+          minimum: 0
+        active_jobs:
+          type: integer
+          minimum: 0
         limits:
           type: object
+          required: [requests_per_minute, jobs_per_day, audio_seconds_per_day, cost_units_per_day, max_concurrent_jobs]
           properties:
             requests_per_minute: {type: integer, minimum: 1}
-            jobs_concurrent: {type: integer, minimum: 1}
+            jobs_per_day: {type: integer, minimum: 1}
+            audio_seconds_per_day: {type: integer, minimum: 1}
+            cost_units_per_day: {type: integer, minimum: 1}
+            max_concurrent_jobs: {type: integer, minimum: 1}
             max_upload_bytes: {type: integer, minimum: 1}
 
     FieldError:

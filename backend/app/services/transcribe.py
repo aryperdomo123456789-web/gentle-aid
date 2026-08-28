@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -27,6 +28,9 @@ from . import api_keys, jobs, media
 
 # Blocos de 10 min: seguros para o limite de upload (25 MB) mesmo em MP3 64 kbps.
 CHUNK_SECONDS = 600
+MAX_PROVIDER_BYTES = 25 * 1024 * 1024
+VAD_MIN_SILENCE_SECONDS = 0.35
+VAD_SEARCH_WINDOW_SECONDS = 45.0
 GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_MODEL = "whisper-large-v3"
 
@@ -275,6 +279,102 @@ def _post_whisper_api(provider: Provider, file_path: Path, language: str | None,
 # --------------------------------------------------------------------------- #
 # Pipeline
 # --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class AudioChunk:
+    start: float
+    duration: float
+    reason: str = "fixed"
+
+
+def _vad_silences(src: Path, duration: float) -> list[tuple[float, float]]:
+    """Detecta intervalos de silêncio sem depender de pacote adicional de VAD."""
+    noise_db = os.environ.get("TRANSCRIBE_VAD_NOISE_DB", "-35dB")
+    silence_duration = os.environ.get(
+        "TRANSCRIBE_VAD_MIN_SILENCE", str(VAD_MIN_SILENCE_SECONDS)
+    )
+    command = [
+        config.ffmpeg_bin,
+        "-hide_banner",
+        "-i",
+        str(src),
+        "-af",
+        f"silencedetect=noise={noise_db}:d={silence_duration}",
+        "-f",
+        "null",
+        "-",
+    ]
+    timeout = max(120, min(900, int(duration * 0.75) + 60))
+    try:
+        completed = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+    text = completed.stdout or ""
+    starts = [float(value) for value in re.findall(r"silence_start:\s*([0-9.]+)", text)]
+    ends = [float(value) for value in re.findall(r"silence_end:\s*([0-9.]+)", text)]
+    intervals: list[tuple[float, float]] = []
+    for index, start in enumerate(starts):
+        end = ends[index] if index < len(ends) else duration
+        if end > start:
+            intervals.append((max(0.0, start), min(duration, end)))
+    return intervals
+
+
+def _plan_chunks(src: Path, duration: float, *, job_id: str) -> list[AudioChunk]:
+    """Planeja partes por tempo/tamanho e desloca cortes para silêncios próximos."""
+    size_bytes = 0
+    try:
+        size_bytes = src.stat().st_size
+    except OSError:
+        pass
+    time_parts = max(1, int((duration + CHUNK_SECONDS - 1) // CHUNK_SECONDS))
+    size_parts = max(1, int((size_bytes + MAX_PROVIDER_BYTES - 1) // MAX_PROVIDER_BYTES))
+    parts = max(time_parts, size_parts)
+    if parts == 1:
+        return [AudioChunk(0.0, duration, "single")]
+
+    use_vad = os.environ.get("TRANSCRIBE_VAD_ENABLED", "1").strip().lower() not in {
+        "0", "false", "no", "off"
+    }
+    silences = _vad_silences(src, duration) if use_vad else []
+    silence_points = [point for pair in silences for point in pair]
+    target_step = duration / parts
+    cuts: list[float] = []
+    previous = 0.0
+    minimum_chunk = max(1.0, min(30.0, target_step * 0.25))
+    for index in range(1, parts):
+        target = target_step * index
+        candidates = [
+            point
+            for point in silence_points
+            if abs(point - target) <= VAD_SEARCH_WINDOW_SECONDS
+            and point - previous >= minimum_chunk
+            and duration - point >= minimum_chunk
+        ]
+        cut = min(candidates, key=lambda point: abs(point - target)) if candidates else target
+        cuts.append(cut)
+        previous = cut
+
+    boundaries = [0.0, *cuts, duration]
+    chunks: list[AudioChunk] = []
+    for start, end in zip(boundaries, boundaries[1:]):
+        chunk_duration = max(0.1, end - start)
+        reason = "vad" if silences else "fixed"
+        chunks.append(AudioChunk(start, chunk_duration, reason))
+    jobs.log(
+        job_id,
+        f"Áudio longo particionado · {len(chunks)} chunk(s) · VAD={'on' if silences else 'fallback'}",
+    )
+    return chunks
+
+
 def _extract_mp3(src: Path, dst: Path, *, start: float, duration: float, job_id: str | None) -> Path:
     media.run(
         [
@@ -284,6 +384,11 @@ def _extract_mp3(src: Path, dst: Path, *, start: float, duration: float, job_id:
         ],
         job_id=job_id,
     )
+    try:
+        if dst.stat().st_size > MAX_PROVIDER_BYTES:
+            raise TranscribeError("Chunk de áudio excede o limite de 25 MB do provider.")
+    except OSError as exc:
+        raise TranscribeError("Não foi possível validar o tamanho do chunk de áudio.") from exc
     return dst
 
 
@@ -344,19 +449,19 @@ def transcribe(
     work = src.parent / f"{job_id}_stt"
     work.mkdir(parents=True, exist_ok=True)
 
-    blocks = max(1, int((duration + CHUNK_SECONDS - 1) // CHUNK_SECONDS))
-    jobs.log(job_id, f"Ouvindo o áudio original · {duration:.1f}s em {blocks} bloco(s)")
+    chunks = _plan_chunks(src, duration, job_id=job_id)
+    jobs.log(job_id, f"Ouvindo o áudio original · {duration:.1f}s em {len(chunks)} chunk(s)")
 
     segments: list[Segment] = []
     detected = language or ""
     last_error: Exception | None = None
     try:
-        for index in range(blocks):
+        for index, chunk in enumerate(chunks):
             jobs.check_cancelled(job_id)
-            offset = index * CHUNK_SECONDS
+            offset = chunk.start
             piece = _extract_mp3(
                 src, work / f"stt_{index:04d}.mp3",
-                start=offset, duration=min(CHUNK_SECONDS, duration - offset), job_id=None,
+                start=chunk.start, duration=chunk.duration, job_id=None,
             )
             payload: dict | None = None
             for provider in providers:
@@ -388,7 +493,7 @@ def transcribe(
                 raise TranscribeError(str(last_error) if last_error else "Nenhum provedor de transcrição respondeu.")
             detected = detected or (payload.get("language") or "")
             segments.extend(_segments_from(payload, offset))
-            jobs.update(job_id, progress=min(45, 12 + int(30 * (index + 1) / blocks)))
+            jobs.update(job_id, progress=min(45, 12 + int(30 * (index + 1) / len(chunks))))
 
     finally:
         for leftover in work.glob("*"):

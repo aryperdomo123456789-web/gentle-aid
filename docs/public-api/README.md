@@ -3,21 +3,21 @@
 ## Documentação pública de integração
 
 **Versão do documento:** 0.1.0-alpha
-**Status:** alpha controlada — transcrição v1 e envelope de operação longa publicados; expansão da API ainda condicionada aos gates operacionais
+**Status:** alpha controlada — transcrição v1, chunking/VAD para mídia longa, envelope de operação longa, fila persistente, exportação protegida e limites por consumidor publicados; expansão comercial ainda condicionada aos gates operacionais
 **Última revisão:** 27 de agosto de 2026
 **Base prevista:** `https://viral.vr766.com/api/v1`
 
-> **Aviso de disponibilidade.** Este documento descreve a Mago API v1 em alpha controlada. `GET /api/v1/health`, `GET /api/v1/capabilities`, `POST /api/v1/transcriptions`, consulta/cancelamento de operações, entrega protegida e OpenAPI estão publicados no ambiente principal. Rate limit comercial, quotas, paginação por cursor e fila persistente ainda não devem ser tratados como garantias de disponibilidade. Consulte a seção [Estado de lançamento](#estado-de-lançamento) antes de iniciar uma integração.
+> **Aviso de disponibilidade.** Este documento descreve a Mago API v1 em alpha controlada. `GET /api/v1/health`, `GET /api/v1/capabilities`, `POST /api/v1/transcriptions`, consulta/cancelamento de operações, entrega protegida e OpenAPI estão publicados no ambiente principal. Rate limit, quota diária e fila persistente estão ativos com valores conservadores; não há SLA comercial. Consulte a seção [Estado de lançamento](#estado-de-lançamento) antes de iniciar uma integração.
 
 ## Visão geral
 
-A Mago API será a camada externa do gentle-aid para que outros produtos criem e acompanhem operações de processamento de mídia sem depender da interface do painel. A primeira versão será deliberadamente pequena: saúde, capacidades, transcrição assíncrona, consulta/cancelamento de jobs, entrega protegida de resultados e consumo do próprio consumidor.
+A Mago API será a camada externa do gentle-aid para que outros produtos criem e acompanhem operações de processamento de mídia sem depender da interface do painel. A primeira versão será deliberadamente pequena: saúde, capacidades, transcrição assíncrona, chunking/VAD para entradas longas, consulta/cancelamento de jobs, exportação protegida de resultados e consumo do próprio consumidor.
 
 O contrato segue princípios usados por APIs maduras: operações longas retornam um recurso consultável em vez de bloquear o request [1], POSTs que criam efeitos aceitam idempotência [2], coleções usam cursores [3], erros são machine-readable [4] [5], e mudanças incompatíveis exigem uma nova versão [6].
 
 ## Estado de lançamento
 
-A API Hub documentada no legado prevê uma camada com `X-API-Key`, `Authorization: Bearer`, catálogo e endpoints públicos. A implementação atual tem uma tela owner para gerar e revogar chaves em `/api-hub/chaves`, um endpoint administrativo interno em `/api/access-keys` e a superfície pública alpha em `/api/v1`. O envelope de operação longa foi adicionado sem remover os aliases `/jobs/*`; quotas comerciais, fila persistente e SLA continuam fora da garantia alpha.
+A API Hub documentada no legado prevê uma camada com `X-API-Key`, `Authorization: Bearer`, catálogo e endpoints públicos. A implementação atual tem uma tela owner para gerar e revogar chaves em `/api-hub/chaves`, um endpoint administrativo interno em `/api/access-keys` e a superfície pública alpha em `/api/v1`. O envelope de operação longa foi adicionado sem remover os aliases `/jobs/*`; limites técnicos por chave estão ativos, enquanto billing, planos, webhooks e SLA comercial continuam fora da garantia alpha.
 
 Até que o checklist abaixo esteja verde, a documentação deve permanecer marcada como **Alpha**:
 
@@ -28,9 +28,9 @@ Até que o checklist abaixo esteja verde, a documentação deve permanecer marca
 | Consulta segura | Consumidor só vê operações criadas pela sua chave | Implementado |
 | Resultado protegido | Nenhum caminho físico ou arquivo interno é público | Implementado; outputs legados em migração |
 | OpenAPI publicado | `/api/docs` e `/api/openapi.json` refletem o runtime | Publicado |
-| Limites | Rate limit, quota de upload, concorrência e custo definidos | Parcial; limite de upload e concorrência ativos |
+| Limites | Rate limit, quota de upload, concorrência e custo definidos | Implementado com defaults conservadores e configuração por ambiente |
 | Idempotência | Retry do mesmo POST não duplica job | Implementado e testado |
-| Testes | Autorização, isolamento, erro, retry, expiração e carga cobertos | Contrato e segurança cobertos; carga pendente |
+| Testes | Autorização, isolamento, erro, retry, expiração, fila e limites cobertos | Contrato, fila e limites cobertos; provider real e carga pendentes |
 
 ## URL base e versões
 
@@ -60,6 +60,14 @@ Authorization: Bearer mago_<sua-chave>
 ```
 
 Envie a chave somente por HTTPS. Não use `/api/access-keys` ou a interface owner no código do consumidor; essas superfícies são administrativas. A aplicação consumidora deve armazenar o token em secret manager ou variável de ambiente protegida.
+
+### Idempotência e correlação são coisas diferentes
+
+`Idempotency-Key` é um identificador da **intenção de escrita**. Ele é obrigatório para criar ou cancelar operações, é armazenado junto do consumidor e do fingerprint do payload e serve para que um retry não crie um segundo job. A mesma chave com o mesmo payload devolve a mesma decisão; a mesma chave com payload diferente devolve `409 IDEMPOTENCY_CONFLICT`.
+
+`X-Request-Id` é um identificador de **uma requisição HTTP específica**. Ele é gerado pelo servidor, devolvido na resposta e usado para suporte, logs e rastreabilidade. Cada tentativa pode receber um novo `X-Request-Id`, inclusive quando o servidor devolve um replay idempotente. O cliente não deve usar esse valor para deduplicação e não deve depender de seu conteúdo.
+
+`X-Client-Request-Id` é opcional e serve apenas para o consumidor correlacionar a chamada com seu próprio sistema. Ele não altera o fingerprint de idempotência. Um valor enviado pelo cliente no header `X-Request-Id` também não controla o identificador retornado pela API.
 
 ### Escopos
 
@@ -134,7 +142,7 @@ Content-Type: application/json
 |---|---:|---|---|
 | `file` | Sim | binário | Áudio ou vídeo dentro do limite da chave |
 | `language` | Não | string | Código curto, por exemplo `pt`, `en` ou `es` |
-| `output_format` | Não | enum | `srt`, `vtt`, `json` ou `text`; default `srt` |
+| `output_format` | Não | enum | `srt`, `vtt`, `json`, `json_verbose` ou `text`; default `srt` |
 | `webhook.url` | Não | URL | HTTPS público do consumidor |
 | `webhook.secret` | Não | string | Segredo HMAC com pelo menos 32 caracteres; nunca devolvido |
 | `webhook.events` | Não | array | `job.completed`, `job.failed`, `job.cancelled` |
@@ -223,6 +231,39 @@ curl "https://viral.vr766.com/api/v1/jobs/job_01J7MAGOTRANSCRIBE/result?format=s
 ```
 
 A API nunca deve devolver caminho físico do servidor, nome interno de pasta, JSON privado de job ou link permanente sem autorização. O resultado pode ser transmitido pela API ou entregue por URL assinada com expiração curta. Depois do TTL, o resultado retorna `410 Gone` e o consumidor precisa reenviar o job.
+
+### Exportar formatos adicionais
+
+Quando o job foi criado com segmentos canônicos, o consumidor pode renderizar uma nova saída sem reenviar a mídia:
+
+```bash
+curl "https://viral.vr766.com/api/v1/transcriptions/job_01J7MAGOTRANSCRIBE/export?format=vtt" \
+  -H "X-API-Key: ${MAGO_API_KEY}" \
+  -o legenda.vtt
+```
+
+O endpoint `GET /api/v1/transcriptions/{job_id}/export` aceita `srt`, `vtt`, `json_verbose`, `json` e `text`. Ele exige o escopo `results:read`, valida ownership e devolve `202` enquanto o job ainda estiver em processamento. `json_verbose` inclui `object`, `language`, `duration_seconds`, `text`, segmentos e palavras quando o provider retorná-las. Jobs antigos que não possuem segmentos canônicos só podem ser baixados no formato originalmente produzido.
+
+### Mídia longa e chunking
+
+Entradas superiores a dez minutos ou cujo arquivo intermediário possa ultrapassar 25 MB são particionadas sequencialmente. O pipeline usa `ffmpeg silencedetect` para mover cortes para pontos próximos de silêncio quando disponíveis; se não encontrar silêncio adequado, usa cortes temporais seguros. Cada segmento retornado pelo provider recebe o offset absoluto do chunk, preservando a linha do tempo global na concatenação. O tamanho final de cada chunk é validado antes do envio ao provider.
+
+## Rate limit, quotas e custo
+
+As rotas autenticadas aplicam um limite fixo por API key e devolvem headers de transparência quando a chave é válida:
+
+```http
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 59
+X-Quota-Jobs-Limit: 100
+X-Quota-Jobs-Used: 1
+X-Quota-Audio-Seconds-Limit: 3600
+X-Quota-Audio-Seconds-Used: 42
+X-Quota-Cost-Units-Limit: 3600
+X-Quota-Cost-Units-Used: 1
+```
+
+Os defaults são política técnica de alpha, não preço comercial. `cost_units` é uma estimativa interna baseada em minutos de áudio; não representa a fatura final do provider. Quando o limite é excedido, a API responde `429` com `Retry-After` e um código estável: `RATE_LIMIT_EXCEEDED`, `DAILY_JOB_QUOTA_EXCEEDED`, `DAILY_AUDIO_QUOTA_EXCEEDED` ou `DAILY_COST_LIMIT_EXCEEDED`. `/usage` expõe o uso da própria chave.
 
 ## Webhooks
 
