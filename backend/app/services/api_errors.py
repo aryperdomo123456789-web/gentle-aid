@@ -80,6 +80,21 @@ ERROR_CATALOG: dict[str, dict[str, Any]] = {
         "title": "Result not found",
         "retryable": False,
     },
+    "CLIP_INVALID_WINDOW": {
+        "http_status": 400,
+        "title": "Invalid clip window",
+        "retryable": False,
+    },
+    "CLIP_SOURCE_UNAVAILABLE": {
+        "http_status": 409,
+        "title": "Clip source unavailable",
+        "retryable": False,
+    },
+    "CLIP_OUTPUT_UNAVAILABLE": {
+        "http_status": 409,
+        "title": "Clip output unavailable",
+        "retryable": False,
+    },
     "FORMAT_MISMATCH": {
         "http_status": 409,
         "title": "Format mismatch",

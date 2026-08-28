@@ -3,7 +3,7 @@
 ## Documentação pública de integração
 
 **Versão do documento:** 0.1.0-alpha
-**Status:** alpha controlada — transcrição v1, chunking/VAD para mídia longa, envelope de operação longa, fila persistente, exportação protegida e limites por consumidor publicados; expansão comercial ainda condicionada aos gates operacionais
+**Status:** alpha controlada — transcrição v1, chunking/VAD para mídia longa, Viral Clip Engine heurístico, envelope de operação longa, fila persistente, exportação protegida e limites por consumidor publicados; expansão comercial ainda condicionada aos gates operacionais
 **Última revisão:** 27 de agosto de 2026
 **Base prevista:** `https://viral.vr766.com/api/v1`
 
@@ -11,7 +11,7 @@
 
 ## Visão geral
 
-A Mago API será a camada externa do gentle-aid para que outros produtos criem e acompanhem operações de processamento de mídia sem depender da interface do painel. A primeira versão será deliberadamente pequena: saúde, capacidades, transcrição assíncrona, chunking/VAD para entradas longas, consulta/cancelamento de jobs, exportação protegida de resultados e consumo do próprio consumidor.
+A Mago API será a camada externa do gentle-aid para que outros produtos criem e acompanhem operações de processamento de mídia sem depender da interface do painel. A primeira versão será deliberadamente pequena: saúde, capacidades, transcrição assíncrona, chunking/VAD para entradas longas, insights editoriais, geração assíncrona de clips, consulta/cancelamento de jobs, exportação protegida de resultados e consumo do próprio consumidor.
 
 O contrato segue princípios usados por APIs maduras: operações longas retornam um recurso consultável em vez de bloquear o request [1], POSTs que criam efeitos aceitam idempotência [2], coleções usam cursores [3], erros são machine-readable [4] [5], e mudanças incompatíveis exigem uma nova versão [6].
 
@@ -247,6 +247,29 @@ O endpoint `GET /api/v1/transcriptions/{job_id}/export` aceita `srt`, `vtt`, `js
 ### Mídia longa e chunking
 
 Entradas superiores a dez minutos ou cujo arquivo intermediário possa ultrapassar 25 MB são particionadas sequencialmente. O pipeline usa `ffmpeg silencedetect` para mover cortes para pontos próximos de silêncio quando disponíveis; se não encontrar silêncio adequado, usa cortes temporais seguros. Cada segmento retornado pelo provider recebe o offset absoluto do chunk, preservando a linha do tempo global na concatenação. O tamanho final de cada chunk é validado antes do envio ao provider.
+
+## Viral Clip Engine
+
+Depois que uma transcrição possui `json_verbose`, o consumidor pode solicitar oportunidades editoriais:
+
+```bash
+curl "https://viral.vr766.com/api/v1/transcriptions/job_01J7MAGOTRANSCRIBE/insights" \
+  -H "X-API-Key: ${MAGO_API_KEY}"
+```
+
+`GET /api/v1/transcriptions/{job_id}/insights` exige `results:read` e retorna janelas de 30 a 90 segundos com `retention_score` de 0 a 100, título sugerido, hook inicial, resumo, sinais normalizados e razões legíveis. O motor atual é `heuristic-v1`: usa densidade de contexto, padrões de gancho, perguntas, viradas, provas e resultados específicos. O score serve para priorização editorial e **não garante viralização**.
+
+Para gerar um clip escolhido pelo consumidor:
+
+```bash
+curl -X POST "https://viral.vr766.com/api/v1/transcriptions/job_01J7MAGOTRANSCRIBE/clips" \
+  -H "X-API-Key: ${MAGO_API_KEY}" \
+  -H "Idempotency-Key: clip-7b8d5b25-4a9e-4de3" \
+  -H "Content-Type: application/json" \
+  -d '{"start_seconds": 42.5, "end_seconds": 98.0}'
+```
+
+`POST /api/v1/transcriptions/{job_id}/clips` exige `transcribe:write` e cria uma operação assíncrona. A janela aceita de 1 a 90 segundos, é validada contra a duração do áudio e é extraída pela fila persistente com FFmpeg. O resultado de mídia fica disponível no `result_url` da operação. O mesmo job de clip pode ser exportado por `GET /api/v1/transcriptions/{clip_job_id}/export?format=srt` ou `format=vtt`; os timestamps das legendas começam em zero no clipe e as legendas também ficam registradas como artefatos protegidos.
 
 ## Rate limit, quotas e custo
 
