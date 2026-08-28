@@ -573,7 +573,7 @@ def get_job_result(job_id: str):
         output,
         as_attachment=True,
         download_name=output.name,
-        mimetype=transcription_exports.mime_type(expected) if expected in transcription_exports.OUTPUT_FORMATS else "application/octet-stream",
+        mimetype=transcription_exports.mime_type(expected) if expected in transcription_exports.OUTPUT_FORMATS else transcription_exports.media_mime_type(expected),
         max_age=0,
     )
 
