@@ -185,6 +185,7 @@ def _process(item: dict[str, Any]) -> None:
         if jobs.is_cancelled(job_id):
             jobs.update(job_id, status="cancelled", stage="cancelado", message="Job cancelado antes de iniciar.", finished_at=jobs._now())
             persistent_queue.complete(job_id, WORKER_ID)
+            jobs.update(job_id, queue_status="done")
             _release_active_slot(job_id)
             _cleanup_input_source(item)
             return
@@ -203,11 +204,13 @@ def _process(item: dict[str, Any]) -> None:
         if job.get("status") not in jobs.TERMINAL_STATUSES:
             jobs.update(job_id, status="done", stage="concluido", message="Concluído.", progress=100, finished_at=jobs._now())
         persistent_queue.complete(job_id, WORKER_ID)
+        jobs.update(job_id, queue_status="done")
         _release_active_slot(job_id)
         _cleanup_input_source(item, terminal_success=True)
     except jobs.JobCancelled:
         jobs.update(job_id, status="cancelled", stage="cancelado", message="Job cancelado pelo operador.", finished_at=jobs._now())
         persistent_queue.complete(job_id, WORKER_ID)
+        jobs.update(job_id, queue_status="done")
         _release_active_slot(job_id)
         _cleanup_input_source(item)
     except Exception as exc:
@@ -222,11 +225,12 @@ def _process(item: dict[str, Any]) -> None:
                 error_code=code,
                 retryable=False,
                 finished_at=jobs._now(),
+                queue_status="failed",
             )
             _release_active_slot(job_id)
             _cleanup_input_source(item)
         else:
-            jobs.update(job_id, status="queued", stage="aguardando_retry", message="Falha temporária; retry agendado.", error_code=code, retryable=True)
+            jobs.update(job_id, status="queued", stage="aguardando_retry", message="Falha temporária; retry agendado.", error_code=code, retryable=True, queue_status="queued")
 
 
 def main() -> int:

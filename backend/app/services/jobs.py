@@ -550,16 +550,22 @@ def wait(job_id: str, timeout: float = 8.0) -> None:
 
 
 def get(job_id: str) -> dict[str, Any] | None:
+    """Lê o snapshot persistido para sincronizar Gunicorn e worker separados."""
+    file = _job_file(job_id)
+    if file.exists():
+        try:
+            data = _heal(_normalize(json.loads(file.read_text(encoding="utf-8"))))
+            with _lock:
+                _jobs[job_id] = data
+                _cancel_events.setdefault(job_id, threading.Event())
+                _done_events.setdefault(job_id, threading.Event())
+            return data
+        except (OSError, json.JSONDecodeError):
+            pass
     with _lock:
         job = _jobs.get(job_id)
         if job:
             return _heal(_normalize(dict(job)))
-    file = _job_file(job_id)
-    if file.exists():
-        try:
-            return _heal(_normalize(json.loads(file.read_text(encoding="utf-8"))))
-        except json.JSONDecodeError:
-            return None
     return None
 
 
