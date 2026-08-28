@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import secrets
+import socket
 import sqlite3
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -85,6 +88,30 @@ def _signature(secret: str, payload: bytes, timestamp: int) -> str:
     return f"t={timestamp},v1={digest}"
 
 
+def _safe_delivery_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or parsed.username or parsed.password or not parsed.hostname:
+        return False
+    try:
+        addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
+    except OSError:
+        return False
+    for item in addresses:
+        address = item[4][0]
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError:
+            return False
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            return False
+    return True
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def _event_type(job: dict[str, Any]) -> str:
     if job.get("status") == "error":
         return "job.failed"
@@ -119,6 +146,8 @@ def notify_job(job: dict[str, Any]) -> dict[str, Any] | None:
     secret = str(meta.get("webhook_secret") or "").strip()
     if not url or not secret or job.get("status") not in {"done", "error", "cancelled"}:
         return None
+    if not _safe_delivery_url(url):
+        return {"status": "failed", "attempts": 0, "error": "UNSAFE_WEBHOOK_URL"}
     event_type = _event_type(job)
     payload = _payload(job, event_type)
     raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -141,6 +170,7 @@ def notify_job(job: dict[str, Any]) -> dict[str, Any] | None:
 
     last_error = None
     status_code = None
+    opener = urllib.request.build_opener(_NoRedirect())
     for attempt in range(1, MAX_ATTEMPTS + 1):
         if attempt > 1:
             time.sleep(BACKOFF_SECONDS[attempt - 1])
@@ -158,8 +188,9 @@ def notify_job(job: dict[str, Any]) -> dict[str, Any] | None:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+            with opener.open(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
                 status_code = int(response.status)
+                response.read(1024)
             if 200 <= status_code < 300:
                 with _conn() as conn:
                     conn.execute("UPDATE api_webhook_deliveries SET status = 'delivered', attempts = ?, last_status_code = ?, last_error = NULL, delivered_at = ? WHERE delivery_id = ?", (attempt, status_code, _now(), delivery_id))
