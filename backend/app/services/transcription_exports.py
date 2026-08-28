@@ -39,6 +39,17 @@ def mime_type(output_format: str) -> str:
     return _MIME_TYPES[normalized]
 
 
+def media_mime_type(extension: str) -> str:
+    normalized = str(extension or "").strip().lower().lstrip(".")
+    return {
+        "mp4": "video/mp4",
+        "m4a": "audio/mp4",
+        "mov": "video/quicktime",
+        "mkv": "video/x-matroska",
+        "webm": "video/webm",
+    }.get(normalized, "application/octet-stream")
+
+
 def _round_seconds(value: Any, default: float = 0.0) -> float:
     try:
         return round(float(value), 3)
